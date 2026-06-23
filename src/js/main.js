@@ -2,7 +2,7 @@
   'use strict';
 
   // Single source of truth
-  const APP_NAME = 'FRAMEGRID';
+  const APP_NAME = 'TimeGrid';
   const APP_VERSION = 'v28.12';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
 
@@ -10407,7 +10407,7 @@ async function exportPngSeqDrawings() {
       const url = URL.createObjectURL(pngs[0].blob);
       const a = document.createElement('a');
       a.href = url;
-      const base = state.videoFile?.name?.replace(/\.[^.]+$/, '') || (state.imageFiles?.[0]?.name?.replace(/\.[^.]+$/, '') || 'framegrid');
+      const base = state.videoFile?.name?.replace(/\.[^.]+$/, '') || (state.imageFiles?.[0]?.name?.replace(/\.[^.]+$/, '') || 'timegrid');
       a.download = makeExportFilename({ mode: 'assets', ext: 'png', frames: state.frames.length, fps: state.animFps, extra: pngs[0].name.replace(/\.png$/i,'') });
       a.click();
       URL.revokeObjectURL(url);
@@ -10506,7 +10506,7 @@ async function exportPngSeqDrawings() {
 
     const baseName =
       state.videoFile?.name?.replace(/\.[^.]+$/, '') ||
-      (state.imageFiles?.[0]?.name?.replace(/\.[^.]+$/, '') || 'framegrid');
+      (state.imageFiles?.[0]?.name?.replace(/\.[^.]+$/, '') || 'timegrid');
 
     const url = URL.createObjectURL(zipBlob);
     const a = document.createElement('a');
@@ -11127,14 +11127,14 @@ const canvas = document.createElement('canvas');
   // UTILS
   // File name helper: keeps exports readable and filesystem-safe
   function makeSafeName(name) {
-    const raw = String(name || 'framegrid');
-    const base = raw.replace(/\.[^/.]+$/, '') || 'framegrid'; // drop extension
+    const raw = String(name || 'timegrid');
+    const base = raw.replace(/\.[^/.]+$/, '') || 'timegrid'; // drop extension
     const safe = base
       .replace(/\s+/g, '_')
       .replace(/[^a-zA-Z0-9._-]+/g, '_')
       .replace(/_+/g, '_')
       .replace(/^_+|_+$/g, '');
-    return (safe || 'framegrid').slice(0, 80);
+    return (safe || 'timegrid').slice(0, 80);
   }
 
   // ISO week helper (week number + year) for export naming
@@ -11150,7 +11150,7 @@ const canvas = document.createElement('canvas');
 
   function getExportBaseName() {
     const override = (state.filenameOverride && String(state.filenameOverride).trim()) ? String(state.filenameOverride).trim() : '';
-    const raw = override || state.videoFile?.name || state.imageFiles?.[0]?.name || 'framegrid';
+    const raw = override || state.videoFile?.name || state.imageFiles?.[0]?.name || 'timegrid';
     return makeSafeName(raw);
   }
 
