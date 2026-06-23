@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>FRAMEGRID</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #fff;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ===== MAIN LAYOUT ===== */
+    .app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-color, #0a0a0a);
+    }
+
+    /* ===== TOP METADATA BAR ===== */
+    .metadata-bar {
+      height: 32px;
+      min-height: 32px;
+      background: #000;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 16px;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      z-index: 10;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    .metadata-bar.hidden {
+      transform: translateY(-100%);
+      opacity: 0;
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .metadata-logo {
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .metadata-logo::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: #35f2a3;
+      border-radius: 1px;
+    }
+
+    .metadata-item {
+      color: rgba(255,255,255,0.6);
+    }
+
+    .metadata-item span {
+      color: rgba(255,255,255,0.9);
+    }
+
+    .metadata-spacer {
+      flex: 1;
+    }
+
+    .menu-toggle {
+      width: 28px;
+      height: 28px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 2px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      transition: all 0.15s ease;
+    }
+
+    .menu-toggle:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.4);
+    }
+
+    .menu-toggle span {
+      width: 12px;
+      height: 1px;
+      background: rgba(255,255,255,0.8);
+    }
+
+    /* ===== CANVAS AREA ===== */
+    .canvas-area {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+    }
+
+    .canvas-area:active {
+      cursor: grabbing;
+    }
+
+    .canvas-inner {
+      position: absolute;
+      transform-origin: 0 0;
+      display: flex;
+      flex-direction: column;
+      padding: 40px;
+    }
+
+    /* ===== GRID ===== */
+    .frames-grid {
+      display: grid;
+      gap: 2px;
+      background: transparent;
+    }
+
+    .frame-item {
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .frame-image-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: var(--video-aspect, 16/9);
+      background: #111;
+      overflow: hidden;
+    }
+
+    .frame-image-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .frame-meta {
+      height: 20px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.85);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .frame-meta.hidden {
+      display: none;
+    }
+
+    /* ===== DROP ZONE ===== */
+    .drop-zone {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: var(--bg-color, #0a0a0a);
+      z-index: 5;
+      transition: opacity 0.2s ease;
+    }
+
+    .drop-zone.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .drop-zone-icon {
+      width: 80px;
+      height: 80px;
+      border: 2px dashed rgba(255,255,255,0.3);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    .drop-zone-text {
+      font-size: 14px;
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+    }
+
+    .drop-zone-btn {
+      padding: 10px 24px;
+      background: #35f2a3;
+      color: #000;
+      border: none;
+      border-radius: 2px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .drop-zone-btn:hover {
+      background: #4df7b5;
+    }
+
+    .drop-zone.drag-over {
+      background: rgba(53, 242, 163, 0.1);
+    }
+
+    .drop-zone.drag-over .drop-zone-icon {
+      border-color: #35f2a3;
+      color: #35f2a3;
+    }
+
+    /* ===== SIDE MENU ===== */
+    .side-menu {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 240px;
+      background: rgba(0,0,0,0.95);
+      border-left: 1px solid rgba(255,255,255,0.15);
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .side-menu.open {
+      transform: translateX(0);
+    }
+
+    .side-menu-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .menu-section {
+      padding: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .menu-section-title {
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 12px;
+    }
+
+    .menu-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .menu-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .menu-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.75);
+    }
+
+    .menu-input {
+      width: 60px;
+      padding: 6px 8px;
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 2px;
+      color: #fff;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .menu-input:focus {
+      outline: none;
+      border-color: #35f2a3;
+    }
+
+    .menu-select {
+      padding: 6px 8px;
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 2px;
+      color: #fff;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .menu-select:focus {
+      outline: none;
+      border-color: #35f2a3;
+    }
+
+    .menu-toggle-switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      background: #333;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .menu-toggle-switch.active {
+      background: #35f2a3;
+    }
+
+    .menu-toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+
+    .menu-toggle-switch.active::after {
+      transform: translateX(16px);
+    }
+
+    .menu-color-input {
+      width: 36px;
+      height: 28px;
+      padding: 2px;
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    .menu-color-input::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .menu-color-input::-webkit-color-swatch {
+      border: none;
+      border-radius: 1px;
+    }
+
+    .menu-btn {
+      width: 100%;
+      padding: 10px 16px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 2px;
+      color: rgba(255,255,255,0.8);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-top: 8px;
+    }
+
+    .menu-btn:first-of-type {
+      margin-top: 0;
+    }
+
+    .menu-btn:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.4);
+    }
+
+    .menu-btn.primary {
+      background: #35f2a3;
+      border-color: #35f2a3;
+      color: #000;
+    }
+
+    .menu-btn.primary:hover {
+      background: #4df7b5;
+    }
+
+    /* ===== HOVER TRIGGER ZONE ===== */
+    .menu-trigger {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 20px;
+      z-index: 15;
+    }
+
+    /* ===== MOBILE MENU BUTTON ===== */
+    .mobile-menu-btn {
+      display: none;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 36px;
+      height: 36px;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 2px;
+      z-index: 25;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+
+    .mobile-menu-btn span {
+      width: 16px;
+      height: 2px;
+      background: #fff;
+    }
+
+    /* ===== PROGRESS ===== */
+    .progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: rgba(255,255,255,0.1);
+      z-index: 30;
+      display: none;
+    }
+
+    .progress-bar.visible {
+      display: block;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #35f2a3;
+      width: 0%;
+      transition: width 0.1s ease;
+    }
+
+    /* ===== LOADING ===== */
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+
+    .loading-overlay.visible {
+      display: flex;
+    }
+
+    .loading-text {
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: 0.1em;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .menu-trigger {
+        display: none;
+      }
+
+      .mobile-menu-btn {
+        display: flex;
+      }
+
+      .metadata-bar {
+        height: 28px;
+        min-height: 28px;
+        font-size: 10px;
+        padding: 0 8px;
+        gap: 8px;
+      }
+
+      .side-menu {
+        width: 280px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .side-menu {
+        width: 100%;
+      }
+
+      .metadata-item.hide-mobile {
+        display: none;
+      }
+    }
+
+    /* ===== HIDDEN VIDEO ===== */
+    #videoElement {
+      display: none;
+    }
+
+    #fileInput {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- Metadata Bar -->
+    <div class="metadata-bar" id="metadataBar">
+      <div class="metadata-logo">FRAMEGRID</div>
+      <div class="metadata-item" id="metaFilename">No file loaded</div>
+      <div class="metadata-item hide-mobile" id="metaResolution"></div>
+      <div class="metadata-item hide-mobile" id="metaFps"></div>
+      <div class="metadata-item" id="metaDuration"></div>
+      <div class="metadata-item hide-mobile" id="metaMode"></div>
+      <div class="metadata-spacer"></div>
+      <button class="menu-toggle" id="menuToggleBtn">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+
+    <!-- Canvas Area -->
+    <div class="canvas-area" id="canvasArea">
+      <div class="canvas-inner" id="canvasInner">
+        <div class="frames-grid" id="framesGrid"></div>
+      </div>
+
+      <!-- Drop Zone -->
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-icon">▶</div>
+        <div class="drop-zone-text">
+          Drop video file here<br>
+          <span style="font-size: 11px; opacity: 0.6;">or click to browse</span>
+        </div>
+        <button class="drop-zone-btn" id="browseBtn">SELECT VIDEO</button>
+      </div>
+
+      <!-- Menu Trigger Zone (desktop) -->
+      <div class="menu-trigger" id="menuTrigger"></div>
+
+      <!-- Mobile Menu Button -->
+      <button class="mobile-menu-btn" id="mobileMenuBtn">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+
+    <!-- Side Menu -->
+    <div class="side-menu" id="sideMenu">
+      <div class="side-menu-header">Settings</div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Grid Size</div>
+        <div class="menu-row">
+          <span class="menu-label">Columns</span>
+          <input type="number" class="menu-input" id="gridCols" value="4" min="1" max="20">
+        </div>
+        <div class="menu-row">
+          <span class="menu-label">Rows</span>
+          <input type="number" class="menu-input" id="gridRows" value="6" min="1" max="20">
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Frame Selection</div>
+        <div class="menu-row">
+          <span class="menu-label">Mode</span>
+          <select class="menu-select" id="selectionMode">
+            <option value="count">Fixed Count</option>
+            <option value="seconds">Every N Sec</option>
+            <option value="frames">Every N Frames</option>
+          </select>
+        </div>
+        <div class="menu-row" id="intervalRow">
+          <span class="menu-label" id="intervalLabel">Interval</span>
+          <input type="number" class="menu-input" id="intervalValue" value="1" min="1">
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Display</div>
+        <div class="menu-row">
+          <span class="menu-label">Show Metadata Bar</span>
+          <div class="menu-toggle-switch active" id="toggleMetadata"></div>
+        </div>
+        <div class="menu-row">
+          <span class="menu-label">Show Timecode</span>
+          <div class="menu-toggle-switch active" id="toggleTimecode"></div>
+        </div>
+        <div class="menu-row">
+          <span class="menu-label">Background</span>
+          <input type="color" class="menu-color-input" id="bgColor" value="#0a0a0a">
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Actions</div>
+        <button class="menu-btn primary" id="generateBtn">Generate Grid</button>
+        <button class="menu-btn" id="fitScreenBtn">Fit to Screen</button>
+        <button class="menu-btn" id="exportBtn">Export PNG</button>
+        <button class="menu-btn" id="newVideoBtn">Load New Video</button>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-text">Processing frames...</div>
+    </div>
+  </div>
+
+  <!-- Hidden Elements -->
+  <video id="videoElement" crossorigin="anonymous"></video>
+  <input type="file" id="fileInput" accept="video/*">
+  <canvas id="captureCanvas" style="display:none;"></canvas>
+
+  <script>
+    (function() {
+      'use strict';
+
+      // ===== STATE =====
+      const state = {
+        videoFile: null,
+        videoUrl: null,
+        videoDuration: 0,
+        videoWidth: 0,
+        videoHeight: 0,
+        videoFps: 30, // estimated
+        frames: [],
+        gridCols: 4,
+        gridRows: 6,
+        selectionMode: 'count', // count, seconds, frames
+        intervalValue: 1,
+        showMetadata: true,
+        showTimecode: true,
+        bgColor: '#0a0a0a',
+        // Pan & Zoom
+        scale: 1,
+        panX: 0,
+        panY: 0,
+        isPanning: false,
+        startPanX: 0,
+        startPanY: 0,
+        startMouseX: 0,
+        startMouseY: 0
+      };
+
+      // ===== DOM ELEMENTS =====
+      const app = document.getElementById('app');
+      const metadataBar = document.getElementById('metadataBar');
+      const canvasArea = document.getElementById('canvasArea');
+      const canvasInner = document.getElementById('canvasInner');
+      const framesGrid = document.getElementById('framesGrid');
+      const dropZone = document.getElementById('dropZone');
+      const sideMenu = document.getElementById('sideMenu');
+      const menuTrigger = document.getElementById('menuTrigger');
+      const menuToggleBtn = document.getElementById('menuToggleBtn');
+      const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+      const progressBar = document.getElementById('progressBar');
+      const progressFill = document.getElementById('progressFill');
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      const videoElement = document.getElementById('videoElement');
+      const fileInput = document.getElementById('fileInput');
+      const captureCanvas = document.getElementById('captureCanvas');
+      const captureCtx = captureCanvas.getContext('2d');
+
+      // Menu inputs
+      const gridColsInput = document.getElementById('gridCols');
+      const gridRowsInput = document.getElementById('gridRows');
+      const selectionModeSelect = document.getElementById('selectionMode');
+      const intervalValueInput = document.getElementById('intervalValue');
+      const intervalRow = document.getElementById('intervalRow');
+      const intervalLabel = document.getElementById('intervalLabel');
+      const toggleMetadata = document.getElementById('toggleMetadata');
+      const toggleTimecode = document.getElementById('toggleTimecode');
+      const bgColorInput = document.getElementById('bgColor');
+      const generateBtn = document.getElementById('generateBtn');
+      const fitScreenBtn = document.getElementById('fitScreenBtn');
+      const exportBtn = document.getElementById('exportBtn');
+      const newVideoBtn = document.getElementById('newVideoBtn');
+      const browseBtn = document.getElementById('browseBtn');
+
+      // Metadata display
+      const metaFilename = document.getElementById('metaFilename');
+      const metaResolution = document.getElementById('metaResolution');
+      const metaFps = document.getElementById('metaFps');
+      const metaDuration = document.getElementById('metaDuration');
+      const metaMode = document.getElementById('metaMode');
+
+      // ===== MENU FUNCTIONS =====
+      let menuTimeout = null;
+
+      function openMenu() {
+        sideMenu.classList.add('open');
+      }
+
+      function closeMenu() {
+        sideMenu.classList.remove('open');
+      }
+
+      function toggleMenu() {
+        sideMenu.classList.toggle('open');
+      }
+
+      // Desktop: hover trigger
+      menuTrigger.addEventListener('mouseenter', () => {
+        clearTimeout(menuTimeout);
+        openMenu();
+      });
+
+      sideMenu.addEventListener('mouseenter', () => {
+        clearTimeout(menuTimeout);
+      });
+
+      sideMenu.addEventListener('mouseleave', () => {
+        menuTimeout = setTimeout(closeMenu, 300);
+      });
+
+      menuTrigger.addEventListener('mouseleave', () => {
+        menuTimeout = setTimeout(closeMenu, 300);
+      });
+
+      // Toggle buttons
+      menuToggleBtn.addEventListener('click', toggleMenu);
+      mobileMenuBtn.addEventListener('click', toggleMenu);
+
+      // ===== FILE HANDLING =====
+      function handleFile(file) {
+        if (!file || !file.type.startsWith('video/')) {
+          alert('Please select a video file');
+          return;
+        }
+
+        state.videoFile = file;
+        if (state.videoUrl) {
+          URL.revokeObjectURL(state.videoUrl);
+        }
+        state.videoUrl = URL.createObjectURL(file);
+
+        videoElement.src = state.videoUrl;
+        videoElement.load();
+
+        dropZone.classList.add('hidden');
+        loadingOverlay.classList.add('visible');
+      }
+
+      videoElement.addEventListener('loadedmetadata', () => {
+        state.videoDuration = videoElement.duration;
+        state.videoWidth = videoElement.videoWidth;
+        state.videoHeight = videoElement.videoHeight;
+
+        // Update metadata display
+        metaFilename.innerHTML = `<span>${state.videoFile.name}</span>`;
+        metaResolution.innerHTML = `<span>${state.videoWidth}×${state.videoHeight}</span>`;
+        metaFps.innerHTML = `~<span>${state.videoFps}</span>fps`;
+        metaDuration.innerHTML = `<span>${formatTime(state.videoDuration)}</span>`;
+
+        // Set aspect ratio CSS variable
+        const aspect = state.videoWidth / state.videoHeight;
+        framesGrid.style.setProperty('--video-aspect', aspect);
+
+        loadingOverlay.classList.remove('visible');
+        generateFrames();
+      });
+
+      videoElement.addEventListener('error', () => {
+        loadingOverlay.classList.remove('visible');
+        alert('Error loading video');
+      });
+
+      // Drag & Drop
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+      });
+
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        handleFile(file);
+      });
+
+      dropZone.addEventListener('click', (e) => {
+        if (e.target === browseBtn || e.target.closest('.drop-zone-btn')) return;
+        fileInput.click();
+      });
+
+      browseBtn.addEventListener('click', () => fileInput.click());
+      newVideoBtn.addEventListener('click', () => {
+        fileInput.click();
+        closeMenu();
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) handleFile(file);
+      });
+
+      // ===== FRAME GENERATION =====
+      async function generateFrames() {
+        if (!state.videoUrl) return;
+
+        const cols = state.gridCols;
+        const rows = state.gridRows;
+        const totalFrames = cols * rows;
+
+        // Calculate frame times based on mode
+        const times = calculateFrameTimes(totalFrames);
+
+        state.frames = [];
+        progressBar.classList.add('visible');
+        loadingOverlay.classList.add('visible');
+
+        // Set canvas size
+        captureCanvas.width = state.videoWidth;
+        captureCanvas.height = state.videoHeight;
+
+        for (let i = 0; i < times.length; i++) {
+          const time = times[i];
+          const frameData = await captureFrame(time);
+          state.frames.push({
+            time: time,
+            frameNumber: Math.floor(time * state.videoFps),
+            dataUrl: frameData
+          });
+
+          // Update progress
+          const progress = ((i + 1) / times.length) * 100;
+          progressFill.style.width = `${progress}%`;
+        }
+
+        progressBar.classList.remove('visible');
+        loadingOverlay.classList.remove('visible');
+        progressFill.style.width = '0%';
+
+        renderGrid();
+        updateModeDisplay();
+        fitToScreen();
+      }
+
+      function calculateFrameTimes(totalFrames) {
+        const times = [];
+        const duration = state.videoDuration;
+
+        switch (state.selectionMode) {
+          case 'count':
+            // Fixed count: distribute evenly
+            for (let i = 0; i < totalFrames; i++) {
+              const time = (duration / (totalFrames + 1)) * (i + 1);
+              times.push(Math.min(time, duration - 0.1));
+            }
+            break;
+
+          case 'seconds':
+            // Every N seconds
+            const secInterval = state.intervalValue;
+            let t = secInterval;
+            while (t < duration && times.length < totalFrames) {
+              times.push(t);
+              t += secInterval;
+            }
+            break;
+
+          case 'frames':
+            // Every N frames
+            const frameInterval = state.intervalValue;
+            const fps = state.videoFps;
+            let frame = frameInterval;
+            while ((frame / fps) < duration && times.length < totalFrames) {
+              times.push(frame / fps);
+              frame += frameInterval;
+            }
+            break;
+        }
+
+        return times;
+      }
+
+      function captureFrame(time) {
+        return new Promise((resolve) => {
+          videoElement.currentTime = time;
+          videoElement.onseeked = () => {
+            captureCtx.drawImage(videoElement, 0, 0);
+            const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.85);
+            resolve(dataUrl);
+          };
+        });
+      }
+
+      function renderGrid() {
+        framesGrid.innerHTML = '';
+        framesGrid.style.gridTemplateColumns = `repeat(${state.gridCols}, 1fr)`;
+
+        state.frames.forEach((frame) => {
+          const item = document.createElement('div');
+          item.className = 'frame-item';
+
+          const imgWrap = document.createElement('div');
+          imgWrap.className = 'frame-image-wrap';
+
+          const img = document.createElement('img');
+          img.src = frame.dataUrl;
+          imgWrap.appendChild(img);
+
+          const meta = document.createElement('div');
+          meta.className = 'frame-meta' + (state.showTimecode ? '' : ' hidden');
+          meta.textContent = `${formatTime(frame.time)} / F${frame.frameNumber}`;
+
+          item.appendChild(imgWrap);
+          item.appendChild(meta);
+          framesGrid.appendChild(item);
+        });
+      }
+
+      // ===== PAN & ZOOM =====
+      canvasArea.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const rect = canvasArea.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Zoom toward mouse position
+        const newScale = Math.max(0.1, Math.min(10, state.scale * delta));
+        const scaleChange = newScale / state.scale;
+
+        state.panX = mouseX - (mouseX - state.panX) * scaleChange;
+        state.panY = mouseY - (mouseY - state.panY) * scaleChange;
+        state.scale = newScale;
+
+        updateTransform();
+      }, { passive: false });
+
+      canvasArea.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.drop-zone') || e.target.closest('.side-menu')) return;
+        state.isPanning = true;
+        state.startMouseX = e.clientX;
+        state.startMouseY = e.clientY;
+        state.startPanX = state.panX;
+        state.startPanY = state.panY;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!state.isPanning) return;
+        const dx = e.clientX - state.startMouseX;
+        const dy = e.clientY - state.startMouseY;
+        state.panX = state.startPanX + dx;
+        state.panY = state.startPanY + dy;
+        updateTransform();
+      });
+
+      window.addEventListener('mouseup', () => {
+        state.isPanning = false;
+      });
+
+      // Touch support
+      let lastTouchDist = 0;
+      let lastTouchCenter = { x: 0, y: 0 };
+
+      canvasArea.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.drop-zone') || e.target.closest('.side-menu')) return;
+        
+        if (e.touches.length === 1) {
+          state.isPanning = true;
+          state.startMouseX = e.touches[0].clientX;
+          state.startMouseY = e.touches[0].clientY;
+          state.startPanX = state.panX;
+          state.startPanY = state.panY;
+        } else if (e.touches.length === 2) {
+          const dx = e.touches[1].clientX - e.touches[0].clientX;
+          const dy = e.touches[1].clientY - e.touches[0].clientY;
+          lastTouchDist = Math.hypot(dx, dy);
+          lastTouchCenter = {
+            x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+            y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+          };
+        }
+      }, { passive: false });
+
+      canvasArea.addEventListener('touchmove', (e) => {
+        if (e.target.closest('.drop-zone') || e.target.closest('.side-menu')) return;
+        e.preventDefault();
+
+        if (e.touches.length === 1 && state.isPanning) {
+          const dx = e.touches[0].clientX - state.startMouseX;
+          const dy = e.touches[0].clientY - state.startMouseY;
+          state.panX = state.startPanX + dx;
+          state.panY = state.startPanY + dy;
+          updateTransform();
+        } else if (e.touches.length === 2) {
+          const dx = e.touches[1].clientX - e.touches[0].clientX;
+          const dy = e.touches[1].clientY - e.touches[0].clientY;
+          const dist = Math.hypot(dx, dy);
+          const center = {
+            x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+            y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+          };
+
+          if (lastTouchDist > 0) {
+            const delta = dist / lastTouchDist;
+            const rect = canvasArea.getBoundingClientRect();
+            const cx = center.x - rect.left;
+            const cy = center.y - rect.top;
+
+            const newScale = Math.max(0.1, Math.min(10, state.scale * delta));
+            const scaleChange = newScale / state.scale;
+
+            state.panX = cx - (cx - state.panX) * scaleChange;
+            state.panY = cy - (cy - state.panY) * scaleChange;
+            state.scale = newScale;
+
+            updateTransform();
+          }
+
+          lastTouchDist = dist;
+          lastTouchCenter = center;
+        }
+      }, { passive: false });
+
+      canvasArea.addEventListener('touchend', () => {
+        state.isPanning = false;
+        lastTouchDist = 0;
+      });
+
+      function updateTransform() {
+        canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+      }
+
+      function fitToScreen() {
+        if (state.frames.length === 0) return;
+
+        const areaRect = canvasArea.getBoundingClientRect();
+        const padding = 40;
+
+        // Estimate grid size
+        const frameWidth = 200; // base width
+        const aspect = state.videoWidth / state.videoHeight;
+        const frameHeight = frameWidth / aspect + (state.showTimecode ? 20 : 0);
+        const gridWidth = state.gridCols * frameWidth + (state.gridCols - 1) * 2;
+        const gridHeight = state.gridRows * frameHeight + (state.gridRows - 1) * 2;
+
+        const scaleX = (areaRect.width - padding * 2) / gridWidth;
+        const scaleY = (areaRect.height - padding * 2) / gridHeight;
+        state.scale = Math.min(scaleX, scaleY, 1);
+
+        // Center
+        const scaledWidth = gridWidth * state.scale;
+        const scaledHeight = gridHeight * state.scale;
+        state.panX = (areaRect.width - scaledWidth) / 2;
+        state.panY = (areaRect.height - scaledHeight) / 2;
+
+        updateTransform();
+      }
+
+      // ===== MENU CONTROLS =====
+      gridColsInput.addEventListener('change', () => {
+        state.gridCols = parseInt(gridColsInput.value) || 4;
+      });
+
+      gridRowsInput.addEventListener('change', () => {
+        state.gridRows = parseInt(gridRowsInput.value) || 6;
+      });
+
+      selectionModeSelect.addEventListener('change', () => {
+        state.selectionMode = selectionModeSelect.value;
+        updateIntervalUI();
+      });
+
+      intervalValueInput.addEventListener('change', () => {
+        state.intervalValue = parseInt(intervalValueInput.value) || 1;
+      });
+
+      function updateIntervalUI() {
+        if (state.selectionMode === 'count') {
+          intervalRow.style.display = 'none';
+        } else {
+          intervalRow.style.display = 'flex';
+          intervalLabel.textContent = state.selectionMode === 'seconds' ? 'Seconds' : 'Frames';
+        }
+      }
+
+      toggleMetadata.addEventListener('click', () => {
+        state.showMetadata = !state.showMetadata;
+        toggleMetadata.classList.toggle('active', state.showMetadata);
+        metadataBar.classList.toggle('hidden', !state.showMetadata);
+      });
+
+      toggleTimecode.addEventListener('click', () => {
+        state.showTimecode = !state.showTimecode;
+        toggleTimecode.classList.toggle('active', state.showTimecode);
+        document.querySelectorAll('.frame-meta').forEach(el => {
+          el.classList.toggle('hidden', !state.showTimecode);
+        });
+      });
+
+      bgColorInput.addEventListener('input', () => {
+        state.bgColor = bgColorInput.value;
+        app.style.setProperty('--bg-color', state.bgColor);
+      });
+
+      generateBtn.addEventListener('click', () => {
+        generateFrames();
+        closeMenu();
+      });
+
+      fitScreenBtn.addEventListener('click', () => {
+        fitToScreen();
+        closeMenu();
+      });
+
+      exportBtn.addEventListener('click', () => {
+        exportPNG();
+        closeMenu();
+      });
+
+      // ===== EXPORT =====
+      function exportPNG() {
+        if (state.frames.length === 0) return;
+
+        const frameWidth = 400;
+        const aspect = state.videoWidth / state.videoHeight;
+        const frameHeight = frameWidth / aspect;
+        const metaHeight = state.showTimecode ? 28 : 0;
+        const gap = 2;
+        const headerHeight = state.showMetadata ? 40 : 0;
+
+        const totalWidth = state.gridCols * frameWidth + (state.gridCols - 1) * gap;
+        const totalHeight = headerHeight + state.gridRows * (frameHeight + metaHeight) + (state.gridRows - 1) * gap;
+
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = totalWidth;
+        exportCanvas.height = totalHeight;
+        const ctx = exportCanvas.getContext('2d');
+
+        // Background
+        ctx.fillStyle = state.bgColor;
+        ctx.fillRect(0, 0, totalWidth, totalHeight);
+
+        // Header
+        if (state.showMetadata) {
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, totalWidth, headerHeight);
+          ctx.fillStyle = '#35f2a3';
+          ctx.fillRect(12, 16, 8, 8);
+          ctx.fillStyle = '#fff';
+          ctx.font = '600 14px system-ui';
+          ctx.fillText('FRAMEGRID', 28, 24);
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.font = '12px system-ui';
+          const info = `${state.videoFile?.name || 'video'} · ${state.videoWidth}×${state.videoHeight} · ${formatTime(state.videoDuration)} · ${getModeText()}`;
+          ctx.fillText(info, 120, 24);
+        }
+
+        // Frames
+        const images = document.querySelectorAll('.frame-image-wrap img');
+        let drawn = 0;
+
+        images.forEach((img, i) => {
+          const col = i % state.gridCols;
+          const row = Math.floor(i / state.gridCols);
+          const x = col * (frameWidth + gap);
+          const y = headerHeight + row * (frameHeight + metaHeight + gap);
+
+          // Frame image
+          ctx.drawImage(img, x, y, frameWidth, frameHeight);
+
+          // Timecode
+          if (state.showTimecode && state.frames[i]) {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x, y + frameHeight, frameWidth, metaHeight);
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.font = '11px system-ui';
+            ctx.textAlign = 'center';
+            const tc = `${formatTime(state.frames[i].time)} / F${state.frames[i].frameNumber}`;
+            ctx.fillText(tc, x + frameWidth / 2, y + frameHeight + 18);
+            ctx.textAlign = 'left';
+          }
+
+          drawn++;
+          if (drawn === images.length) {
+            // Download
+            const link = document.createElement('a');
+            link.download = `framegrid_${state.videoFile?.name || 'export'}.png`;
+            link.href = exportCanvas.toDataURL('image/png');
+            link.click();
+          }
+        });
+      }
+
+      // ===== UTILITIES =====
+      function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+
+      function getModeText() {
+        switch (state.selectionMode) {
+          case 'count': return `${state.gridCols * state.gridRows} frames`;
+          case 'seconds': return `every ${state.intervalValue}s`;
+          case 'frames': return `every ${state.intervalValue} frames`;
+        }
+      }
+
+      function updateModeDisplay() {
+        metaMode.innerHTML = `<span>${getModeText()}</span>`;
+      }
+
+      // ===== INIT =====
+      updateIntervalUI();
+      app.style.setProperty('--bg-color', state.bgColor);
+
+      // Close menu on outside click (mobile)
+      canvasArea.addEventListener('click', (e) => {
+        if (!e.target.closest('.side-menu') && !e.target.closest('.mobile-menu-btn') && !e.target.closest('.menu-toggle')) {
+          if (window.innerWidth <= 768) {
+            closeMenu();
+          }
+        }
+      });
+
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeMenu();
+        }
+        if (e.key === 'f' || e.key === 'F') {
+          fitToScreen();
+        }
+      });
+
+    })();
+  </script>
+</body>
+</html>

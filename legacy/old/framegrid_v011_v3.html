@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<!--
+╔════════════════════════════════════════════════════════════════╗
+║      FRAMEGRID v0.11 FIXED - Исправленная версия (2026)        ║
+╚════════════════════════════════════════════════════════════════╝
+
+✅ ИСПРАВЛЕНИЯ:
+
+1. MP4 Export - Codec изменен на avc1.640028 (H.264 Level 4.0)
+   Решает ошибку: "coded area exceeds the maximum coded area"
+   Поддерживает до 2,073,600 пикселей (классический Full HD и чуть выше)
+
+2. Исправлено вычисление даты модификации
+3. Небольшие правки UI и текста
+
+-->
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FRAMEGRID v0.11 FIXED</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #050608;
+      color: #f0f0f0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+    .app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: radial-gradient(circle at top, #181b20 0, #050608 55%, #020203 100%);
+      color: #fff;
+      overflow: hidden;
+    }
+    .metadata-bar {
+      position: relative;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: linear-gradient(to right, rgba(6, 10, 18, 0.96), rgba(3, 5, 9, 0.98));
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      z-index: 10;
+    }
+    .metadata-logo {
+      font-weight: 600;
+      color: #35f2a3;
+      margin-right: 12px;
+      white-space: nowrap;
+    }
+    .metadata-item {
+      margin-right: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      white-space: nowrap;
+    }
+    .metadata-spacer {
+      flex: 1;
+    }
+    .menu-toggle {
+      width: 28px;
+      height: 22px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(0, 0, 0, 0.7);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+    }
+    .menu-toggle span {
+      display: block;
+      width: 14px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.9);
+      margin: 1px 0;
+    }
+    .menu-toggle:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .canvas-area {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+    }
+    .canvas-inner {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .frames-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-auto-rows: auto;
+      gap: 2px;
+      max-width: 100%;
+      max-height: 100%;
+      transform-origin: center center;
+      transition: transform 0.18s ease-out;
+    }
+    .frame-cell {
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+    .frame-cell canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      image-rendering: auto;
+    }
+    .frame-number {
+      position: absolute;
+      left: 4px;
+      bottom: 4px;
+      font-size: 10px;
+      padding: 2px 4px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      border-radius: 2px;
+      font-family: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono",
+        "Courier New", monospace;
+    }
+    .frame-timecode {
+      position: absolute;
+      right: 4px;
+      bottom: 4px;
+      font-size: 10px;
+      padding: 2px 4px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      border-radius: 2px;
+      font-family: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono",
+        "Courier New", monospace;
+    }
+    .drop-zone {
+      border: 1px dashed rgba(255, 255, 255, 0.23);
+      border-radius: 10px;
+      padding: 24px 22px;
+      text-align: center;
+      background: radial-gradient(circle at top, rgba(53, 242, 163, 0.12), transparent 58%);
+      cursor: pointer;
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+      max-width: 460px;
+      margin: 0 16px;
+    }
+    .drop-zone:hover {
+      background: radial-gradient(circle at top, rgba(53, 242, 163, 0.2), transparent 70%);
+      border-color: rgba(53, 242, 163, 0.85);
+      transform: translateY(-1px);
+    }
+    .drop-zone-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+    .drop-zone-desc {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.76);
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    .drop-zone-hint {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 12px;
+    }
+    .drop-zone-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+    }
+    .drop-zone-btn:hover { background: #4df7b5; }
+    .drop-zone.drag-over { background: rgba(53, 242, 163, 0.1); }
+
+    /* SIDE MENU */
+    .side-menu {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 280px;
+      background: rgba(0,0,0,0.98); border-left: 1px solid rgba(255,255,255,0.15);
+      transform: translateX(100%); transition: transform 0.25s ease;
+      z-index: 20; display: flex; flex-direction: column; overflow-y: auto;
+    }
+    .side-menu.open { transform: translateX(0); }
+    .side-menu-header {
+      padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .menu-close-btn {
+      border: none; background: transparent; color: rgba(255,255,255,0.6);
+      font-size: 16px; cursor: pointer; padding: 0 4px;
+    }
+
+    .menu-section {
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .menu-section-title {
+      padding: 10px 16px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .menu-section-title::after {
+      content: "▾";
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+    }
+    .menu-section.collapsed .menu-section-title::after {
+      content: "▸";
+    }
+    .menu-section-content {
+      padding: 8px 16px 12px 16px;
+      font-size: 12px;
+      display: block;
+    }
+    .menu-section.collapsed .menu-section-content {
+      display: none;
+    }
+    .menu-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .menu-row:last-child {
+      margin-bottom: 0;
+    }
+    .menu-label {
+      flex: 1;
+      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      margin-right: 8px;
+    }
+    .menu-input,
+    .menu-input-narrow {
+      font-size: 11px;
+      padding: 4px 6px;
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      border-radius: 2px;
+      width: 64px;
+    }
+    .menu-input-narrow { width: 44px; }
+    .menu-input-btn {
+      width: 28px; height: 28px; background: #222; border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 2px; color: #fff; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .menu-input-btn:hover { background: #333; }
+    .menu-input-btn:active { background: #35f2a3; color: #000; }
+
+    /* Quick Toolbar */
+    .quick-toolbar {
+      position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 15;
+    }
+    .quick-btn {
+      width: 36px; height: 36px; background: rgba(0,0,0,0.8);
+      border: 1px solid rgba(255,255,255,0.25); border-radius: 4px;
+      color: rgba(255,255,255,0.8); font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .quick-btn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); }
+    .quick-btn:active, .quick-btn.active { background: rgba(53,242,163,0.3); border-color: #35f2a3; color: #35f2a3; }
+    .quick-btn svg { width: 18px; height: 18px; fill: currentColor; }
+    @media (max-width: 768px) {
+      .quick-toolbar { top: 44px; }
+    }
+    .menu-select {
+      padding: 6px 8px; background: #111;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 2px;
+      color: #fff; font-size: 11px; cursor: pointer;
+    }
+    .menu-select:hover { border-color: rgba(255,255,255,0.4); }
+    .menu-toggle-switch {
+      width: 32px; height: 18px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.35);
+      position: relative; cursor: pointer; background: #000;
+    }
+    .menu-toggle-switch::after {
+      content: ""; position: absolute; width: 14px; height: 14px;
+      border-radius: 50%; background: rgba(255,255,255,0.8);
+      top: 1px; left: 1px; transition: all 0.15s ease;
+    }
+    .menu-toggle-switch.active {
+      background: #35f2a3; border-color: #35f2a3;
+    }
+    .menu-toggle-switch.active::after {
+      left: 15px; background: #000;
+    }
+
+    .menu-slider-row {
+      display: flex;
+      align-items: center;
+      flex: 1.5;
+    }
+    .menu-slider {
+      flex: 1;
+      margin-right: 6px;
+    }
+    .menu-slider-value {
+      width: 42px;
+      font-size: 11px;
+      text-align: right;
+      color: rgba(255,255,255,0.75);
+    }
+    .menu-color-input {
+      width: 40px;
+      height: 20px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.5);
+      background: transparent;
+      padding: 0;
+    }
+
+    .menu-btn {
+      width: 100%;
+      margin: 4px 0;
+      padding: 6px 10px;
+      font-size: 11px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.02);
+      color: rgba(255,255,255,0.9);
+      cursor: pointer;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .menu-btn.primary {
+      background: linear-gradient(135deg, #35f2a3, #2ec5f5);
+      color: #000;
+      border-color: transparent;
+      font-weight: 600;
+    }
+    .menu-btn:hover {
+      background: rgba(255,255,255,0.08);
+    }
+    .menu-btn.primary:hover {
+      filter: brightness(1.05);
+    }
+
+    .progress-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 3px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+      z-index: 12;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #35f2a3, #2ec5f5);
+      transition: width 0.1s linear;
+    }
+
+    .loading-overlay {
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at top, rgba(0,0,0,0.7), #000);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+      flex-direction: column;
+      color: rgba(255,255,255,0.85);
+      font-size: 13px;
+    }
+    .loading-overlay.visible {
+      display: flex;
+    }
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #35f2a3;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 10px;
+    }
+    .loading-text {
+      margin-bottom: 4px;
+    }
+    .loading-sub {
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .grid-hint {
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.7);
+      font-size: 11px;
+      color: rgba(255,255,255,0.8);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      z-index: 9;
+    }
+    .grid-hint.visible {
+      opacity: 1;
+    }
+
+    .about-section {
+      padding: 10px 16px 80px 16px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.76);
+    }
+    .about-section.collapsed .about-content {
+      display: none;
+    }
+    .about-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      padding: 6px 0 8px 0;
+    }
+    .about-title {
+      font-size: 11px;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+    }
+    .about-toggle {
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+    }
+    .about-content p {
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+    .about-content p:last-child {
+      margin-bottom: 0;
+    }
+    .hide-mobile {
+      display: inline;
+    }
+    @media (max-width: 600px) {
+      .hide-mobile {
+        display: none;
+      }
+    }
+
+    .menu-hint {
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    .menu-input-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .menu-hotkeys {
+      font-size: 10px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .menu-hotkeys code {
+      background: #111;
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-size: 10px;
+    }
+
+    .menu-note {
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 4px;
+    }
+
+    .zoom-indicator {
+      position: absolute;
+      right: 52px;
+      top: 8px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      padding: 2px 6px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 4px;
+      z-index: 14;
+    }
+
+    .metadata-info-card {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 6px 8px;
+      background: rgba(0,0,0,0.75);
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.2);
+      font-size: 11px;
+      color: rgba(255,255,255,0.9);
+      max-width: 240px;
+      z-index: 11;
+      display: none;
+    }
+    .metadata-info-card span {
+      display: block;
+      margin-bottom: 2px;
+    }
+    .metadata-info-card span:last-child {
+      margin-bottom: 0;
+    }
+
+    .anim-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.95);
+      z-index: 40;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .anim-overlay.visible { display: flex; }
+    .anim-frame { max-width: 90%; max-height: 80%; object-fit: contain; }
+    .anim-info { 
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.8); padding: 8px 16px; border-radius: 4px;
+      font-size: 12px; color: rgba(255,255,255,0.8);
+    }
+    .anim-close {
+      position: absolute; top: 20px; right: 20px;
+      width: 40px; height: 40px; background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.3); border-radius: 50%;
+      color: #fff; font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .anim-close:hover { background: rgba(255,255,255,0.2); }
+
+    .menu-section-title span.hotkey {
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="metadata-bar" id="metadataBar">
+      <div class="metadata-logo">FRAMEGRID v0.10</div>
+      <div class="metadata-item" id="metaFilename">No file</div>
+      <div class="metadata-item hide-mobile" id="metaResolution"></div>
+      <div class="metadata-item" id="metaDuration"></div>
+      <div class="metadata-item hide-mobile" id="metaDate"></div>
+      <div class="metadata-item" id="metaFrames"></div>
+      <div class="metadata-spacer"></div>
+      <button class="menu-toggle" id="menuToggleBtn"><span></span><span></span><span></span></button>
+    </div>
+
+    <div class="canvas-area" id="canvasArea">
+      <div class="canvas-inner" id="canvasInner">
+        <div class="frames-grid" id="framesGrid"></div>
+
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-zone-title">Drop video or click to load</div>
+          <div class="drop-zone-desc">
+            FRAMEGRID slices your video into a clean frame grid for storyboards, studies and print.
+          </div>
+          <div class="drop-zone-hint">
+            Supported formats: MP4, MOV, WEBM · Up to ~2K or lightweight 4K video recommended
+          </div>
+          <button class="drop-zone-btn" id="browseBtn">Browse video…</button>
+          <div class="menu-hotkeys" style="margin-top:10px; text-align:left;">
+            Shortcuts: <br>
+            <code>1</code> Frame selection · <code>2</code> Grid layout · <code>3</code> Display · <code>4</code> Animation · <code>5</code> Export<br>
+            <code>F</code> Fit to screen · <code>0</code> Reset zoom
+          </div>
+        </div>
+
+        <div class="metadata-info-card" id="infoCard">
+          <span id="infoFilename"></span>
+          <span id="infoResolution"></span>
+          <span id="infoFps"></span>
+          <span id="infoDuration"></span>
+          <span id="infoFrames"></span>
+        </div>
+
+        <div class="grid-hint" id="gridHint">Scroll to zoom · drag to pan</div>
+
+        <div class="zoom-indicator" id="zoomIndicator">100%</div>
+      </div>
+
+      <div class="side-menu" id="sideMenu">
+        <div class="side-menu-header">
+          <span>Settings</span>
+          <button class="menu-close-btn" id="menuCloseBtn">✕</button>
+        </div>
+
+        <div class="menu-section">
+          <div class="menu-section-title">Frame Selection <span class="hotkey">[1]</span></div>
+          <div class="menu-section-content">
+            <div class="menu-row">
+              <span class="menu-label">Mode</span>
+              <select class="menu-select" id="selectionMode">
+                <option value="count" selected>Fixed Count</option>
+                <option value="seconds">Every N Sec</option>
+                <option value="frames">Every N Frames</option>
+              </select>
+            </div>
+            <div class="menu-row" id="countRow">
+              <span class="menu-label">Frames</span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="countMinus">−</button>
+                <input type="number" class="menu-input" id="frameCount" value="16" min="1">
+                <button class="menu-input-btn" id="countPlus">+</button>
+              </div>
+            </div>
+            <div class="menu-row" id="intervalRow" style="display:none;">
+              <span class="menu-label" id="intervalLabel">Every N Sec</span>
+              <input type="number" class="menu-input" id="intervalValue" value="1" min="0.01" step="0.01">
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Start frame</span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="startMinus">−</button>
+                <input type="number" class="menu-input" id="startFrame" value="0" min="0">
+                <button class="menu-input-btn" id="startPlus">+</button>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">End frame</span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="endMinus">−</button>
+                <input type="number" class="menu-input" id="endFrame" value="0" min="0">
+                <button class="menu-input-btn" id="endPlus">+</button>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Quality</span>
+              <select class="menu-select" id="qualitySelect">
+                <option value="1">Full</option>
+                <option value="0.5" selected>Half</option>
+                <option value="0.25">Quarter</option>
+              </select>
+            </div>
+            <button class="menu-btn primary" id="generateBtn">Regenerate Grid</button>
+            <div class="menu-note">
+              Tip: Use fewer frames for print or AI reference, more for overviews.
+            </div>
+          </div>
+        </div>
+
+        <div class="menu-section collapsed">
+          <div class="menu-section-title">Grid Layout <span class="hotkey">[2]</span></div>
+          <div class="menu-section-content">
+            <div class="menu-row">
+              <span class="menu-label">Columns</span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="colsMinus">−</button>
+                <input type="number" class="menu-input" id="gridCols" value="4" min="1">
+                <button class="menu-input-btn" id="colsPlus">+</button>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Canvas aspect</span>
+              <select class="menu-select" id="canvasAspect">
+                <option value="video" selected>Match video</option>
+                <option value="1">1:1</option>
+                <option value="4/5">4:5</option>
+                <option value="3/2">3:2</option>
+                <option value="16/9">16:9</option>
+                <option value="9/16">9:16</option>
+              </select>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Spacing</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="spacingSlider" min="0" max="40" value="2">
+                <span class="menu-slider-value" id="spacingValue">2px</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display + Timecode Style merged -->
+        <div class="menu-section collapsed">
+          <div class="menu-section-title">Display <span class="hotkey">[3]</span></div>
+          <div class="menu-section-content">
+            <div class="menu-row">
+              <span class="menu-label">Metadata Bar</span>
+              <div class="menu-toggle-switch active" id="toggleMetadata"></div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Timecode</span>
+              <div class="menu-toggle-switch" id="toggleTimecode"></div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Info Card</span>
+              <div class="menu-toggle-switch" id="toggleInfoCard"></div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Font Size</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="fontSizeSlider" min="6" max="32" value="10">
+                <span class="menu-slider-value" id="fontSizeValue">10px</span>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Background</span>
+              <input type="color" class="menu-color-input" id="bgColor" value="#0a0a0a">
+            </div>
+
+            <!-- Timecode style controls moved here -->
+            <div class="menu-row">
+              <span class="menu-label">Text Color</span>
+              <input type="color" class="menu-color-input" id="tcTextColor" value="#ffffff">
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">BG Color</span>
+              <input type="color" class="menu-color-input" id="tcBgColor" value="#000000">
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">BG Opacity</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="tcOpacitySlider" min="0" max="100" value="70">
+                <span class="menu-slider-value" id="tcOpacityValue">70%</span>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Align</span>
+              <select class="menu-select" id="tcAlign">
+                <option value="left" selected>Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Position</span>
+              <select class="menu-select" id="tcPosition">
+                <option value="top" selected>Top</option>
+                <option value="bottom">Bottom</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Animation Preview moved above Export -->
+        <div class="menu-section collapsed">
+          <div class="menu-section-title">Animation Preview <span class="hotkey">[4]</span></div>
+          <div class="menu-section-content">
+            <div class="menu-row">
+              <span class="menu-label">FPS</span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="animFpsMinus">−</button>
+                <input type="number" class="menu-input" id="animFps" value="8" min="1" max="30">
+                <button class="menu-input-btn" id="animFpsPlus">+</button>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Direction</span>
+              <select class="menu-select" id="animDirection">
+                <option value="forward">Forward</option>
+                <option value="backward">Backward</option>
+                <option value="pingpong">Ping-pong</option>
+              </select>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Pattern</span>
+              <select class="menu-select" id="animPattern">
+                <option value="sequential">Sequential</option>
+                <option value="center">Center-out</option>
+                <option value="snake">Snake</option>
+                <option value="vertical">Vertical</option>
+              </select>
+            </div>
+            <button class="menu-btn primary" id="playBtn">▶ Play Animation</button>
+            <button class="menu-btn" id="stopBtn" style="display:none;">■ Stop</button>
+            <div class="menu-hotkeys">
+              Preview shortcuts: click frame to start · click again to pause.
+            </div>
+          </div>
+        </div>
+
+        <!-- Export now after Animation Preview -->
+        <div class="menu-section collapsed">
+          <div class="menu-section-title">Export <span class="hotkey">[5]</span></div>
+          <div class="menu-section-content">
+            <button class="menu-btn" id="fitScreenBtn">Fit to Screen</button>
+            <button class="menu-btn" id="exportSmallBtn">Export JPEG 2K (AI)</button>
+            <button class="menu-btn" id="exportMedBtn">Export JPEG 4K</button>
+            <button class="menu-btn" id="exportFullBtn">Export PNG Full</button>
+            <button class="menu-btn" id="exportMp4GridBtn">Export MP4 Grid</button>
+            <button class="menu-btn" id="exportMp4SingleBtn">Export MP4 Single</button>
+            <button class="menu-btn" id="exportGifGridBtn" style="display:none">Export GIF Grid</button>
+            <button class="menu-btn" id="exportGifSingleBtn" style="display:none">Export GIF Single</button>
+            <button class="menu-btn" id="newVideoBtn">Load New Video</button>
+            <div class="menu-note">
+              MP4 export uses H.264 (avc1.640028) for better compatibility.
+            </div>
+          </div>
+        </div>
+
+        <div class="about-section collapsed">
+          <div class="about-header" id="aboutHeader">
+            <div class="about-title">FRAMEGRID</div>
+            <div class="about-toggle">▾</div>
+          </div>
+          <div class="about-content">
+            <p>
+              FRAMEGRID is a small tool for turning video into frame grids for storyboards,
+              reference sheets and print.
+            </p>
+            <p>
+              Drop a video, choose how many frames you need and tweak layout.
+              Export as JPEG or PNG for static grids, or MP4 for animated previews.
+            </p>
+            <p>
+              v0.11 FIXED – MP4 export codec updated to H.264 Level 4.0.<br>
+              Made with vanilla JS + Canvas.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-toolbar">
+        <button class="quick-btn" id="zoomOutBtn" title="Zoom out">
+          −
+        </button>
+        <button class="quick-btn" id="zoomResetBtn" title="Reset zoom">
+          100%
+        </button>
+        <button class="quick-btn" id="zoomInBtn" title="Zoom in">
+          +
+        </button>
+      </div>
+
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Processing video…</div>
+        <div class="loading-sub" id="loadingProgress">0%</div>
+      </div>
+
+      <div class="anim-overlay" id="animOverlay">
+        <button class="anim-close" id="animCloseBtn">✕</button>
+        <img class="anim-frame" id="animFrame" alt="Animation preview">
+        <div class="anim-info" id="animInfo"></div>
+      </div>
+    </div>
+  </div>
+
+  <video id="videoElement" style="display:none;"></video>
+  <canvas id="captureCanvas" style="display:none;"></canvas>
+  <input type="file" id="fileInput" accept="video/*" style="display:none;"/>
+
+  <script>
+    const state = {
+      videoLoaded: false,
+      videoWidth: 0,
+      videoHeight: 0,
+      videoDuration: 0,
+      videoFps: 0,
+      totalFrames: 0,
+      frameCount: 16,
+      selectionMode: 'count',
+      intervalValue: 1,
+      startFrame: 0,
+      endFrame: 0,
+      cols: 4,
+      spacing: 2,
+      canvasAspect: 'video',
+      fontSize: 10,
+      showMetadataBar: true,
+      showTimecode: false,
+      showInfoCard: false,
+      bgColor: '#0a0a0a',
+      quality: 0.5,
+      zoom: 1,
+      offsetX: 0,
+      offsetY: 0,
+      dragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      lastOffsetX: 0,
+      lastOffsetY: 0,
+      frames: [],
+      timecodeStyle: {
+        textColor: '#ffffff',
+        bgColor: '#000000',
+        bgOpacity: 0.7,
+        align: 'right',
+        position: 'bottom'
+      },
+      menuOpen: false,
+      // Animation
+      animFps: 8, animDirection: 'forward', animPattern: 'sequential',
+      isPlaying: false, animFrame: 0, animInterval: null
+    };
+
+    const $ = id => document.getElementById(id);
+    const app = $('app'), metadataBar = $('metadataBar'), canvasArea = $('canvasArea');
+    const canvasInner = $('canvasInner'), framesGrid = $('framesGrid'), dropZone = $('dropZone');
+    const sideMenu = $('sideMenu'), menuToggleBtn = $('menuToggleBtn'), menuCloseBtn = $('menuCloseBtn');
+    const progressBar = $('progressBar'), progressFill = $('progressFill');
+    const loadingOverlay = $('loadingOverlay'), loadingProgress = $('loadingProgress');
+    const videoElement = $('videoElement'), fileInput = $('fileInput');
+    const captureCanvas = $('captureCanvas'), captureCtx = captureCanvas.getContext('2d');
+    const gridHint = $('gridHint');
+
+    const gridColsInput = $('gridCols'), canvasAspectSelect = $('canvasAspect');
+    const selectionModeSelect = $('selectionMode'), frameCountInput = $('frameCount');
+    const countMinus = $('countMinus'), countPlus = $('countPlus');
+    const intervalValueInput = $('intervalValue'), qualitySelect = $('qualitySelect');
+    const startFrameInput = $('startFrame'), endFrameInput = $('endFrame');
+    const countRow = $('countRow'), intervalRow = $('intervalRow'), intervalLabel = $('intervalLabel');
+    const toggleMetadata = $('toggleMetadata'), toggleTimecode = $('toggleTimecode');
+    const toggleInfoCard = $('toggleInfoCard');
+    const fontSizeSlider = $('fontSizeSlider'), fontSizeValue = $('fontSizeValue');
+    const bgColorInput = $('bgColor');
+    const spacingSlider = $('spacingSlider'), spacingValue = $('spacingValue');
+    const generateBtn = $('generateBtn');
+    const zoomIndicator = $('zoomIndicator');
+    const infoCard = $('infoCard');
+    const infoFilename = $('infoFilename'), infoResolution = $('infoResolution');
+    const infoFps = $('infoFps'), infoDuration = $('infoDuration'), infoFrames = $('infoFrames');
+    const aboutHeader = $('aboutHeader');
+    const aboutSection = aboutHeader ? aboutHeader.parentElement : null;
+
+    const tcTextColor = $('tcTextColor'), tcBgColor = $('tcBgColor');
+    const tcOpacitySlider = $('tcOpacitySlider'), tcOpacityValue = $('tcOpacityValue');
+    const tcAlign = $('tcAlign'), tcPosition = $('tcPosition');
+
+    const fitScreenBtn = $('fitScreenBtn');
+    const exportSmallBtn = $('exportSmallBtn'), exportMedBtn = $('exportMedBtn'), exportFullBtn = $('exportFullBtn');
+    const exportMp4GridBtn = $('exportMp4GridBtn'), exportMp4SingleBtn = $('exportMp4SingleBtn');
+    const newVideoBtn = $('newVideoBtn');
+
+    const zoomOutBtn = $('zoomOutBtn'), zoomInBtn = $('zoomInBtn'), zoomResetBtn = $('zoomResetBtn');
+
+    const animOverlay = $('animOverlay'), animFrameEl = $('animFrame'), animInfo = $('animInfo'), animCloseBtn = $('animCloseBtn');
+    const animFpsInput = $('animFps'), animDirectionSelect = $('animDirection'), animPatternSelect = $('animPattern');
+    const animFpsMinus = $('animFpsMinus'), animFpsPlus = $('animFpsPlus');
+    const playBtn = $('playBtn'), stopBtn = $('stopBtn');
+
+    const sideSections = sideMenu.querySelectorAll('.menu-section');
+    sideSections.forEach(section => {
+      const titleEl = section.querySelector('.menu-section-title');
+      titleEl.addEventListener('click', () => {
+        section.classList.toggle('collapsed');
+      });
+    });
+
+    if (aboutHeader && aboutSection) {
+      aboutHeader.addEventListener('click', () => {
+        aboutSection.classList.toggle('collapsed');
+        const toggleEl = aboutHeader.querySelector('.about-toggle');
+        if (aboutSection.classList.contains('collapsed')) {
+          toggleEl.textContent = '▾';
+        } else {
+          toggleEl.textContent = '▴';
+        }
+      });
+    }
+
+    function openMenu() {
+      sideMenu.classList.add('open');
+      state.menuOpen = true;
+    }
+    function closeMenu() {
+      sideMenu.classList.remove('open');
+      state.menuOpen = false;
+    }
+
+    menuToggleBtn.addEventListener('click', () => {
+      if (state.menuOpen) closeMenu(); else openMenu();
+    });
+    menuCloseBtn.addEventListener('click', closeMenu);
+
+    canvasInner.addEventListener('click', () => {
+      if (!state.videoLoaded) {
+        fileInput.click();
+      }
+    });
+    $('browseBtn').addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+    });
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) loadVideoFile(file);
+    });
+
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) loadVideoFile(file);
+    });
+
+    selectionModeSelect.addEventListener('change', () => {
+      state.selectionMode = selectionModeSelect.value;
+      if (state.selectionMode === 'count') {
+        countRow.style.display = 'flex';
+        intervalRow.style.display = 'none';
+      } else {
+        countRow.style.display = 'none';
+        intervalRow.style.display = 'flex';
+        intervalLabel.textContent =
+          state.selectionMode === 'seconds' ? 'Every N Sec' : 'Every N Frames';
+      }
+      regenerateFrames();
+    });
+
+    frameCountInput.addEventListener('change', () => {
+      state.frameCount = Math.max(1, parseInt(frameCountInput.value || 1, 10));
+      frameCountInput.value = state.frameCount;
+      regenerateFrames();
+    });
+    countMinus.addEventListener('click', () => {
+      state.frameCount = Math.max(1, state.frameCount - 1);
+      frameCountInput.value = state.frameCount;
+      regenerateFrames();
+    });
+    countPlus.addEventListener('click', () => {
+      state.frameCount = Math.min(9999, state.frameCount + 1);
+      frameCountInput.value = state.frameCount;
+      regenerateFrames();
+    });
+
+    intervalValueInput.addEventListener('change', () => {
+      let val = parseFloat(intervalValueInput.value || '0.01');
+      if (state.selectionMode === 'seconds') {
+        if (val <= 0) val = 0.01;
+      } else {
+        if (val <= 0) val = 1;
+      }
+      intervalValueInput.value = val;
+      state.intervalValue = val;
+      regenerateFrames();
+    });
+
+    startFrameInput.addEventListener('change', () => {
+      let v = parseInt(startFrameInput.value || 0, 10);
+      if (v < 0) v = 0;
+      if (state.endFrame > 0 && v >= state.endFrame) {
+        v = Math.max(0, state.endFrame - 1);
+      }
+      state.startFrame = v;
+      startFrameInput.value = v;
+      regenerateFrames();
+    });
+    endFrameInput.addEventListener('change', () => {
+      let v = parseInt(endFrameInput.value || 0, 10);
+      if (v < 0) v = 0;
+      if (v !== 0 && v <= state.startFrame) {
+        v = state.startFrame + 1;
+      }
+      state.endFrame = v;
+      endFrameInput.value = v;
+      regenerateFrames();
+    });
+
+    $('startMinus').addEventListener('click', () => {
+      let v = state.startFrame - 1;
+      if (v < 0) v = 0;
+      if (state.endFrame > 0 && v >= state.endFrame) {
+        v = Math.max(0, state.endFrame - 1);
+      }
+      state.startFrame = v;
+      startFrameInput.value = v;
+      regenerateFrames();
+    });
+    $('startPlus').addEventListener('click', () => {
+      let v = state.startFrame + 1;
+      if (state.endFrame > 0 && v >= state.endFrame) {
+        v = state.endFrame - 1;
+      }
+      state.startFrame = v;
+      startFrameInput.value = v;
+      regenerateFrames();
+    });
+
+    $('endMinus').addEventListener('click', () => {
+      let v = state.endFrame - 1;
+      if (v < 0) v = 0;
+      if (v !== 0 && v <= state.startFrame) {
+        v = state.startFrame + 1;
+      }
+      state.endFrame = v;
+      endFrameInput.value = v;
+      regenerateFrames();
+    });
+    $('endPlus').addEventListener('click', () => {
+      let v = state.endFrame + 1;
+      state.endFrame = v;
+      endFrameInput.value = v;
+      regenerateFrames();
+    });
+
+    qualitySelect.addEventListener('change', () => {
+      state.quality = parseFloat(qualitySelect.value);
+      regenerateFrames();
+    });
+
+    gridColsInput.addEventListener('change', () => {
+      state.cols = Math.max(1, parseInt(gridColsInput.value || 1, 10));
+      gridColsInput.value = state.cols;
+      updateGridLayout();
+    });
+    $('colsMinus').addEventListener('click', () => {
+      state.cols = Math.max(1, state.cols - 1);
+      gridColsInput.value = state.cols;
+      updateGridLayout();
+    });
+    $('colsPlus').addEventListener('click', () => {
+      state.cols = Math.max(1, state.cols + 1);
+      gridColsInput.value = state.cols;
+      updateGridLayout();
+    });
+
+    canvasAspectSelect.addEventListener('change', () => {
+      state.canvasAspect = canvasAspectSelect.value;
+      updateGridLayout();
+    });
+
+    spacingSlider.addEventListener('input', () => {
+      state.spacing = parseInt(spacingSlider.value, 10);
+      spacingValue.textContent = `${state.spacing}px`;
+      updateGridLayout();
+    });
+
+    fontSizeSlider.addEventListener('input', () => {
+      state.fontSize = parseInt(fontSizeSlider.value, 10);
+      fontSizeValue.textContent = `${state.fontSize}px`;
+      updateGridLayout();
+    });
+
+    bgColorInput.addEventListener('input', () => {
+      state.bgColor = bgColorInput.value;
+      updateGridLayout();
+    });
+
+    toggleMetadata.addEventListener('click', () => {
+      toggleMetadata.classList.toggle('active');
+      state.showMetadataBar = toggleMetadata.classList.contains('active');
+      metadataBar.style.display = state.showMetadataBar ? 'flex' : 'none';
+    });
+
+    toggleTimecode.addEventListener('click', () => {
+      toggleTimecode.classList.toggle('active');
+      state.showTimecode = toggleTimecode.classList.contains('active');
+      updateGridLayout();
+    });
+
+    toggleInfoCard.addEventListener('click', () => {
+      toggleInfoCard.classList.toggle('active');
+      state.showInfoCard = toggleInfoCard.classList.contains('active');
+      infoCard.style.display = state.showInfoCard ? 'block' : 'none';
+    });
+
+    tcTextColor.addEventListener('input', () => {
+      state.timecodeStyle.textColor = tcTextColor.value;
+      updateGridLayout();
+    });
+    tcBgColor.addEventListener('input', () => {
+      state.timecodeStyle.bgColor = tcBgColor.value;
+      updateGridLayout();
+    });
+    tcOpacitySlider.addEventListener('input', () => {
+      const v = parseInt(tcOpacitySlider.value || '70', 10);
+      state.timecodeStyle.bgOpacity = v / 100;
+      tcOpacityValue.textContent = `${v}%`;
+      updateGridLayout();
+    });
+    tcAlign.addEventListener('change', () => {
+      state.timecodeStyle.align = tcAlign.value;
+      updateGridLayout();
+    });
+    tcPosition.addEventListener('change', () => {
+      state.timecodeStyle.position = tcPosition.value;
+      updateGridLayout();
+    });
+
+    generateBtn.addEventListener('click', () => regenerateFrames());
+
+    function updateZoomIndicator() {
+      zoomIndicator.textContent = `${Math.round(state.zoom * 100)}%`;
+    }
+    function fitToScreen() {
+      state.zoom = 1;
+      state.offsetX = 0;
+      state.offsetY = 0;
+      updateTransform();
+      updateZoomIndicator();
+    }
+
+    zoomOutBtn.addEventListener('click', () => {
+      state.zoom *= 0.9;
+      if (state.zoom < 0.1) state.zoom = 0.1;
+      updateTransform();
+      updateZoomIndicator();
+    });
+    zoomInBtn.addEventListener('click', () => {
+      state.zoom *= 1.1;
+      if (state.zoom > 8) state.zoom = 8;
+      updateTransform();
+      updateZoomIndicator();
+    });
+    zoomResetBtn.addEventListener('click', () => {
+      state.zoom = 1;
+      state.offsetX = 0;
+      state.offsetY = 0;
+      updateTransform();
+      updateZoomIndicator();
+    });
+
+    function updateTransform() {
+      framesGrid.style.transform =
+        `translate(${state.offsetX}px,${state.offsetY}px) scale(${state.zoom})`;
+    }
+
+    canvasInner.addEventListener('wheel', e => {
+      if (!state.videoLoaded) return;
+      const delta = Math.sign(e.deltaY);
+      const factor = delta > 0 ? 0.92 : 1.08;
+      const oldZoom = state.zoom;
+      let newZoom = oldZoom * factor;
+      newZoom = Math.max(0.1, Math.min(8, newZoom));
+
+      const rect = framesGrid.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+
+      const dx = cx - rect.width / 2;
+      const dy = cy - rect.height / 2;
+
+      state.offsetX -= dx * (1 / oldZoom - 1 / newZoom);
+      state.offsetY -= dy * (1 / oldZoom - 1 / newZoom);
+
+      state.zoom = newZoom;
+      updateTransform();
+      updateZoomIndicator();
+
+      gridHint.classList.add('visible');
+      clearTimeout(updateTransform.gridHintTimeout);
+      updateTransform.gridHintTimeout = setTimeout(() => {
+        gridHint.classList.remove('visible');
+      }, 1000);
+
+      e.preventDefault();
+    }, { passive: false });
+
+    canvasInner.addEventListener('mousedown', e => {
+      if (!state.videoLoaded) return;
+      state.dragging = true;
+      state.dragStartX = e.clientX;
+      state.dragStartY = e.clientY;
+      state.lastOffsetX = state.offsetX;
+      state.lastOffsetY = state.offsetY;
+      canvasInner.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mousemove', e => {
+      if (!state.dragging) return;
+      const dx = e.clientX - state.dragStartX;
+      const dy = e.clientY - state.dragStartY;
+      state.offsetX = state.lastOffsetX + dx;
+      state.offsetY = state.lastOffsetY + dy;
+      updateTransform();
+    });
+    window.addEventListener('mouseup', () => {
+      if (state.dragging) {
+        state.dragging = false;
+        canvasInner.style.cursor = 'default';
+      }
+    });
+
+    function showProgress(p) {
+      progressBar.style.display = 'block';
+      progressFill.style.width = `${p}%`;
+      loadingOverlay.classList.add('visible');
+      loadingProgress.textContent = `${Math.round(p)}%`;
+    }
+    function hideProgress() {
+      progressBar.style.display = 'none';
+      loadingOverlay.classList.remove('visible');
+    }
+
+    function loadVideoFile(file) {
+      const url = URL.createObjectURL(file);
+      videoElement.src = url;
+      videoElement.load();
+      showProgress(0);
+
+      videoElement.addEventListener('loadedmetadata', onLoadedMetadataOnce);
+      videoElement.addEventListener('error', onVideoErrorOnce);
+
+      function onLoadedMetadataOnce() {
+        videoElement.removeEventListener('loadedmetadata', onLoadedMetadataOnce);
+        videoElement.removeEventListener('error', onVideoErrorOnce);
+        onVideoLoadedMetadata(file);
+      }
+      function onVideoErrorOnce() {
+        videoElement.removeEventListener('loadedmetadata', onLoadedMetadataOnce);
+        videoElement.removeEventListener('error', onVideoErrorOnce);
+        hideProgress();
+        alert('Error loading video');
+      }
+    }
+
+    function onVideoLoadedMetadata(file) {
+      state.videoLoaded = true;
+      state.videoWidth = videoElement.videoWidth;
+      state.videoHeight = videoElement.videoHeight;
+      state.videoDuration = videoElement.duration;
+      state.videoFps = estimateFps(videoElement) || 25;
+      state.totalFrames = Math.floor(state.videoDuration * state.videoFps);
+
+      state.startFrame = 0;
+      state.endFrame = 0;
+      startFrameInput.value = 0;
+      endFrameInput.value = 0;
+
+      if (file) {
+        $('metaFilename').textContent = file.name;
+        infoFilename.textContent = `File: ${file.name}`;
+      }
+      $('metaResolution').textContent = `${state.videoWidth}×${state.videoHeight}`;
+      $('metaDuration').textContent = formatDuration(state.videoDuration);
+      $('metaFrames').textContent = `${state.totalFrames} frames`;
+      infoResolution.textContent = `Resolution: ${state.videoWidth}×${state.videoHeight}`;
+      infoFps.textContent = `FPS: ${state.videoFps.toFixed(2)}`;
+      infoDuration.textContent = `Duration: ${formatDuration(state.videoDuration)}`;
+      infoFrames.textContent = `Frames: ${state.totalFrames}`;
+
+      if (file && file.lastModified) {
+        const dt = new Date(file.lastModified);
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        $('metaDate').textContent = `${y}-${m}-${d}`;
+      } else {
+        $('metaDate').textContent = '';
+      }
+
+      dropZone.style.display = 'none';
+      infoCard.style.display = state.showInfoCard ? 'block' : 'none';
+
+      generateFrames().then(() => {
+        hideProgress();
+        fitToScreen();
+      });
+    }
+
+    function estimateFps(video) {
+      return video.frameRate || 0;
+    }
+
+    function formatDuration(sec) {
+      const total = Math.floor(sec);
+      const mm = Math.floor(total / 60);
+      const ss = total % 60;
+      return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    }
+
+    async function generateFrames() {
+      if (!state.videoLoaded) return;
+      showProgress(0);
+
+      const fps = state.videoFps || 25;
+      const dur = state.videoDuration;
+      const totalFrames = state.totalFrames || Math.floor(fps * dur);
+
+      const startFrame = state.startFrame;
+      const endFrame = state.endFrame > 0 ? Math.min(state.endFrame, totalFrames) : totalFrames;
+      const framesRange = endFrame - startFrame;
+
+      let frameIndices = [];
+
+      if (state.selectionMode === 'count') {
+        const count = Math.max(1, state.frameCount);
+        if (count === 1) {
+          frameIndices = [startFrame + Math.floor(framesRange / 2)];
+        } else {
+          const step = framesRange / (count - 1);
+          for (let i = 0; i < count; i++) {
+            frameIndices.push(Math.floor(startFrame + step * i));
+          }
+        }
+      } else if (state.selectionMode === 'seconds') {
+        const intervalSec = Math.max(0.01, state.intervalValue);
+        const count = Math.floor(dur / intervalSec);
+        for (let i = 0; i <= count; i++) {
+          const t = i * intervalSec;
+          const f = Math.floor(t * fps);
+          if (f >= startFrame && f <= endFrame) {
+            frameIndices.push(f);
+          }
+        }
+      } else if (state.selectionMode === 'frames') {
+        const stepFrames = Math.max(1, Math.floor(state.intervalValue));
+        for (let f = startFrame; f <= endFrame; f += stepFrames) {
+          frameIndices.push(f);
+        }
+      }
+
+      frameIndices = Array.from(new Set(frameIndices)).filter(f => f >= 0 && f < totalFrames);
+      frameIndices.sort((a, b) => a - b);
+
+      if (frameIndices.length === 0) {
+        frameIndices = [Math.floor(totalFrames / 2)];
+      }
+
+      const w = state.videoWidth * state.quality;
+      const h = state.videoHeight * state.quality;
+      captureCanvas.width = Math.max(1, Math.floor(w));
+      captureCanvas.height = Math.max(1, Math.floor(h));
+
+      state.frames = [];
+
+      for (let i = 0; i < frameIndices.length; i++) {
+        const f = frameIndices[i];
+        const time = f / fps;
+        videoElement.currentTime = time;
+        await waitForSeek(videoElement);
+
+        captureCtx.drawImage(videoElement, 0, 0, captureCanvas.width, captureCanvas.height);
+        const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.9);
+        state.frames.push({ index: f, time, dataUrl });
+        showProgress(((i + 1) / frameIndices.length) * 100);
+      }
+
+      renderGrid();
+    }
+
+    function waitForSeek(video) {
+      return new Promise(resolve => {
+        function handler() {
+          video.removeEventListener('seeked', handler);
+          resolve();
+        }
+        video.addEventListener('seeked', handler);
+      });
+    }
+
+    function regenerateFrames() {
+      if (!state.videoLoaded) return;
+      generateFrames().then(() => {
+        hideProgress();
+        fitToScreen();
+      });
+    }
+
+    function renderGrid() {
+      framesGrid.innerHTML = '';
+      if (!state.frames.length) return;
+
+      state.frames.forEach(frame => {
+        const cell = document.createElement('div');
+        cell.className = 'frame-cell';
+
+        const img = document.createElement('img');
+        img.src = frame.dataUrl;
+        img.draggable = false;
+        cell.appendChild(img);
+
+        if (state.showTimecode || true) {
+          const tc = document.createElement('div');
+          tc.className = 'frame-timecode';
+          tc.textContent = frameToTimecode(frame.index, state.videoFps);
+          cell.appendChild(tc);
+        }
+
+        framesGrid.appendChild(cell);
+      });
+
+      updateGridLayout();
+      attachFramePreviewHandlers();
+    }
+
+    function frameToTimecode(frameIndex, fps) {
+      const totalSeconds = frameIndex / fps;
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      const frames = Math.floor((totalSeconds * fps) % fps);
+      return (
+        String(hours).padStart(2, '0') + ':' +
+        String(minutes).padStart(2, '0') + ':' +
+        String(seconds).padStart(2, '0') + ':' +
+        String(frames).padStart(2, '0')
+      );
+    }
+
+    function updateGridLayout() {
+      framesGrid.style.gridTemplateColumns = `repeat(${state.cols}, 1fr)`;
+      framesGrid.style.backgroundColor = state.bgColor;
+
+      framesGrid.style.gap = `${state.spacing}px`;
+      framesGrid.style.padding = `${state.spacing}px`;
+
+      const cells = framesGrid.querySelectorAll('.frame-cell');
+      cells.forEach((cell, i) => {
+        const tcEl = cell.querySelector('.frame-timecode');
+        if (tcEl) {
+          if (!state.showTimecode) {
+            tcEl.style.display = 'none';
+            return;
+          } else {
+            tcEl.style.display = 'block';
+          }
+
+          tcEl.style.color = state.timecodeStyle.textColor;
+          tcEl.style.fontSize = `${state.fontSize}px`;
+
+          const bg = hexToRgba(state.timecodeStyle.bgColor, state.timecodeStyle.bgOpacity);
+          tcEl.style.backgroundColor = bg;
+
+          if (state.timecodeStyle.align === 'left') {
+            tcEl.style.left = '4px';
+            tcEl.style.right = 'auto';
+            tcEl.style.textAlign = 'left';
+          } else if (state.timecodeStyle.align === 'center') {
+            tcEl.style.left = '50%';
+            tcEl.style.transform = 'translateX(-50%)';
+            tcEl.style.right = 'auto';
+            tcEl.style.textAlign = 'center';
+          } else {
+            tcEl.style.right = '4px';
+            tcEl.style.left = 'auto';
+            tcEl.style.transform = 'none';
+            tcEl.style.textAlign = 'right';
+          }
+
+          if (state.timecodeStyle.position === 'top') {
+            tcEl.style.top = '4px';
+            tcEl.style.bottom = 'auto';
+          } else {
+            tcEl.style.bottom = '4px';
+            tcEl.style.top = 'auto';
+          }
+        }
+      });
+
+      if (!state.showMetadataBar) {
+        metadataBar.style.display = 'none';
+      }
+    }
+
+    function hexToRgba(hex, alpha) {
+      let c = hex.replace('#', '');
+      if (c.length === 3) {
+        c = c.split('').map(ch => ch + ch).join('');
+      }
+      const num = parseInt(c, 16);
+      const r = (num >> 16) & 255;
+      const g = (num >> 8) & 255;
+      const b = num & 255;
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    fitScreenBtn.addEventListener('click', () => {
+      fitToScreen();
+    });
+
+    newVideoBtn.addEventListener('click', () => {
+      state.videoLoaded = false;
+      state.frames = [];
+      framesGrid.innerHTML = '';
+      dropZone.style.display = 'block';
+      infoCard.style.display = 'none';
+      $('metaFilename').textContent = 'No file';
+      $('metaResolution').textContent = '';
+      $('metaDuration').textContent = '';
+      $('metaFrames').textContent = '';
+      $('metaDate').textContent = '';
+      videoElement.src = '';
+    });
+
+    exportSmallBtn.addEventListener('click', () => exportGrid('jpeg', 2048));
+    exportMedBtn.addEventListener('click', () => exportGrid('jpeg', 3840));
+    exportFullBtn.addEventListener('click', () => exportGrid('png', 0));
+
+    function exportGrid(format, targetW) {
+      if (!state.frames.length) return;
+      const cols = state.cols;
+      const rows = Math.ceil(state.frames.length / cols);
+
+      const sample = new Image();
+      sample.src = state.frames[0].dataUrl;
+
+      sample.onload = () => {
+        const frameW = sample.width;
+        const frameH = sample.height;
+        const spacing = state.spacing;
+
+        let outW = cols * frameW + (cols + 1) * spacing;
+        let outH = rows * frameH + (rows + 1) * spacing;
+
+        let scale = 1;
+        if (targetW > 0 && outW > targetW) {
+          scale = targetW / outW;
+          outW = Math.round(outW * scale);
+          outH = Math.round(outH * scale);
+        }
+
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = outW;
+        exportCanvas.height = outH;
+        const ctx = exportCanvas.getContext('2d');
+
+        ctx.fillStyle = state.bgColor;
+        ctx.fillRect(0, 0, outW, outH);
+
+        state.frames.forEach((frame, i) => {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+
+          const x = (col + 1) * spacing + col * frameW;
+          const y = (row + 1) * spacing + row * frameH;
+
+          const dx = Math.round(x * scale);
+          const dy = Math.round(y * scale);
+          const dw = Math.round(frameW * scale);
+          const dh = Math.round(frameH * scale);
+
+          const img = new Image();
+          img.src = frame.dataUrl;
+          ctx.drawImage(img, dx, dy, dw, dh);
+
+          if (state.showTimecode) {
+            const tcText = frameToTimecode(frame.index, state.videoFps);
+            ctx.font = `${Math.round(state.fontSize * scale)}px system-ui, sans-serif`;
+            ctx.textBaseline = 'alphabetic';
+
+            ctx.fillStyle = hexToRgba(state.timecodeStyle.bgColor, state.timecodeStyle.bgOpacity);
+            ctx.strokeStyle = 'transparent';
+
+            const textWidth = ctx.measureText(tcText).width;
+            const padding = 4 * scale;
+            let tx, ty;
+
+            if (state.timecodeStyle.align === 'left') {
+              tx = dx + padding;
+            } else if (state.timecodeStyle.align === 'center') {
+              tx = dx + dw / 2 - textWidth / 2;
+            } else {
+              tx = dx + dw - textWidth - padding;
+            }
+
+            if (state.timecodeStyle.position === 'top') {
+              ty = dy + padding + state.fontSize * scale;
+            } else {
+              ty = dy + dh - padding;
+            }
+
+            const boxHeight = state.fontSize * scale + padding * 2;
+            const boxWidth = textWidth + padding * 2;
+            const boxX = tx - padding;
+            const boxY = ty - state.fontSize * scale - padding;
+
+            ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+            ctx.fillStyle = state.timecodeStyle.textColor;
+            ctx.fillText(tcText, tx, ty - 2 * scale);
+          }
+        });
+
+        const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+        const dataUrl = exportCanvas.toDataURL(mime, 0.95);
+        const a = document.createElement('a');
+        const now = new Date();
+        const ts = now.toISOString().replace(/[:.]/g, '-');
+        a.href = dataUrl;
+        a.download = format === 'png'
+          ? `framegrid_${ts}.png`
+          : `framegrid_${ts}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+    }
+
+    exportMp4GridBtn.addEventListener('click', () => exportMp4('grid'));
+    exportMp4SingleBtn.addEventListener('click', () => exportMp4('single'));
+
+    async function exportMp4(mode) {
+      if (!state.frames.length) return;
+
+      const fps = state.animFps || 8;
+      const frames = state.frames.slice();
+      let sequence = buildAnimationSequence(frames, state.animPattern, state.animDirection);
+
+      const offscreen = document.createElement('canvas');
+      const context = offscreen.getContext('2d');
+
+      const cols = state.cols;
+      const rows = Math.ceil(frames.length / cols);
+
+      const sampleImg = new Image();
+      sampleImg.src = frames[0].dataUrl;
+      await new Promise(resolve => sampleImg.onload = resolve);
+
+      const frameW = sampleImg.width;
+      const frameH = sampleImg.height;
+      const spacing = state.spacing;
+
+      if (mode === 'grid') {
+        offscreen.width = cols * frameW + (cols + 1) * spacing;
+        offscreen.height = rows * frameH + (rows + 1) * spacing;
+      } else {
+        offscreen.width = frameW;
+        offscreen.height = frameH;
+      }
+
+      const stream = offscreen.captureStream(fps);
+      const options = {
+        mimeType: 'video/webm;codecs=vp9,opus'
+      };
+
+      let recorder;
+      try {
+        recorder = new MediaRecorder(stream, options);
+      } catch (e) {
+        try {
+          recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' });
+        } catch (e2) {
+          alert('MediaRecorder is not supported in this browser for the required codecs.');
+          return;
+        }
+      }
+
+      const chunks = [];
+      recorder.ondataavailable = e => {
+        if (e.data && e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      const totalFrames = sequence.length;
+      let current = 0;
+
+      recorder.start();
+
+      await new Promise(resolve => {
+        const interval = setInterval(() => {
+          if (current >= totalFrames) {
+            clearInterval(interval);
+            recorder.stop();
+            resolve();
+            return;
+          }
+          drawAnimationFrame(context, offscreen, sequence[current], mode, cols, rows, frameW, frameH, spacing);
+          current++;
+        }, 1000 / fps);
+      });
+
+      const blob = await new Promise(resolve => {
+        recorder.onstop = () => {
+          const webmBlob = new Blob(chunks, { type: 'video/webm' });
+          resolve(webmBlob);
+        };
+      });
+
+      const fileUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const now = new Date();
+      const ts = now.toISOString().replace(/[:.]/g, '-');
+      a.href = fileUrl;
+      a.download = mode === 'grid'
+        ? `framegrid_anim_grid_${ts}.webm`
+        : `framegrid_anim_single_${ts}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(fileUrl);
+    }
+
+    function buildAnimationSequence(frames, pattern, direction) {
+      let seq = [];
+      const n = frames.length;
+
+      if (pattern === 'sequential') {
+        seq = frames.slice();
+      } else if (pattern === 'center') {
+        const centerIndex = Math.floor(n / 2);
+        const result = [];
+        let left = centerIndex;
+        let right = centerIndex + 1;
+        while (left >= 0 || right < n) {
+          if (left >= 0) result.push(frames[left--]);
+          if (right < n) result.push(frames[right++]);
+        }
+        seq = result;
+      } else if (pattern === 'snake') {
+        seq = frames.slice();
+      } else if (pattern === 'vertical') {
+        seq = frames.slice();
+      } else {
+        seq = frames.slice();
+      }
+
+      if (direction === 'backward') {
+        seq = seq.slice().reverse();
+      } else if (direction === 'pingpong') {
+        const rev = seq.slice().reverse();
+        rev.shift();
+        rev.pop();
+        seq = seq.concat(rev);
+      }
+      return seq;
+    }
+
+    function drawAnimationFrame(ctx, canvas, frame, mode, cols, rows, frameW, frameH, spacing) {
+      ctx.fillStyle = state.bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (mode === 'grid') {
+        state.frames.forEach((f, i) => {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const x = (col + 1) * spacing + col * frameW;
+          const y = (row + 1) * spacing + row * frameH;
+          const img = new Image();
+          img.src = f.dataUrl;
+          ctx.drawImage(img, x, y, frameW, frameH);
+        });
+      } else {
+        const img = new Image();
+        img.src = frame.dataUrl;
+        ctx.drawImage(img, 0, 0, frameW, frameH);
+      }
+    }
+
+    function attachFramePreviewHandlers() {
+      const cells = framesGrid.querySelectorAll('.frame-cell');
+      cells.forEach((cell, index) => {
+        cell.addEventListener('click', () => {
+          startAnimationPreview(index);
+        });
+      });
+    }
+
+    function startAnimationPreview(startIndex) {
+      if (!state.frames.length) return;
+      if (state.isPlaying) stopAnimationPreview();
+
+      state.animFps = parseInt(animFpsInput.value || '8', 10);
+      state.animDirection = animDirectionSelect.value;
+      state.animPattern = animPatternSelect.value;
+
+      state.isPlaying = true;
+      animOverlay.classList.add('visible');
+
+      const sequence = buildAnimationSequence(state.frames, state.animPattern, state.animDirection);
+      state.animFrame = 0;
+
+      const fps = state.animFps;
+      const delay = 1000 / fps;
+
+      state.animInterval = setInterval(() => {
+        if (!state.isPlaying) return;
+        const frame = sequence[state.animFrame % sequence.length];
+        animFrameEl.src = frame.dataUrl;
+        animInfo.textContent = `Frame ${frame.index} · ${frameToTimecode(frame.index, state.videoFps)} · ${fps} FPS`;
+        state.animFrame++;
+      }, delay);
+
+      playBtn.style.display = 'none';
+      stopBtn.style.display = 'block';
+    }
+
+    function stopAnimationPreview() {
+      state.isPlaying = false;
+      if (state.animInterval) {
+        clearInterval(state.animInterval);
+        state.animInterval = null;
+      }
+      animOverlay.classList.remove('visible');
+      playBtn.style.display = 'block';
+      stopBtn.style.display = 'none';
+    }
+
+    animCloseBtn.addEventListener('click', stopAnimationPreview);
+    stopBtn.addEventListener('click', stopAnimationPreview);
+    playBtn.addEventListener('click', () => {
+      if (!state.isPlaying) {
+        startAnimationPreview(0);
+      }
+    });
+
+    animFpsInput.addEventListener('change', () => {
+      state.animFps = parseInt(animFpsInput.value || '8', 10);
+      if (state.isPlaying) {
+        stopAnimationPreview();
+        startAnimationPreview(0);
+      }
+    });
+
+    animDirectionSelect.addEventListener('change', () => {
+      state.animDirection = animDirectionSelect.value;
+      if (state.isPlaying) {
+        stopAnimationPreview();
+        startAnimationPreview(0);
+      }
+    });
+
+    animPatternSelect.addEventListener('change', () => {
+      state.animPattern = animPatternSelect.value;
+      if (state.isPlaying) {
+        stopAnimationPreview();
+        startAnimationPreview(0);
+      }
+    });
+
+    ['keydown'].forEach(ev => {
+      window.addEventListener(ev, e => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+        if (e.key === '1') {
+          sideSections[0].classList.remove('collapsed');
+          sideMenu.scrollTop = 0;
+          openMenu();
+        } else if (e.key === '2') {
+          sideSections[1].classList.remove('collapsed');
+          openMenu();
+        } else if (e.key === '3') {
+          sideSections[2].classList.remove('collapsed');
+          openMenu();
+        } else if (e.key === '4') {
+          sideSections[3].classList.remove('collapsed');
+          openMenu();
+        } else if (e.key === '5') {
+          sideSections[4].classList.remove('collapsed');
+          openMenu();
+        } else if (e.key.toLowerCase() === 'f') {
+          fitToScreen();
+        } else if (e.key === '0') {
+          state.zoom = 1;
+          state.offsetX = 0;
+          state.offsetY = 0;
+          updateTransform();
+          updateZoomIndicator();
+        }
+      });
+    });
+
+    animFpsMinus.addEventListener('click', () => {
+      let v = parseInt(animFpsInput.value || '8', 10);
+      v = Math.max(1, v - 1);
+      animFpsInput.value = v;
+      state.animFps = v;
+      if (state.isPlaying) {
+        stopAnimationPreview();
+        startAnimationPreview(0);
+      }
+    });
+
+    animFpsPlus.addEventListener('click', () => {
+      let v = parseInt(animFpsInput.value || '8', 10);
+      v = Math.min(30, v + 1);
+      animFpsInput.value = v;
+      state.animFps = v;
+      if (state.isPlaying) {
+        stopAnimationPreview();
+        startAnimationPreview(0);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<!--
+╔════════════════════════════════════════════════════════════════╗
+║      FRAMEGRID v28.12                                        ║
+╚════════════════════════════════════════════════════════════════╝
+-->
+
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="pinterest" content="nopin">
+  <meta name="pinterest" content="nohover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>FRAMEGRID v28.12</title>
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+<div class="app" id="app">
+    <div class="metadata-bar" id="metadataBar">
+      <div class="metadata-center" id="metadataCenter">
+        <div class="metadata-logo" aria-label="FRAMEGRID">
+          <span class="fg-logo-icon" id="fgLogoIcon" aria-hidden="true">
+            <span class="fg-logo-cell active"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell"></span>
+            <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell"></span>
+            <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell active2"></span>
+          </span>
+          <span class="metadata-logo-text" id="fgLogoText">FRAMEGRID v28.12</span>
+        </div>
+        <div class="metadata-gap"></div>
+        <div class="metadata-group">
+          <div class="metadata-item filename editable" id="metaFilename">No file</div>
+          <div class="metadata-item" id="metaDuration"></div>
+          <div class="metadata-item" id="metaSourceFrames"></div>
+          <div class="metadata-item hide-mobile" id="metaResolution"></div>
+          <div class="metadata-item hide-mobile" id="metaDate"></div>
+        </div>
+        <div class="metadata-gap"></div>
+        <div class="metadata-group fps-group">
+          <div class="metadata-item dynamic menu-input-group" style="display:flex; align-items:center; gap:6px; padding: 2px 4px; background: transparent; border:none;" id="metaAnimFps">
+            <button class="menu-input-btn" id="metaFpsMinus" style="width:20px;height:20px;font-size:12px;border:none;">−</button>
+            <span id="metaAnimFpsText" style="min-width:36px;text-align:center;">14 fps</span>
+            <button class="menu-input-btn" id="metaFpsPlus" style="width:20px;height:20px;font-size:12px;border:none;">+</button>
+          </div>
+        </div>
+        <div class="metadata-gap"></div>
+        <div class="metadata-group" id="metaAnimSettingsGroup" style="display:none;">
+          <div class="metadata-item" id="metaDirection">
+            <div class="meta-cycle" id="metaDirCycle">
+              <span class="meta-cycle-label" id="metaDirLabel">—</span>
+            </div>
+          </div>
+          <div class="metadata-item" id="metaPattern">
+            <div class="meta-cycle" id="metaPtnCycle">
+              <span class="meta-cycle-label" id="metaPtnLabel">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="metadata-gap" id="metaAnimSettingsGap" style="display:none;"></div>
+        <div class="metadata-group">
+          <div class="metadata-item" id="metaFrames"></div>
+          <div class="metadata-item hide-mobile" id="metaGridShape"></div>
+          <div class="metadata-item hide-mobile" id="metaLayout"></div>
+        </div>
+      </div>
+      <button class="menu-toggle" id="menuToggleBtn"><span></span><span></span><span></span></button>
+    </div>
+
+    <div class="canvas-area" id="canvasArea">
+      <div class="bg-grid-layer" id="bgGridLayer"></div>
+      <div class="canvas-inner" id="canvasInner">
+        <canvas class="bg-underlay-canvas" id="bgUnderlayCanvas"></canvas>
+        <div class="frames-grid" id="framesGrid"></div>
+        <canvas class="draw-canvas" id="drawCanvas"></canvas>
+        <div class="export-guides" id="exportGuides" aria-hidden="true">
+          <div class="export-guides-inner"></div>
+          <div class="export-guides-corner tl"></div>
+          <div class="export-guides-corner tr"></div>
+          <div class="export-guides-corner bl"></div>
+          <div class="export-guides-corner br"></div>
+        </div>
+
+      </div>
+      
+      <!-- Floating Draw Palette - COMPACT -->
+      <div class="draw-palette" id="drawPalette">
+                <div class="draw-cols-wrapper">
+        <div class="draw-palette-col">
+            <!-- Row 1: Main tools -->
+            <div class="draw-palette-row draw-tools-row">
+              <button class="draw-btn draw-brush-btn active" data-brush="round" title="Round brush">●</button>
+              <button class="draw-btn draw-brush-btn" data-brush="spray" title="Spray">✦</button>
+              <button class="draw-btn" id="drawEraser" title="Eraser (3)">◯</button>
+              <button class="draw-btn" id="toggleTemplateVisibility" title="Toggle Template Visibility (T)">T</button>
+              <div class="draw-row-sep"></div>
+              <input type="color" id="drawColorInput" value="#ffffff" class="draw-color-input" style="width:28px;height:28px;border:2px solid rgba(255,255,255,0.3);padding:0;cursor:pointer;border-radius:2px;background:none;">
+              <button class="draw-btn" id="drawPaletteToggle" title="Hide palette (P)">▾</button>
+              <button class="draw-btn wide" id="drawBrushLock" title="Brush Off (A)">BRUSH OFF</button>
+            </div>
+
+            <!-- Row 2: Colors - Recent (circles) + Video palette (squares) -->
+            <div class="draw-palette-row" style="gap:3px;align-items:center;">
+              <div id="recentColorsRow" style="display:flex;gap:2px;"></div>
+              <div style="width:1px;height:16px;background:rgba(255,255,255,0.2);margin:0 2px;"></div>
+              <div id="videoPaletteRow" style="display:flex;gap:2px;"></div>
+              <button class="draw-btn" id="genVideoPalette" title="Regenerate video palette (Shift+V)">↻</button>
+            </div>
+
+            <!-- Row 5: Target buttons -->
+            <div class="draw-target-row">
+              <button class="draw-target-btn active" data-target="background" title="Background (Q)">BG</button>
+              <button class="draw-target-btn" data-target="template" title="Template (W)">TPL</button>
+              <button class="draw-target-btn" data-target="frame" title="Frame (E)">FRM</button>
+            </div>
+          </div>
+
+          <div class="draw-palette-col">
+            <!-- Row 3: Size slider -->
+            <div class="draw-palette-row draw-slider-row" style="gap:4px;">
+              <span class="draw-softness-label" title="Size">SIZE</span><span class="draw-value-label" id="drawSizeLabel" style="margin-left:4px;min-width:26px;">4</span>
+              <button class="menu-input-btn" id="drawSizeMinus">−</button>
+              <input type="range" class="draw-size-slider" id="drawSizeSlider" min="1" max="120" value="4" style="flex:1;">
+              <button class="menu-input-btn" id="drawSizePlus">+</button>
+            </div>
+
+            <!-- Row 4: Opacity slider with +/- -->
+            <div class="draw-palette-row draw-slider-row" style="gap:4px;">
+              <span class="draw-softness-label" title="Opacity">OPAC</span><span class="draw-value-label" id="drawOpacityLabel" style="margin-left:4px;min-width:32px;">100%</span>
+              <button class="menu-input-btn" id="drawOpacityMinus">−</button>
+              <input type="range" class="draw-size-slider" id="drawOpacitySlider" min="5" max="100" value="100" style="flex:1;">
+              <button class="menu-input-btn" id="drawOpacityPlus">+</button>
+            </div>
+
+            
+
+            <!-- Row 5: Edge Softness -->
+            <div class="draw-palette-row draw-slider-row" style="gap:4px;">
+              <span class="draw-softness-label" title="Edge Softness">EDGE</span><span class="draw-value-label" id="edgeSoftnessLabel" style="margin-left:4px;min-width:26px;">0%</span>
+              <button class="menu-input-btn" id="edgeSoftnessMinus">−</button>
+              <input type="range" class="draw-size-slider" id="edgeSoftnessSlider" min="0" max="100" value="0" style="flex:1;" title="Edge Softness">
+              <button class="menu-input-btn" id="edgeSoftnessPlus">+</button>
+            </div>
+
+          </div>
+        </div>
+      <!-- Row 6: Actions + Long Stroke with +/- -->
+      <div class="draw-palette-row draw-palette-full-row" style="gap:3px;align-items:center;flex-wrap:wrap;">
+        <button class="draw-btn" id="drawUndo" title="Undo (Z)">↶</button>
+        <button class="draw-btn" id="drawOnion" title="Onion Skin">◐</button>
+        <button class="draw-btn" id="drawClear" title="Clear (C)">✕</button>
+        <div class="draw-row-sep"></div>
+        <button class="draw-btn" id="savePointSave1" title="Save drawing to slot 1">S1</button>
+        <button class="draw-btn" id="savePointLoad1" title="Load drawing from slot 1" style="opacity:0.35">L1</button>
+        <button class="draw-btn" id="savePointSave2" title="Save drawing to slot 2">S2</button>
+        <button class="draw-btn" id="savePointLoad2" title="Load drawing from slot 2" style="opacity:0.35">L2</button>
+        <button class="draw-btn" id="savePointSave3" title="Save drawing to slot 3">S3</button>
+        <button class="draw-btn" id="savePointLoad3" title="Load drawing from slot 3" style="opacity:0.35">L3</button>
+        <button class="draw-btn wide" id="applyTemplateToFrames" title="Apply TEMPLATE layer into per-frame drawings">APLY TMPL</button>
+        <div class="draw-row-sep"></div>
+        <button class="draw-btn" id="drawOneFrameBtn" title="One Frame — no cross-frame bleed">1F</button>
+        <button class="draw-btn" id="drawLongStroke" title="Long Stroke (L)">⟿</button>
+        <button class="menu-input-btn" id="trailMinus">−</button>
+        <input type="number" class="menu-input menu-input-compact" id="longStrokeFade" value="8" min="0" max="100" title="Trail frames">
+        <button class="menu-input-btn" id="trailPlus">+</button>
+      </div>
+      </div>
+
+<!-- Hidden elements for compatibility -->
+      <div style="display:none;">
+        <button id="drawEyedropper"></button>
+<button id="drawToggle"></button>
+        <div id="drawSizePreview"><div id="drawSizeDot"></div></div>
+      </div>
+
+      <!-- Template Frame Window (LIVE layer editor) -->
+      <div class="template-frame" id="templateFrame" style="left:20px;top:20px;width:320px;height:200px;">
+        <div class="template-frame-header" id="templateFrameHeader">
+          <span>TEMPLATE LAYER</span>
+          <button class="template-frame-close" id="templateFrameClose" title="Close">×</button>
+        </div>
+        <div class="template-frame-canvas-wrap">
+          <canvas class="template-frame-canvas" id="templateFrameCanvas"></canvas>
+          <div class="template-frame-grid"></div>
+        </div>
+        <div class="template-frame-resize" id="templateFrameResize"></div>
+      </div>
+
+      <!-- Quick Toolbar -->
+      <div class="quick-toolbar" id="quickToolbar">
+        <button class="quick-btn" id="qMode" title="View Mode (G/1)" style="font-size:10px;width:auto;padding:0 10px;">GRID</button>
+        <button class="quick-btn" id="qFit" title="Fit to Screen (F)" aria-label="Fit to Screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v2H6v5H4V4zm9 0h7v7h-2V6h-5V4zm7 9v7h-7v-2h5v-5h2zM11 20H4v-7h2v5h5v2z"/></svg></button>
+        <button class="quick-btn" id="qOne" title="Zoom 100% (no fit)" style="font-size:10px;">1:1</button>
+        <button class="quick-btn" id="qReset" title="Reset to Start (Home)" aria-label="Reset to Start" style="font-size:15px;">↺</button>
+        <button class="quick-btn" id="qPlay" title="Play / Stop (Space)" aria-label="Play/Stop"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg></button>
+        <button class="quick-btn" id="qPrev" title="Previous Frame (←)" aria-label="Previous Frame" style="font-size:18px;letter-spacing:-1px;">‹</button>
+        <button class="quick-btn" id="qNext" title="Next Frame (→)" aria-label="Next Frame" style="font-size:18px;letter-spacing:-1px;">›</button>
+        <button class="quick-btn" id="qDraw" title="Draw Mode (D)">●</button>
+        <button class="quick-btn" id="qMenu" title="Menu (M)">≡</button>
+      </div>
+      
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-icon" aria-hidden="true">
+          <span class="fg-logo-icon fg-logo-icon--welcome" id="fgLogoIconWelcome">
+            <span class="fg-logo-cell active"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell"></span>
+            <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell"></span>
+            <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell active2"></span>
+          </span>
+        </div>
+        <div class="drop-zone-text">
+          <div class="dz-title">FrameGrid</div>
+          <div class="dz-subtitle"><div>Experimental open-source tool for video sampling and frame extraction.</div><div>Inspired by motion study plates, sequential art, and contact sheets.</div></div>
+</div>
+        <div class="drop-zone-btn-row">
+          <button class="drop-zone-btn" id="browseVideoBtn">IMPORT VIDEO</button>
+          <button class="drop-zone-btn" id="browseImageBtn">IMPORT IMAGE</button>
+          <button class="drop-zone-btn" id="browseCutBtn">SLICE</button>
+        </div>
+        <div class="drop-zone-formats">H.264 · PNG · JPEG</div>
+        <div class="drop-zone-hint">Best in the latest version of Chrome.</div>
+<!-- (Hotkeys list removed from start screen; see Menu > FRAMEGRID) -->
+
+        <div class="drop-zone-support">
+          <div class="drop-zone-support-text">
+            <p>An independent passion project, shared with the audiovisual community.<br>If it helps your creative process, <a class="drop-zone-support-link" href="https://buymeacoffee.com/comp1mov" target="_blank" rel="noopener noreferrer">your support</a> keeps the late-night sessions going.<br>Vibecoded by <a class="drop-zone-support-link" href="https://grisha-tsvetkov.com" target="_blank" rel="noopener noreferrer">Grisha Tsvetkov</a>.</p></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="side-menu" id="sideMenu">
+      <div class="side-menu-header">
+        <span>Settings</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="menu-close-btn" id="menuCollapseBtn" title="Collapse / expand all (N)">◀</button>
+          <button class="menu-close-btn" id="menuCloseBtn">✕</button>
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Frame Selection</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Start Frame</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="startMinus">−</button>
+              <input type="text" class="menu-input menu-input-narrow" id="startFrame" value="0" inputmode="decimal">
+              <button class="menu-input-btn" id="startPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">End Frame</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="endMinus">−</button>
+              <input type="text" class="menu-input menu-input-narrow" id="endFrame" value="0" inputmode="decimal">
+              <button class="menu-input-btn" id="endPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row" style="height:6px;"></div>
+          <div class="menu-row">
+            <span class="menu-label">Mode</span>
+            <select class="menu-select" id="selectionMode">
+              <option value="count" selected>Fixed Count</option>
+              <option value="seconds">Every N Sec</option>
+              <option value="frames">Every N Frames</option>
+              <option value="scene">Scene</option>
+              <option value="slice">Slice</option>
+            </select>
+          </div>
+          <div class="menu-row" id="countRow">
+            <span class="menu-label">Frame Count</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="countMinus">−</button>
+              <input type="text" class="menu-input menu-input-narrow" id="frameCount" value="24" inputmode="decimal">
+              <button class="menu-input-btn" id="countPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row" id="intervalRow" style="display:none;">
+            <span class="menu-label" id="intervalLabel">Seconds</span>
+            <input type="number" class="menu-input" id="intervalValue" value="3" min="1">
+          </div>
+          <div class="menu-row" id="sceneCountRow" style="display:none;">
+            <span class="menu-label">Scenes</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="sceneCountMinus">−</button>
+              <input type="text" inputmode="decimal" class="menu-input menu-input-narrow" id="sceneCountInput" value="5" min="1" max="200">
+              <button class="menu-input-btn" id="sceneCountPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row" id="sceneDepthRow" style="display:none;">
+            <span class="menu-label">Depth</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="sceneDepthMinus">−</button>
+              <input type="text" inputmode="decimal" class="menu-input menu-input-narrow" id="sceneDepthInput" value="8" min="1" max="200">
+              <button class="menu-input-btn" id="sceneDepthPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row" id="sceneDistanceRow" style="display:none;">
+            <span class="menu-label">Distance</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="sceneDistanceMinus">−</button>
+              <input type="text" inputmode="decimal" class="menu-input menu-input-narrow" id="sceneDistanceInput" value="1" min="1" max="500">
+              <button class="menu-input-btn" id="sceneDistancePlus">+</button>
+            </div>
+          </div>
+
+          <div class="menu-row" id="sliceColsRow" style="display:none;">
+            <span class="menu-label">Cols</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="sliceColsMinus">−</button>
+              <input type="number" class="menu-input menu-input-narrow" id="cutCols" value="3" min="1" max="64" inputmode="decimal">
+              <button class="menu-input-btn" id="sliceColsPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row" id="sliceRowsRow" style="display:none;">
+            <span class="menu-label">Rows</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="sliceRowsMinus">−</button>
+              <input type="number" class="menu-input menu-input-narrow" id="cutRows" value="3" min="1" max="64" inputmode="decimal">
+              <button class="menu-input-btn" id="sliceRowsPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row" id="sliceTotalRow" style="display:none;">
+            <span class="menu-label">Total Cells</span>
+            <span id="cutTotalText" style="font-size:11px;color:#aaa;">9</span>
+            <input type="hidden" id="cutTotal" value="9">
+          </div>
+          <div id="sliceBtnsRow" style="display:none; flex-direction:column; gap:6px;">
+            <button class="menu-btn" id="sliceFirstImageBtn" style="width:100%;">Slice Current Image</button>
+            <button class="menu-btn" id="loadNewImageBtn" style="width:100%;">Load New Image</button>
+          </div>
+          <div class="menu-row" style="height:6px;"></div>
+          <div class="menu-row">
+            <span class="menu-label">Quality</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+            <select class="menu-select" id="qualitySelect">
+              <option value="1">Full</option>
+              <option value="0.5" selected>/2</option>
+              <option value="0.25">/4</option>
+              <option value="0.125">/8</option>
+              <option value="0.0625">/16</option>
+              <option value="0.03125">/32</option>
+              <option value="0.015625">/64</option>
+              <option value="0.0078125">/128</option>
+              <option value="0.00390625">/256</option>
+              <option value="0.001953125">/512</option>
+              <option value="0.0009765625">/1024</option>
+            </select>
+            <span id="qualityResHint" style="font-size:10px;color:rgba(255,255,255,0.4);white-space:nowrap;min-width:60px;"></span>
+            </div>
+          </div>
+
+          <div id="regenFrameHint" style="text-align:left;font-size:10px;color:#ccc;margin-bottom:4px;letter-spacing:0.04em;min-height:14px;padding-left:2px;"></div>
+          <button class="menu-btn primary" id="generateBtn">Regenerate Grid</button>
+        </div>
+      </div>
+
+      <!-- FRAME TRANSFORM — separate collapsible section -->
+      <div class="menu-section collapsed">
+        <div class="menu-section-title">Frame Transform</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Target Aspect</span>
+            <select id="frameTargetAspect" class="menu-select">
+              <option value="auto">Auto (Source)</option>
+              <option value="1:1">1:1 Square</option>
+              <option value="9:16">9:16 Portrait</option>
+              <option value="16:9">16:9 Landscape</option>
+              <option value="4:3">4:3</option>
+              <option value="3:4">3:4</option>
+            </select>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Link Scale</span>
+            <div class="menu-toggle-switch active" id="toggleScaleLink"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Scale X</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="frameImgScaleX" min="0.1" max="4.0" step="0.01" value="1">
+              <input type="number" class="menu-slider-input" id="frameImgScaleNumX" min="0.1" max="4" step="0.01" value="1.00" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Scale Y</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="frameImgScaleY" min="0.1" max="4.0" step="0.01" value="1">
+              <input type="number" class="menu-slider-input" id="frameImgScaleNumY" min="0.1" max="4" step="0.01" value="1.00" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Offset X</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="frameImgOffX" min="-50" max="100" step="1" value="0">
+              <input type="number" class="menu-slider-input" id="frameImgOffXNum" min="-50" max="100" step="1" value="0" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Offset Y</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="frameImgOffY" min="-50" max="100" step="1" value="0">
+              <input type="number" class="menu-slider-input" id="frameImgOffYNum" min="-50" max="100" step="1" value="0" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Rotation</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="frameImgRot" min="-360" max="360" step="0.1" value="0">
+              <input type="number" class="menu-slider-input" id="frameImgRotNum" min="-360" max="360" step="0.1" value="0.0" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Opacity</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="frameImgOpacity" min="0" max="1" step="0.01" value="1">
+              <input type="number" class="menu-slider-input" id="frameImgOpacityNum" min="0" max="1" step="0.01" value="1.00" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Outside BG</span>
+            <input class="menu-color" type="color" id="frameBgColor" value="#000000">
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">BG Opacity</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="frameBgOpacity" min="0" max="1" step="0.01" value="1">
+              <input type="number" class="menu-slider-input" id="frameBgOpacityLabel" min="0" max="1" step="0.01" value="1.00" inputmode="decimal">
+            </div>
+          </div>
+
+          <button class="menu-btn" id="resetFrameTransformBtn">Reset Transform</button>
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Grid Layout</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Target Aspect</span>
+            <select class="menu-select" id="canvasAspect">
+              <option value="auto">Auto</option>
+              <option value="custom">Custom</option>
+              <option value="1:1">1:1 Square</option>
+              <option value="16:9">16:9 Wide</option>
+              <option value="9:16">9:16 Vertical</option>
+              <option value="4:3">4:3</option>
+              <option value="3:4">3:4</option>
+            </select>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Columns</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="colsMinus">−</button>
+              <input type="text" class="menu-input menu-input-narrow" id="gridCols" value="6" inputmode="decimal">
+              <button class="menu-input-btn" id="colsPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label" title="1 = off/show all. 2,3,4... show only first N frames in grid.">Frame Target</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="frameTargetMinus">−</button>
+              <input type="number" class="menu-input menu-input-narrow" id="frameTargetInput" value="1" min="1" max="9999" style="width:44px;" inputmode="decimal" placeholder="auto">
+              <button class="menu-input-btn" id="frameTargetPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">HIDE</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="cellMinus">-</button>
+              <input type="number" class="menu-input menu-input-narrow" id="cellSizeInput" value="1" min="1" max="999" style="width:44px;">
+              <button class="menu-input-btn" id="cellPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label" title="Show frames sequentially across cells instead of spreading them">Sequence Mode</span>
+            <div class="menu-toggle-switch" id="toggleSequenceMode"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Phase Spread</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="loopMinus">-</button>
+              <input type="number" class="menu-input menu-input-narrow" id="gridLoopsInput" value="1" min="1" max="999" style="width:44px;">
+              <button class="menu-input-btn" id="loopPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Loop after N</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="loopNMinus">-</button>
+              <input type="number" class="menu-input menu-input-narrow" id="loopNInput" value="0" min="0" max="9999" style="width:52px;">
+              <button class="menu-input-btn" id="loopNPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row" id="loopOffsetRow" style="display:none;">
+            <span class="menu-label">Loop Offset</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="loopOffsetMinus">-</button>
+              <input type="number" class="menu-input menu-input-narrow" id="loopOffsetInput" value="0" min="0" max="9999" style="width:52px;">
+              <button class="menu-input-btn" id="loopOffsetPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row" style="display:none;">
+            <span class="menu-label">Auto-fit</span>
+            <div class="menu-toggle-switch active" id="toggleAutoFit"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Spacing</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="spacingMinus">−</button>
+              <input type="number" class="menu-input menu-input-narrow" id="spacingInput" value="0" min="0" max="200">
+              <button class="menu-input-btn" id="spacingPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-hint" id="gridHint">Load video to see suggestions</div>
+        </div>
+      </div>
+
+      
+      
+<div class="menu-section collapsed">
+        <div class="menu-section-title">BG</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Background Color</span>
+            <input type="color" class="menu-color-input" id="bgColor" value="#0a0a0a">
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Show BG Grid</span>
+            <div class="menu-toggle-switch" id="toggleBgGrid"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Type</span>
+            <select class="menu-select" id="bgGridType">
+              <option value="lines">Lines</option>
+              <option value="dots">Dots</option>
+            </select>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Color</span>
+            <input type="color" class="menu-color-input" id="bgGridColor" value="#ffffff">
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Opacity</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="bgGridOpacity" min="0" max="100" value="12">
+              <span class="menu-slider-value" id="bgGridOpacityValue">12%</span>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Size</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="bgGridSize" min="6" max="80" value="24">
+              <span class="menu-slider-value" id="bgGridSizeValue">24px</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-section collapsed">
+        <div class="menu-section-title">Animation Preview</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">FPS</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="fpsMinus">−</button>
+              <input type="number" class="menu-input menu-input-narrow" id="animFps" value="14" min="1" max="60" inputmode="decimal">
+              <button class="menu-input-btn" id="fpsPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Direction</span>
+            <select class="menu-select" id="animDirection">
+              <option value="forward">Forward</option>
+              <option value="backward">Backward</option>
+              <option value="pingpong">Ping-pong</option>
+              <option value="bounce-offset">Bounce Offset</option>
+              <option value="stutter">Stutter (Glitch)</option>
+              <option value="holdskip">Hold & Skip</option>
+              <option value="shuffleloop">Shuffle Loop</option>
+              <option value="sync">Sync (all same)</option>
+              <option value="random">Random (Chaos)</option>
+            </select>
+          </div>
+          <div class="menu-row" id="animSeedRow">
+            <span class="menu-label">Seed</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="animSeedRand" title="Randomize seed">↻</button>
+              <input type="number" class="menu-input menu-input-narrow" id="animSeed" value="1" min="0" max="999999999" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Pattern</span>
+            <select class="menu-select" id="animPattern">
+              <option value="sequential">Sequential</option>
+              <option value="center">Center-out</option>
+              <option value="snake">Snake</option>
+              <option value="vertical">Vertical</option>
+              <option value="vertical-snake">Vertical Snake</option>
+              <option value="spiral">Spiral</option>
+              <option value="checkerboard">Checkerboard</option>
+              <option value="random">Random</option>
+            </select>
+          </div>
+          <div style="display:flex; gap:8px; margin-top: 8px; margin-bottom: 8px;">
+            <button class="menu-btn" id="btnFlipX" style="flex:1; margin-top:0;">FLIP X</button>
+            <button class="menu-btn" id="btnFlipY" style="flex:1; margin-top:0;">FLIP Y</button>
+          </div>
+          <button class="menu-btn primary" id="playBtn">▶ Play Animation</button>
+          <button class="menu-btn" id="stopBtn" style="display:none;">■ Stop</button>
+        </div>
+      </div>
+
+      
+      <div class="menu-section collapsed">
+        <div class="menu-section-title">Timecode</div>
+        <div class="menu-section-content">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <button class="menu-btn" id="toggleTcIndex" style="margin:0;">Index</button>
+            <button class="menu-btn" id="toggleTcTime" style="margin:0;">Sec</button>
+            <button class="menu-btn active-toggle" id="toggleTcFrame" style="margin:0;">Frame</button>
+            <button class="menu-btn" id="toggleTcText" style="margin:0;">Text</button>
+          </div>
+          <div class="menu-row" id="tcCustomTextRow" style="display:none;">
+            <span class="menu-label">Text</span>
+            <input type="text" class="menu-input" id="tcCustomTextInput" placeholder="Enter label" value="">
+          </div>
+
+          <div style="margin-bottom:6px;">
+            <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Align</div>
+            <div class="tc-btn-group" id="tcAlignGroup">
+              <button class="menu-btn active-toggle" data-val="left">Left</button>
+              <button class="menu-btn" data-val="center">Center</button>
+              <button class="menu-btn" data-val="right">Right</button>
+            </div>
+          </div>
+          <div style="margin-bottom:4px;">
+            <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Position</div>
+            <div class="tc-btn-group" id="tcPositionGroup">
+              <button class="menu-btn active-toggle" data-val="top">Top</button>
+              <button class="menu-btn" data-val="center">Center</button>
+              <button class="menu-btn" data-val="bottom">Bottom</button>
+            </div>
+          </div>
+
+          <div class="tc-color-grid" style="margin-top:10px;margin-bottom:10px;">
+            <div class="tc-color-btn" id="tcTextColorBtn" style="background:#ffffff;">
+              <input type="color" id="tcTextColor" value="#ffffff">
+              <span class="tc-color-label">Text</span>
+            </div>
+            <div class="tc-color-btn" id="tcBgColorBtn" style="background:#000000;">
+              <input type="color" id="tcBgColor" value="#000000">
+              <span class="tc-color-label">BG</span>
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">TC Opacity</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="tcOpacitySlider" min="0" max="100" value="70">
+              <span class="menu-slider-value" id="tcOpacityValue">70%</span>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Font Size</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="fontSizeSlider" min="6" max="32" value="10">
+              <span class="menu-slider-value" id="fontSizeValue">10px</span>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">TC Box Pad</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="tcPaddingSlider" min="0" max="30" value="0">
+              <span class="menu-slider-value" id="tcPaddingValue">0px</span>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">TC Margin</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="tcMarginSlider" min="0" max="30" value="0">
+              <span class="menu-slider-value" id="tcMarginValue">0px</span>
+            </div>
+          </div>
+          <!-- keep hidden selects for JS compatibility -->
+          <select id="tcAlign" style="display:none;"><option value="left" selected>Left</option><option value="center">Center</option><option value="right">Right</option></select>
+          <select id="tcPosition" style="display:none;"><option value="top" selected>Top</option><option value="center">Center</option><option value="bottom">Bottom</option></select>
+
+          </div>
+      </div>
+
+<div class="menu-section collapsed">
+        <div class="menu-section-title">Draw</div>
+        <div class="menu-section-content">
+<div class="menu-row">
+            <span class="menu-label">Spray Spread</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="sprayScatterSlider" min="5" max="300" value="150">
+              <span class="menu-slider-value" id="sprayScatterValue">150%</span>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Spray Dot</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="sprayDotScaleSlider" min="5" max="300" value="10">
+              <span class="menu-slider-value" id="sprayDotScaleValue">10%</span>
+            </div>
+          </div>
+            
+          <div class="menu-row">
+            <span class="menu-label">Brush Panel</span>
+            <div class="menu-toggle-switch" id="toggleBrushPanel"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">BG Draw Order</span>
+            <div class="menu-toggle-switch" id="toggleBgAboveDrawings"></div>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- CHRONOPHOTO -->
+            <div class="menu-section collapsed" id="colorCorrSection">
+        <div class="menu-section-title">COLOR CORRECTION</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Enable</span>
+            <div class="menu-toggle-switch" id="toggleCC"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Brightness</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="ccBrightness" min="0" max="4" step="0.01" value="1.0">
+              <input type="number" class="menu-slider-input" id="ccBrightnessNum" min="0" max="4" step="0.01" value="1.0" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Contrast</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="ccContrast" min="0" max="4" step="0.01" value="1.0">
+              <input type="number" class="menu-slider-input" id="ccContrastNum" min="0" max="4" step="0.01" value="1.0" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Saturation</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="ccSaturation" min="0" max="3" step="0.01" value="1.0">
+              <input type="number" class="menu-slider-input" id="ccSaturationNum" min="0" max="3" step="0.01" value="1.0" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Hue</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="ccHue" min="-180" max="180" step="1" value="0">
+              <input type="number" class="menu-slider-input" id="ccHueNum" min="-180" max="180" step="1" value="0" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Invert</span>
+            <div class="menu-toggle-switch" id="toggleCCInvert"></div>
+          </div>
+                    
+<div class="menu-row" style="margin-top:6px;">
+            <span class="menu-label"></span>
+            <button class="menu-btn" id="ccReset" style="font-size:9px;padding:4px 10px;opacity:0.6;">RESET</button>
+          </div>
+        </div>
+      </div>
+
+<div class="menu-section collapsed" id="coloramaSection">
+        <div class="menu-section-title">COLORAMA<div class="menu-section-toggle"></div></div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Enable</span>
+            <div class="menu-toggle-switch" id="toggleColorama"></div>
+          </div>
+          <!-- Gradient preview bar -->
+          <div style="margin:8px 0 4px;padding:0 2px;">
+            <canvas id="coloramaBar" width="220" height="20" style="width:100%;height:20px;border-radius:3px;cursor:crosshair;display:block;"></canvas>
+          </div>
+
+          <!-- 3 color stops: Shadow / Mid / Highlight -->
+          <div class="menu-row">
+            <span class="menu-label">Shadow</span>
+            <input type="color" id="caColorA" value="#0a0a2e" style="width:38px;height:22px;border:none;background:none;cursor:pointer;padding:0;">
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Midtone</span>
+            <input type="color" id="caColorB" value="#ff4400" style="width:38px;height:22px;border:none;background:none;cursor:pointer;padding:0;">
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Highlight</span>
+            <input type="color" id="caColorC" value="#ffee00" style="width:38px;height:22px;border:none;background:none;cursor:pointer;padding:0;">
+          </div>
+
+          <!-- Offset — key for animation/cycling -->
+          <div class="menu-row">
+            <span class="menu-label">Offset</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="caOffset" min="-1" max="1" step="0.001" value="0">
+              <input type="number" class="menu-slider-input" id="caOffsetNum" min="-1" max="1" step="0.001" value="0" inputmode="decimal">
+            </div>
+          </div>
+
+          <!-- Blend mode for composite over original -->
+          <div class="menu-row">
+            <span class="menu-label">Blend</span>
+            <select class="menu-select" id="caBlend">
+              <option value="normal">Normal</option>
+              <option value="screen">Screen</option>
+              <option value="multiply">Multiply</option>
+              <option value="overlay">Overlay</option>
+              <option value="hard-light">Hard Light</option>
+              <option value="color">Color</option>
+              <option value="luminosity">Luminosity</option>
+              <option value="difference">Difference</option>
+            </select>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Opacity</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="caOpacity" min="0" max="1" step="0.01" value="1">
+              <input type="number" class="menu-slider-input" id="caOpacityNum" min="0" max="1" step="0.01" value="1" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Speed</span>
+            <select class="menu-select" id="caSpeed">
+              <option value="0">0 — off</option>
+              <option value="1">1 — slow</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4 — fast</option>
+            </select>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Cascade</span>
+            <div class="menu-toggle-switch" id="toggleCACascade"></div>
+          </div>
+          <div class="menu-row" id="caCascadeAmtRow">
+            <span class="menu-label">Cascade Amt</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="caCascadeAmt" min="0" max="2" step="0.01" value="1">
+              <input type="number" class="menu-slider-input" id="caCascadeAmtNum" min="0" max="2" step="0.01" value="1" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row" style="margin-top:6px;">
+            <span class="menu-label"></span>
+            <button class="menu-btn" id="caReset" style="font-size:9px;padding:4px 10px;opacity:0.6;">RESET</button>
+          </div>
+        </div>
+      </div>
+
+
+<div class="menu-section collapsed" id="chronophotoSection">
+        <div class="menu-section-title">CHRONOPHOTO</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Enable</span>
+            <div class="menu-toggle-switch" id="toggleChronophoto"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Blend Mode</span>
+            <select class="menu-select" id="chronoBlend">
+              <option value="source-over">Normal</option>
+              <option value="screen">Screen</option>
+              <option value="overlay">Overlay</option>
+              <option value="multiply">Multiply</option>
+              <option value="lighten">Lighten</option>
+              <option value="darken" selected>Darken</option>
+              <option value="color-dodge">Color Dodge</option>
+              <option value="color-burn">Color Burn</option>
+              <option value="difference">Difference</option>
+              <option value="exclusion">Exclusion</option>
+              <option value="hard-light">Hard Light</option>
+              <option value="soft-light">Soft Light</option>
+              <option value="luminosity">Luminosity</option>
+              <option value="hue">Hue</option>
+              <option value="color">Color</option>
+              <option value="plus-lighter">Plus Lighter</option>
+              <option value="plus-darker">Plus Darker</option>
+            </select>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Frame Depth</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="chronoDepthMinus">−</button>
+              <input type="number" class="menu-input menu-input-narrow" id="chronoDepth" value="5" min="1" max="100">
+              <button class="menu-input-btn" id="chronoDepthPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Layer Opacity</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="chronoOpacity" min="0.01" max="1.0" step="0.01" value="1.00">
+              <input type="number" class="menu-slider-input" id="chronoOpacityNum" min="0.01" max="1.0" step="0.01" value="1.00" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label" title="Cascade makes older frames more transparent">Cascade Fade</span>
+            <div class="menu-toggle-switch" id="toggleChronoCascade"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label" title="Mirror: center frame fully opaque, fades symmetrically to both edges">Mirror</span>
+            <div class="menu-toggle-switch" id="toggleChronoCascadeMirror"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label" title="Number of frames at full opacity before fade begins (1 = only center, 3 = 3 frames fully visible)">Constant</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="chronoCascadeConstMinus">−</button>
+              <input type="number" class="menu-input menu-input-narrow" id="chronoCascadeConst" value="1" min="1" max="24" step="1">
+              <button class="menu-input-btn" id="chronoCascadeConstPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label" title="Step size between ghost frames. Stride 5 = frames at -5,-10,-15...">Phase Stride</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="chronoStrideMinus">−</button>
+              <input type="number" class="menu-input menu-input-narrow" id="chronoStride" value="1" min="1" max="50">
+              <button class="menu-input-btn" id="chronoStridePlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label" title="Fade ghost opacity at loop seam to prevent jump cuts">Clean Loop</span>
+            <div class="menu-toggle-switch" id="toggleChronoCleanLoop"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-section collapsed" id="frameDiffSection">
+        <div class="menu-section-title">FRAME DIFF</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label" title="Overlay a static plate frame using blend mode — shows only what differs from the plate">Enable</span>
+            <div class="menu-toggle-switch" id="toggleFrameDiff"></div>
+          </div>
+          <div id="frameDiffControls">
+            <div class="menu-row">
+              <span class="menu-label">Plate Frame</span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="frameDiffPlateMinus">−</button>
+                <input type="number" class="menu-input menu-input-narrow" id="frameDiffPlateInput" value="0" min="0">
+                <button class="menu-input-btn" id="frameDiffPlatePlus">+</button>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Plate Mode</span>
+              <select class="menu-select" id="frameDiffModeSelect">
+                <option value="static" selected>Static</option>
+                <option value="tick">Tick Driven</option>
+                <option value="loop">Loop N</option>
+              </select>
+            </div>
+            <div class="menu-row" id="frameDiffStepRow">
+              <span class="menu-label">Step</span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="frameDiffStepMinus">−</button>
+                <input type="number" class="menu-input menu-input-narrow" id="frameDiffStepInput" value="1" min="1">
+                <button class="menu-input-btn" id="frameDiffStepPlus">+</button>
+              </div>
+            </div>
+            <div class="menu-row" id="frameDiffLoopRow">
+              <span class="menu-label">Loop N</span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="frameDiffLoopMinus">−</button>
+                <input type="number" class="menu-input menu-input-narrow" id="frameDiffLoopInput" value="1" min="1">
+                <button class="menu-input-btn" id="frameDiffLoopPlus">+</button>
+              </div>
+            </div>
+            <div class="menu-row" id="frameDiffOffsetRow">
+              <span class="menu-label">Offset</span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="frameDiffOffsetMinus">−</button>
+                <input type="number" class="menu-input menu-input-narrow" id="frameDiffOffsetInput" value="0" min="0">
+                <button class="menu-input-btn" id="frameDiffOffsetPlus">+</button>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Blend Mode</span>
+              <select class="menu-select" id="frameDiffBlendSelect">
+                <option value="difference" selected>Difference</option>
+                <option value="exclusion">Exclusion</option>
+                <option value="subtract">Subtract</option>
+                <option value="lighten">Lighten</option>
+                <option value="darken">Darken</option>
+                <option value="screen">Screen</option>
+                <option value="multiply">Multiply</option>
+                <option value="overlay">Overlay</option>
+                <option value="plus-lighter">Plus Lighter</option>
+                <option value="plus-darker">Plus Darker</option>
+              </select>
+            </div>
+            <div class="menu-row">
+              <span class="menu-label">Opacity</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="frameDiffOpacity" min="0.01" max="1.0" step="0.01" value="1.00">
+                <input type="number" class="menu-slider-input" id="frameDiffOpacityNum" min="0.01" max="1.0" step="0.01" value="1.00" inputmode="decimal">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+<div class="menu-section" id="audioSeqSection">
+        <div class="menu-section-title">Audio Collision Seq</div>
+        <div class="menu-section-content">
+
+          <div class="menu-row">
+            <span class="menu-label">Enable</span>
+            <div class="menu-toggle-switch" id="audioSeqEnable"></div>
+          </div>
+
+
+          <div class="menu-subtitle">Mapping</div>
+
+          <div class="menu-row">
+            <span class="menu-label">Status</span>
+            <span id="audioStatus" style="font-size:10px;color:rgba(255,255,255,0.45);"></span>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Playhead</span>
+            <div class="menu-input-group" style="gap:4px;">
+              <button class="menu-btn active-toggle" id="audioEditOff" data-mode="off">Off</button>
+              <button class="menu-btn" id="audioEditAssign" data-mode="assign">Sample</button>
+              <button class="menu-btn" id="audioEditPlayhead" data-mode="playhead">Playhead</button>
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Assign Slot</span>
+            <div class="menu-input-group" style="gap:4px;">
+              <button class="menu-chip-btn" id="audioQuickSlot1" style="color:#35f2a3;">S1</button>
+              <button class="menu-chip-btn" id="audioQuickSlot2" style="color:#ff4fd8;">S2</button>
+              <button class="menu-chip-btn" id="audioQuickSlot3" style="color:#ffd54a;">S3</button>
+              <button class="menu-chip-btn" id="audioQuickSlot4" style="color:#4aa3ff;">S4</button>
+              <div class="fg-audio-mini" id="audioCurrentSlotName" style="margin-left:4px;">—</div>
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Clear</span>
+            <div class="menu-input-group" style="gap:4px;">
+              <button class="menu-chip-btn" id="audioClearPlayheads" title="Clear all playhead cells">Playheads</button>
+              <button class="menu-chip-btn" id="audioClearMap" title="Clear cell→sample assignments">Map</button>
+            </div>
+          </div>
+
+
+          <div class="menu-row">
+            <span class="menu-label">Velocity</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="audioVel" min="0" max="1" step="0.01" value="0.85">
+              <input type="number" class="menu-slider-input" id="audioVelNum" min="0" max="1" step="0.01" value="0.85" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Master</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="audioMaster" min="0" max="1" step="0.01" value="0.9">
+              <input type="number" class="menu-slider-input" id="audioMasterNum" min="0" max="1" step="0.01" value="0.9" inputmode="decimal">
+            </div>
+          </div>
+
+          
+          
+          <div class="menu-subtitle">Grab from Video</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;margin-bottom:8px;align-items:center;">
+            <div style="font-size:10px;color:#aaa;">Length (s)</div>
+            <div><input type="number" class="menu-input menu-input-narrow" id="audioGrabLen" value="2.0" min="0.1" max="60" step="0.1" style="width:100%;"></div>
+
+            <div style="font-size:10px;color:#35f2a3;">S1 Start</div>
+            <div style="display:flex;gap:4px;"><input type="number" class="menu-input menu-input-narrow" id="audioGrabStart1" value="0" min="0" max="9999" step="0.1" style="width:100%;"><button class="menu-input-btn" id="audioGrab1" title="Grab video audio into S1">⬇</button></div>
+
+            <div style="font-size:10px;color:#ff4fd8;">S2 Start</div>
+            <div style="display:flex;gap:4px;"><input type="number" class="menu-input menu-input-narrow" id="audioGrabStart2" value="2" min="0" max="9999" step="0.1" style="width:100%;"><button class="menu-input-btn" id="audioGrab2" title="Grab video audio into S2">⬇</button></div>
+
+            <div style="font-size:10px;color:#ffd54a;">S3 Start</div>
+            <div style="display:flex;gap:4px;"><input type="number" class="menu-input menu-input-narrow" id="audioGrabStart3" value="4" min="0" max="9999" step="0.1" style="width:100%;"><button class="menu-input-btn" id="audioGrab3" title="Grab video audio into S3">⬇</button></div>
+
+            <div style="font-size:10px;color:#4aa3ff;">S4 Start</div>
+            <div style="display:flex;gap:4px;"><input type="number" class="menu-input menu-input-narrow" id="audioGrabStart4" value="6" min="0" max="9999" step="0.1" style="width:100%;"><button class="menu-input-btn" id="audioGrab4" title="Grab video audio into S4">⬇</button></div>
+          </div>
+          <div class="menu-row" style="margin-bottom:8px;">
+            <span class="menu-label"></span>
+            <button class="menu-btn" id="audioGrabAll" style="font-size:9px;padding:4px 10px;">⬇ GRAB ALL</button>
+          </div>
+<div class="menu-subtitle">Samples</div>
+
+          <div class="fg-audio-slot-block" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;margin-top:6px;">
+            <div class="menu-row">
+              <span class="menu-label" style="font-weight:600;color:#35f2a3;">S1<span class="fg-audio-sample-name" id="audioName1">no file</span></span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="audioLoad1" title="Load file into S1">⤓</button>
+                <input type="color" class="fg-audio-color" id="audioColor1" value="#35f2a3" title="S1 color">
+                <button class="menu-input-btn" id="audioTest1" title="Preview S1">▶</button>
+                <button class="menu-input-btn" id="audioRec1" title="Record mic to S1">●</button>
+                <button class="menu-input-btn" id="audioClearSlot1" title="Clear mappings for S1">⌫</button>
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Vol</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioVol1" min="0" max="1" step="0.01" value="1">
+                <input type="number" class="menu-slider-input" id="audioVol1Num" min="0" max="1" step="0.01" value="1" inputmode="decimal">
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Trim In</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioTrimIn1" min="0" max="1" step="0.001" value="0">
+                <input type="number" class="menu-slider-input" id="audioTrimIn1Num" value="0" min="0" max="100" step="0.1" style="width:52px;" inputmode="decimal">
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;margin-bottom:4px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Trim Out</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioTrimOut1" min="0" max="1" step="0.001" value="1">
+                <input type="number" class="menu-slider-input" id="audioTrimOut1Num" value="100" min="0" max="100" step="0.1" style="width:52px;" inputmode="decimal">
+              </div>
+            </div>
+          </div>
+
+          <div class="fg-audio-slot-block" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;margin-top:6px;">
+            <div class="menu-row">
+              <span class="menu-label" style="font-weight:600;color:#ff4fd8;">S2<span class="fg-audio-sample-name" id="audioName2">no file</span></span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="audioLoad2" title="Load file into S2">⤓</button>
+                <input type="color" class="fg-audio-color" id="audioColor2" value="#ff4fd8" title="S2 color">
+                <button class="menu-input-btn" id="audioTest2" title="Preview S2">▶</button>
+                <button class="menu-input-btn" id="audioRec2" title="Record mic to S2">●</button>
+                <button class="menu-input-btn" id="audioClearSlot2" title="Clear mappings for S2">⌫</button>
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Vol</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioVol2" min="0" max="1" step="0.01" value="1">
+                <input type="number" class="menu-slider-input" id="audioVol2Num" min="0" max="1" step="0.01" value="1" inputmode="decimal">
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Trim In</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioTrimIn2" min="0" max="1" step="0.001" value="0">
+                <input type="number" class="menu-slider-input" id="audioTrimIn2Num" value="0" min="0" max="100" step="0.1" style="width:52px;" inputmode="decimal">
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;margin-bottom:4px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Trim Out</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioTrimOut2" min="0" max="1" step="0.001" value="1">
+                <input type="number" class="menu-slider-input" id="audioTrimOut2Num" value="100" min="0" max="100" step="0.1" style="width:52px;" inputmode="decimal">
+              </div>
+            </div>
+          </div>
+
+          <div class="fg-audio-slot-block" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;margin-top:6px;">
+            <div class="menu-row">
+              <span class="menu-label" style="font-weight:600;color:#ffd54a;">S3<span class="fg-audio-sample-name" id="audioName3">no file</span></span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="audioLoad3" title="Load file into S3">⤓</button>
+                <input type="color" class="fg-audio-color" id="audioColor3" value="#ffd54a" title="S3 color">
+                <button class="menu-input-btn" id="audioTest3" title="Preview S3">▶</button>
+                <button class="menu-input-btn" id="audioRec3" title="Record mic to S3">●</button>
+                <button class="menu-input-btn" id="audioClearSlot3" title="Clear mappings for S3">⌫</button>
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Vol</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioVol3" min="0" max="1" step="0.01" value="1">
+                <input type="number" class="menu-slider-input" id="audioVol3Num" min="0" max="1" step="0.01" value="1" inputmode="decimal">
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Trim In</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioTrimIn3" min="0" max="1" step="0.001" value="0">
+                <input type="number" class="menu-slider-input" id="audioTrimIn3Num" value="0" min="0" max="100" step="0.1" style="width:52px;" inputmode="decimal">
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;margin-bottom:4px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Trim Out</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioTrimOut3" min="0" max="1" step="0.001" value="1">
+                <input type="number" class="menu-slider-input" id="audioTrimOut3Num" value="100" min="0" max="100" step="0.1" style="width:52px;" inputmode="decimal">
+              </div>
+            </div>
+          </div>
+
+          <div class="fg-audio-slot-block" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;margin-top:6px;">
+            <div class="menu-row">
+              <span class="menu-label" style="font-weight:600;color:#4aa3ff;">S4<span class="fg-audio-sample-name" id="audioName4">no file</span></span>
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="audioLoad4" title="Load file into S4">⤓</button>
+                <input type="color" class="fg-audio-color" id="audioColor4" value="#4aa3ff" title="S4 color">
+                <button class="menu-input-btn" id="audioTest4" title="Preview S4">▶</button>
+                <button class="menu-input-btn" id="audioRec4" title="Record mic to S4">●</button>
+                <button class="menu-input-btn" id="audioClearSlot4" title="Clear mappings for S4">⌫</button>
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Vol</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioVol4" min="0" max="1" step="0.01" value="1">
+                <input type="number" class="menu-slider-input" id="audioVol4Num" min="0" max="1" step="0.01" value="1" inputmode="decimal">
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Trim In</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioTrimIn4" min="0" max="1" step="0.001" value="0">
+                <input type="number" class="menu-slider-input" id="audioTrimIn4Num" value="0" min="0" max="100" step="0.1" style="width:52px;" inputmode="decimal">
+              </div>
+            </div>
+            <div class="menu-row" style="margin-top:2px;margin-bottom:4px;">
+              <span class="menu-label" style="font-size:10px;color:#aaa;">Trim Out</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="audioTrimOut4" min="0" max="1" step="0.001" value="1">
+                <input type="number" class="menu-slider-input" id="audioTrimOut4Num" value="100" min="0" max="100" step="0.1" style="width:52px;" inputmode="decimal">
+              </div>
+            </div>
+          </div>
+
+          <div class="menu-subtitle">Preview</div>
+
+          <div class="menu-row">
+            <span class="menu-label">Play cell frame</span>
+            <div class="menu-toggle-switch active" id="audioPrevShowPh"></div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Flash</span>
+            <div class="menu-toggle-switch active" id="audioPrevShowFlash"></div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Labels</span>
+            <div class="menu-toggle-switch active" id="audioPrevShowLabels"></div>
+          </div>
+
+
+          <div class="menu-row">
+            <span class="menu-label">Flash intensity</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="audioFlashIntensity" min="0" max="1" step="0.01" value="0.85">
+              <input type="number" class="menu-slider-input" id="audioFlashIntensityNum" min="0" max="1" step="0.01" value="0.85" inputmode="decimal">
+            </div>
+          </div>
+
+<div class="fg-audio-mini" style="margin-top:8px; line-height:1.35;">
+            Frames move, playheads stay. When a new frame enters a playhead cell, it triggers the frame's assigned sample.
+            Assign mode: click a cell to map the frame currently shown there. Shift-click clears.
+          </div>
+
+        </div>
+      </div>
+
+<div class="menu-section collapsed" id="refFrameSection">
+        <div class="menu-section-title">Reference Frame</div>
+        <div class="menu-section-content">
+          <div class="menu-row" style="display:block;">
+            <button class="menu-btn" id="refFrameLoadBtn" style="width:100%;">Load</button>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Visible</span>
+            <div class="menu-toggle-switch" id="toggleRefFrameVisible"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Follow Transform</span>
+            <div class="menu-toggle-switch" id="toggleRefFrameFollow"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Above Drawings</span>
+            <div class="menu-toggle-switch" id="toggleRefFrameAbove"></div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Link Scale</span>
+            <div class="menu-toggle-switch active" id="toggleRefScaleLink"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Scale X</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="refFrameScaleX" min="0.1" max="4.0" step="0.01" value="1">
+              <input type="number" class="menu-slider-input" id="refFrameScaleNumX" min="0.1" max="4" step="0.01" value="1.00" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Scale Y</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="refFrameScaleY" min="0.1" max="4.0" step="0.01" value="1">
+              <input type="number" class="menu-slider-input" id="refFrameScaleNumY" min="0.1" max="4" step="0.01" value="1.00" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Offset X</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="refFrameOffX" min="-50" max="50" step="1" value="0">
+              <input type="number" class="menu-slider-input" id="refFrameOffXNum" min="-50" max="50" step="1" value="0" inputmode="decimal">
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Offset Y</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="refFrameOffY" min="-50" max="50" step="1" value="0">
+              <input type="number" class="menu-slider-input" id="refFrameOffYNum" min="-50" max="50" step="1" value="0" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Rotation</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="refFrameRot" min="-360" max="360" step="0.1" value="0">
+              <input type="number" class="menu-slider-input" id="refFrameRotNum" min="-360" max="360" step="0.1" value="0.0" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Opacity</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="refFrameOpacity" min="0" max="1" step="0.01" value="1">
+              <input type="number" class="menu-slider-input" id="refFrameOpacityNum" min="0" max="1" step="0.01" value="1.00" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="menu-row" style="display:block;">
+            <button class="menu-btn" id="refFrameResetTransformBtn" style="width:100%;">Reset Transform</button>
+          </div>
+
+          <div class="menu-row" style="display:block;">
+            <button class="menu-btn" id="refFrameClearBtn" style="width:100%;">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-section collapsed">
+        <div class="menu-section-title">Export</div>
+        <div class="menu-section-content">
+
+          <div class="menu-row">
+            <span class="menu-label">Quality</span>
+            <select class="menu-select" id="exportQuality">
+              <option value="low">Low (540p)</option>
+              <option value="medium">Medium (720p)</option>
+              <option value="hd" selected>HD (1080p)</option>
+              <option value="high">High (2160p)</option>
+              <option value="max">Max (original)</option>
+            </select>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">MP4 Loops</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="loopsMinus">−</button>
+              <input type="number" class="menu-input menu-input-narrow" id="loopsInput" value="1" min="1" max="10">
+              <button class="menu-input-btn" id="loopsPlus">+</button>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Render from First Frame</span>
+            <div class="menu-toggle-switch active" id="toggleExportResetPlay"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Include Drawings</span>
+            <div class="menu-toggle-switch active" id="toggleExportDraw"></div>
+          </div>
+
+
+          <div class="menu-row">
+            <span class="menu-label">Include Audio Layer</span>
+            <div class="menu-toggle-switch" id="toggleExportAudioLayer"></div>
+          </div>
+
+
+          <div class="menu-row">
+            <span class="menu-label">Include BG Layer</span>
+            <div class="menu-toggle-switch" id="toggleExportBg"></div>
+          </div>
+
+<div class="menu-row">
+            <span class="menu-label">Show Export Guides</span>
+            <div class="menu-toggle-switch" id="toggleExportGuides"></div>
+          </div>
+
+
+
+
+          <div class="menu-row">
+            <span class="menu-label">Padding</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="exportPaddingRange" min="0" max="800" step="1" value="160">
+              <div class="menu-slider-numwrap">
+                <input type="text" class="menu-slider-input" id="exportPaddingNum" value="160" inputmode="decimal">
+                <span class="menu-slider-unit">px</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Include Ref Frame</span>
+            <div class="menu-toggle-switch" id="toggleExportRefFrame"></div>
+          </div>
+
+          <div class="menu-row">
+            <span class="menu-label">Alpha Drawings</span>
+            <div class="menu-toggle-switch" id="toggleExportAlphaDraw"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Metadata in Export</span>
+            <div class="menu-toggle-switch" id="toggleExportMetadata"></div>
+          </div>
+
+          <!-- Consolidated Export UI -->
+          <div class="menu-subtitle">Target View</div>
+          <div style="display:flex; gap: 8px; margin-bottom: 12px;" id="exportTargetMode">
+            <button class="menu-btn active-toggle" data-val="grid" style="flex:1; margin-top:0;">Grid</button>
+            <button class="menu-btn" data-val="single" style="flex:1; margin-top:0;">Single</button>
+          </div>
+
+          <div class="menu-subtitle">Export Format</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+             <button class="menu-btn" id="expJpegBtn" style="margin:0;">JPEG</button>
+             <button class="menu-btn" id="expPngBtn" style="margin:0;">PNG</button>
+             <button class="menu-btn" id="expMp4Btn" style="margin:0;">MP4</button>
+             <button class="menu-btn" id="expSeqBtn" style="margin:0;">SEQ (ZIP)</button>
+          </div>
+
+          <div class="menu-subtitle">Time-Sync Audio Mode</div>
+          <button class="menu-btn" id="expSyncAudioBtn">Render with Original Audio</button>
+
+          <!-- Hidden legacy buttons to keep logic intact -->
+          <div style="display:none;">
+            <button id="exportSmallBtn"></button>
+            <button id="exportFullBtn"></button>
+            <button id="exportMp4GridBtn"></button>
+            <button id="exportResampledGridBtn"></button>
+            <button id="exportJpegSingleBtn"></button>
+            <button id="exportPngSingleBtn"></button>
+            <button id="exportMp4SingleBtn"></button>
+            <button id="exportResampledBtn"></button>
+            <button id="exportPngSeqDrawBtn"></button>
+          </div>
+
+          <div class="menu-subtitle">System</div>
+          <button class="menu-btn" id="newVideoBtn">Load New Video</button>
+          <div style="margin-top:10px; border-top:1px solid #333; padding-top:10px;">
+            <button class="menu-btn" id="resetMemoryBtn" style="width:100%;color:#f88;border-color:#633;">Reset Memory &amp; Grid</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-section collapsed">
+        <div class="menu-section-title">Info</div>
+        <div class="menu-section-content">
+          <div id="infoPanel" style="font-size:10px;color:#aaa;line-height:1.6;font-family:monospace;">
+            <div>Video: <span id="infoVideoRes">—</span></div>
+              <div>Capture: <span id="infoCaptureRes">—</span></div>
+              <div>Grid cells: <span id="infoGridCells">—</span></div>
+              <div>Cell display: <span id="infoCellRes">—</span></div>
+              <div>Draw canvas: <span id="infoDrawRes">—</span></div>
+              <div>TPL canvas: <span id="infoTplRes">—</span></div>
+              <div>FRM tile: <span id="infoFrameTile">—</span></div>
+              <div>Upscale: <span id="infoUpscale">—</span></div>
+              <div>Zoom: <span id="infoZoom">—</span></div>
+              <div>Draw scale: <span id="infoDrawScale">—</span></div>
+              <div>GPU: <span id="infoGpuRenderer">—</span></div>
+              <div>GPU vendor: <span id="infoGpuVendor">—</span></div>
+              <div>GPU mode: <span id="infoGpuMode">—</span></div>
+              <div>GPU hint: <span id="infoGpuHint">—</span></div>
+               <div>UI FPS: <span id="infoUiFps">—</span></div>
+               <div>Composite: <span id="infoCompositeMs">—</span></div>
+          </div>
+
+            
+            
+        </div>
+      </div>
+
+      <div class="about-section collapsed">
+        <div class="about-header" id="aboutHeader">
+          <div class="about-title">FRAMEGRID</div>
+          <div class="about-toggle"></div>
+        </div>
+        <div class="about-content">
+          <div class="about-version">Version v28.12</div>
+          <div class="about-description">Video frame extraction tool for contact sheets, storyboards, and AI analysis.</div>
+          
+                    <div class="menu-row" style="margin-bottom: 12px; justify-content: space-between; padding-right: 4px;">
+            <span class="menu-label" style="opacity:0.7">Accent Color</span>
+            <input class="menu-color" type="color" id="fgAccentColor" value="#35f2a3">
+          </div>
+
+          <div class="menu-row" style="margin-bottom: 12px; justify-content: space-between; padding-right: 4px;">
+            <span class="menu-label" style="opacity:0.7">Accent 2 Color</span>
+            <input class="menu-color" type="color" id="fgAccent2Color" value="#f28c35">
+          </div>
+
+          <div class="about-hotkeys">
+            <div class="about-subtitle">Keyboard Shortcuts</div>
+            <div class="hotkey-row"><span class="hotkey">Space</span> Play / Stop</div>
+            <div class="hotkey-row"><span class="hotkey">G</span> Grid / Single</div>
+            <div class="hotkey-row"><span class="hotkey">F</span> Fit (Grid or Single)</div>
+            <div class="hotkey-row"><span class="hotkey">M</span> Toggle Menu</div>
+            <div class="hotkey-row"><span class="hotkey">N</span> Collapse/Expand All Sections</div>
+            <div class="hotkey-row"><span class="hotkey">+ / -</span> FPS (Shift: ±5, Ctrl+Shift: ±10)</div>
+            <div class="hotkey-row"><span class="hotkey">0</span> Export MP4 (Current View)</div>
+            <div class="hotkey-row"><span class="hotkey">9</span> Export JPEG (Current View)</div>
+            <div class="hotkey-row"><span class="hotkey">D</span> Draw Mode</div>
+            <div class="hotkey-row"><span class="hotkey">P</span> Toggle Brush Palette</div>
+            <div class="hotkey-row"><span class="hotkey">B</span> Toggle TC Frame Display</div>
+            <div class="hotkey-row"><span class="hotkey">1</span> Brush (Round)</div>
+            <div class="hotkey-row"><span class="hotkey">2</span> Spray</div>
+            <div class="hotkey-row"><span class="hotkey">3</span> Eraser</div>
+            <div class="hotkey-row"><span class="hotkey">4</span> Eyedropper</div>
+            <div class="hotkey-row"><span class="hotkey">X</span> Swap Color</div>
+            <div class="hotkey-row"><span class="hotkey">T</span> Toggle Template Visibility</div>
+            <div class="hotkey-row"><span class="hotkey">H</span> Toggle Ref Frame Visibility</div>
+            <div class="hotkey-row"><span class="hotkey">Q/W/E</span> Target BG / TMPL / FRM</div>
+            <div class="hotkey-row"><span class="hotkey">Z</span> Undo (also Ctrl/Cmd+Z)</div>
+            <div class="hotkey-row"><span class="hotkey">C</span> Clear Current Target</div>
+            <div class="hotkey-row"><span class="hotkey">L</span> Long Stroke</div>
+                        <div class="hotkey-row"><span class="hotkey">↑ / ↓</span> Cycle Direction</div>
+            <div class="hotkey-row"><span class="hotkey">Ctrl/Cmd + ↑ / ↓</span> Cycle Pattern</div>
+            <div class="hotkey-row"><span class="hotkey">Shift + ↑ / ↓</span> Columns (Grid Size)</div>
+            <div class="hotkey-row"><span class="hotkey">Ctrl/Cmd + ← / →</span> Hide frames (- / +)</div>
+            <div class="hotkey-row"><span class="hotkey">Shift + ← / →</span> Loop Phases (- / +)</div>
+            <div class="hotkey-row"><span class="hotkey">Ctrl + Shift + (+ / -)</span> FPS (±5)</div>
+            <div class="hotkey-row"><span class="hotkey">[ ]</span> Brush Size</div>
+    
+  <input type="file" id="audioInput1" accept="audio/*">
+  <input type="file" id="audioInput2" accept="audio/*">
+  <input type="file" id="audioInput3" accept="audio/*">
+  <input type="file" id="audioInput4" accept="audio/*">        <div class="hotkey-row"><span class="hotkey">Shift + [ ]</span> Edge Softness</div>
+            <div class="hotkey-row"><span class="hotkey">Ctrl/Cmd + [ ]</span> Brush Opacity</div>
+            <div class="hotkey-row"><span class="hotkey">←/→</span> Step Frame</div>
+            <div class="hotkey-row"><span class="hotkey">Home/End</span> Jump Start/End</div>
+            <div class="hotkey-row"><span class="hotkey">Esc</span> Close / Stop</div>
+          </div>
+
+          <div class="about-copyright">
+            © 2025 <a href="https://grisha-tsvetkov.com" target="_blank" class="about-author">Grisha Tsvetkov</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-text">Processing frames...</div>
+      <div class="loading-progress" id="loadingProgress">0 / 0</div>
+    </div>
+  </div>
+
+  <video id="videoElement" crossorigin="anonymous"></video>
+  <input type="file" id="videoInput" accept="video/*,.mov,.mp4,.webm,.avi,.mkv,.ogv,.m4v">
+  <input type="file" id="imageInput" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff" multiple>
+  <input type="file" id="refFrameInput" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff">
+  <canvas id="captureCanvas" style="display:none;"></canvas>
+
+  <script type="module" src="/src/js/main.js"></script>
+
+  <!-- Grid busy overlay -->
+  <div id="gridBusyOverlay" style="display:none;position:fixed;inset:0;z-index:9999;
+    background:rgba(0,0,0,0.45);backdrop-filter:blur(2px);
+    align-items:center;justify-content:center;flex-direction:column;gap:12px;pointer-events:none;">
+    <div style="width:220px;height:4px;background:rgba(255,255,255,0.12);border-radius:4px;overflow:hidden;">
+      <div id="gridBusyBar" style="height:100%;width:0%;background:rgba(80,220,140,0.9);
+        border-radius:4px;transition:width 0.1s linear;"></div>
+    </div>
+    <div style="color:rgba(255,255,255,0.6);font-size:11px;letter-spacing:1px;font-family:inherit;">
+      BUILDING GRID…</div>
+  </div>
+
+<!-- MP4 Muxer (inlined for offline use) -->
+<script>
+/**
+ * Minified by jsDelivr using Terser v5.39.0.
+ * Original file: /npm/mp4-muxer@5.1.3/build/mp4-muxer.js
+ *
+ * Do NOT use SRI with dynamically generated files! More information: https://www.jsdelivr.com/using-sri-with-dynamic-files
+ */
+"use strict";var Mp4Muxer=(()=>{var e=Object.defineProperty,t=Object.getOwnPropertyDescriptor,i=Object.getOwnPropertyNames,s=Object.prototype.hasOwnProperty,a=(e,t,i)=>{if(!t.has(e))throw TypeError("Cannot "+i)},r=(e,t,i)=>(a(e,t,"read from private field"),i?i.call(e):t.get(e)),n=(e,t,i)=>{if(t.has(e))throw TypeError("Cannot add the same private member more than once");t instanceof WeakSet?t.add(e):t.set(e,i)},o=(e,t,i,s)=>(a(e,t,"write to private field"),s?s.call(e,i):t.set(e,i),i),h=(e,t,i)=>(a(e,t,"access private method"),i),l={};((t,i)=>{for(var s in i)e(t,s,{get:i[s],enumerable:!0})})(l,{ArrayBufferTarget:()=>xe,FileSystemWritableFileStreamTarget:()=>Ee,Muxer:()=>Ut,StreamTarget:()=>ze});var d,f,u,m,p,c,w,g,y=new Uint8Array(8),b=new DataView(y.buffer),k=e=>[(e%256+256)%256],T=e=>(b.setUint16(0,e,!1),[y[0],y[1]]),v=e=>(b.setUint32(0,e,!1),[y[1],y[2],y[3]]),C=e=>(b.setUint32(0,e,!1),[y[0],y[1],y[2],y[3]]),S=e=>(b.setUint32(0,Math.floor(e/2**32),!1),b.setUint32(4,e,!1),[y[0],y[1],y[2],y[3],y[4],y[5],y[6],y[7]]),x=e=>(b.setInt16(0,256*e,!1),[y[0],y[1]]),z=e=>(b.setInt32(0,65536*e,!1),[y[0],y[1],y[2],y[3]]),E=e=>(b.setInt32(0,2**30*e,!1),[y[0],y[1],y[2],y[3]]),A=(e,t=!1)=>{let i=Array(e.length).fill(null).map(((t,i)=>e.charCodeAt(i)));return t&&i.push(0),i},M=e=>e&&e[e.length-1],W=e=>{let t;for(let i of e)(!t||i.presentationTimestamp>t.presentationTimestamp)&&(t=i);return t},O=(e,t,i=!0)=>{let s=e*t;return i?Math.round(s):s},B=e=>{let t=e*(Math.PI/180),i=Math.cos(t),s=Math.sin(t);return[i,s,0,-s,i,0,0,0,1]},U=B(0),j=e=>[z(e[0]),z(e[1]),E(e[2]),z(e[3]),z(e[4]),E(e[5]),z(e[6]),z(e[7]),E(e[8])],D=e=>e?"object"!=typeof e?e:Array.isArray(e)?e.map(D):Object.fromEntries(Object.entries(e).map((([e,t])=>[e,D(t)]))):e,I=e=>e>=0&&e<2**32,R=(e,t,i)=>({type:e,contents:t&&new Uint8Array(t.flat(10)),children:i}),N=(e,t,i,s,a)=>R(e,[k(t),v(i),s??[]],a),V=e=>({type:"mdat",largeSize:e}),L=(e,t,i=!1)=>R("moov",null,[F(t,e),...e.map((e=>$(e,t))),i?le(e):null]),F=(e,t)=>{let i=O(Math.max(0,...t.filter((e=>e.samples.length>0)).map((e=>{const t=W(e.samples);return t.presentationTimestamp+t.duration}))),Mt),s=Math.max(...t.map((e=>e.id)))+1,a=!I(e)||!I(i),r=a?S:C;return N("mvhd",+a,0,[r(e),r(e),C(Mt),r(i),z(1),x(1),Array(10).fill(0),j(U),Array(24).fill(0),C(s)])},$=(e,t)=>R("trak",null,[P(e,t),H(e,t)]),P=(e,t)=>{let i,s=W(e.samples),a=O(s?s.presentationTimestamp+s.duration:0,Mt),r=!I(t)||!I(a),n=r?S:C;return i="video"===e.info.type?"number"==typeof e.info.rotation?B(e.info.rotation):e.info.rotation:U,N("tkhd",+r,3,[n(t),n(t),C(e.id),C(0),n(a),Array(8).fill(0),T(0),T(0),x("audio"===e.info.type?1:0),T(0),j(i),z("video"===e.info.type?e.info.width:0),z("video"===e.info.type?e.info.height:0)])},H=(e,t)=>R("mdia",null,[_(e,t),q("video"===e.info.type?"vide":"soun"),G(e)]),_=(e,t)=>{let i=W(e.samples),s=O(i?i.presentationTimestamp+i.duration:0,e.timescale),a=!I(t)||!I(s),r=a?S:C;return N("mdhd",+a,0,[r(t),r(t),C(e.timescale),r(s),T(21956),T(0)])},q=e=>N("hdlr",0,0,[A("mhlr"),A(e),C(0),C(0),C(0),A("mp4-muxer-hdlr",!0)]),G=e=>R("minf",null,["video"===e.info.type?J():K(),Q(),Z(e)]),J=()=>N("vmhd",0,1,[T(0),T(0),T(0),T(0)]),K=()=>N("smhd",0,0,[T(0),T(0)]),Q=()=>R("dinf",null,[X()]),X=()=>N("dref",0,0,[C(1)],[Y()]),Y=()=>N("url ",0,1),Z=e=>{const t=e.compositionTimeOffsetTable.length>1||e.compositionTimeOffsetTable.some((e=>0!==e.sampleCompositionTimeOffset));return R("stbl",null,[ee(e),se(e),ae(e),re(e),ne(e),oe(e),t?he(e):null])},ee=e=>N("stsd",0,0,[C(1)],["video"===e.info.type?te(ke[e.info.codec],e):ie(ve[e.info.codec],e)]),te=(e,t)=>{return R(e,[Array(6).fill(0),T(1),T(0),T(0),Array(12).fill(0),T(t.info.width),T(t.info.height),C(4718592),C(4718592),C(0),T(1),Array(32).fill(0),T(24),(i=65535,b.setInt16(0,i,!1),[y[0],y[1]])],[Te[t.info.codec](t)]);var i},ie=(e,t)=>R(e,[Array(6).fill(0),T(1),T(0),T(0),C(0),T(t.info.numberOfChannels),T(16),T(0),T(0),z(t.info.sampleRate)],[Ce[t.info.codec](t)]),se=e=>N("stts",0,0,[C(e.timeToSampleTable.length),e.timeToSampleTable.map((e=>[C(e.sampleCount),C(e.sampleDelta)]))]),ae=e=>{if(e.samples.every((e=>"key"===e.type)))return null;let t=[...e.samples.entries()].filter((([,e])=>"key"===e.type));return N("stss",0,0,[C(t.length),t.map((([e])=>C(e+1)))])},re=e=>N("stsc",0,0,[C(e.compactlyCodedChunkTable.length),e.compactlyCodedChunkTable.map((e=>[C(e.firstChunk),C(e.samplesPerChunk),C(1)]))]),ne=e=>N("stsz",0,0,[C(0),C(e.samples.length),e.samples.map((e=>C(e.size)))]),oe=e=>e.finalizedChunks.length>0&&M(e.finalizedChunks).offset>=2**32?N("co64",0,0,[C(e.finalizedChunks.length),e.finalizedChunks.map((e=>S(e.offset)))]):N("stco",0,0,[C(e.finalizedChunks.length),e.finalizedChunks.map((e=>C(e.offset)))]),he=e=>N("ctts",0,0,[C(e.compositionTimeOffsetTable.length),e.compositionTimeOffsetTable.map((e=>[C(e.sampleCount),C(e.sampleCompositionTimeOffset)]))]),le=e=>R("mvex",null,e.map(de)),de=e=>N("trex",0,0,[C(e.id),C(1),C(0),C(0),C(0)]),fe=(e,t)=>R("moof",null,[ue(e),...t.map(pe)]),ue=e=>N("mfhd",0,0,[C(e)]),me=e=>{let t=0,i=0,s="delta"===e.type;return i|=+s,t|=s?1:2,t<<24|i<<16},pe=e=>R("traf",null,[ce(e),we(e),ge(e)]),ce=e=>{let t=0;t|=8,t|=16,t|=32,t|=131072;let i=e.currentChunk.samples[1]??e.currentChunk.samples[0],s={duration:i.timescaleUnitsToNextSample,size:i.size,flags:me(i)};return N("tfhd",0,131128,[C(e.id),C(s.duration),C(s.size),C(s.flags)])},we=e=>N("tfdt",1,0,[S(O(e.currentChunk.startTimestamp,e.timescale))]),ge=e=>{let t=e.currentChunk.samples.map((e=>e.timescaleUnitsToNextSample)),i=e.currentChunk.samples.map((e=>e.size)),s=e.currentChunk.samples.map(me),a=e.currentChunk.samples.map((t=>O(t.presentationTimestamp-t.decodeTimestamp,e.timescale))),r=new Set(t),n=new Set(i),o=new Set(s),h=new Set(a),l=2===o.size&&s[0]!==s[1],d=r.size>1,f=n.size>1,u=!l&&o.size>1,m=h.size>1||[...h].some((e=>0!==e)),p=0;return p|=1,p|=4*+l,p|=256*+d,p|=512*+f,p|=1024*+u,p|=2048*+m,N("trun",1,p,[C(e.currentChunk.samples.length),C(e.currentChunk.offset-e.currentChunk.moofOffset||0),l?C(s[0]):[],e.currentChunk.samples.map(((e,r)=>{return[d?C(t[r]):[],f?C(i[r]):[],u?C(s[r]):[],m?(n=a[r],b.setInt32(0,n,!1),[y[0],y[1],y[2],y[3]]):[]];var n}))])},ye=(e,t)=>N("tfra",1,0,[C(e.id),C(63),C(e.finalizedChunks.length),e.finalizedChunks.map((i=>[S(O(i.startTimestamp,e.timescale)),S(i.moofOffset),C(t+1),C(1),C(1)]))]),be=()=>N("mfro",0,0,[C(0)]),ke={avc:"avc1",hevc:"hvc1",vp9:"vp09",av1:"av01"},Te={avc:e=>e.info.decoderConfig&&R("avcC",[...new Uint8Array(e.info.decoderConfig.description)]),hevc:e=>e.info.decoderConfig&&R("hvcC",[...new Uint8Array(e.info.decoderConfig.description)]),vp9:e=>{if(!e.info.decoderConfig)return null;let t=e.info.decoderConfig;if(!t.colorSpace)throw new Error("'colorSpace' is required in the decoder config for VP9.");let i=t.codec.split("."),s=Number(i[1]),a=Number(i[2]),r=0+(Number(i[3])<<4)+Number(t.colorSpace.fullRange);return N("vpcC",1,0,[k(s),k(a),k(r),k(2),k(2),k(2),T(0)])},av1:()=>R("av1C",[129,0,0,0])},ve={aac:"mp4a",opus:"Opus"},Ce={aac:e=>{let t=new Uint8Array(e.info.decoderConfig.description);return N("esds",0,0,[C(58753152),k(32+t.byteLength),T(1),k(0),C(75530368),k(18+t.byteLength),k(64),k(21),v(0),C(130071),C(130071),C(92307584),k(t.byteLength),...t,C(109084800),k(1),k(2)])},opus:e=>{let t=3840,i=0;const s=e.info.decoderConfig?.description;if(s){if(s.byteLength<18)throw new TypeError("Invalid decoder description provided for Opus; must be at least 18 bytes long.");const e=ArrayBuffer.isView(s)?new DataView(s.buffer,s.byteOffset,s.byteLength):new DataView(s);t=e.getUint16(10,!0),i=e.getInt16(14,!0)}return R("dOps",[k(0),k(e.info.numberOfChannels),T(t),C(e.info.sampleRate),x(i),k(0)])}},Se=(Symbol("isTarget"),class{}),xe=class extends Se{constructor(){super(...arguments),this.buffer=null}},ze=class extends Se{constructor(e){if(super(),this.options=e,"object"!=typeof e)throw new TypeError("StreamTarget requires an options object to be passed to its constructor.");if(e.onData){if("function"!=typeof e.onData)throw new TypeError("options.onData, when provided, must be a function.");if(e.onData.length<2)throw new TypeError("options.onData, when provided, must be a function that takes in at least two arguments (data and position). Ignoring the position argument, which specifies the byte offset at which the data is to be written, can lead to broken outputs.")}if(void 0!==e.chunked&&"boolean"!=typeof e.chunked)throw new TypeError("options.chunked, when provided, must be a boolean.");if(void 0!==e.chunkSize&&(!Number.isInteger(e.chunkSize)||e.chunkSize<=0))throw new TypeError("options.chunkSize, when provided, must be a positive integer.")}},Ee=class extends Se{constructor(e,t){if(super(),this.stream=e,this.options=t,!(e instanceof FileSystemWritableFileStream))throw new TypeError("FileSystemWritableFileStreamTarget requires a FileSystemWritableFileStream instance.");if(void 0!==t&&"object"!=typeof t)throw new TypeError("FileSystemWritableFileStreamTarget's options, when provided, must be an object.");if(t&&void 0!==t.chunkSize&&(!Number.isInteger(t.chunkSize)||t.chunkSize<=0))throw new TypeError("options.chunkSize, when provided, must be a positive integer")}},Ae=class{constructor(){this.pos=0,n(this,d,new Uint8Array(8)),n(this,f,new DataView(r(this,d).buffer)),this.offsets=new WeakMap}seek(e){this.pos=e}writeU32(e){r(this,f).setUint32(0,e,!1),this.write(r(this,d).subarray(0,4))}writeU64(e){r(this,f).setUint32(0,Math.floor(e/2**32),!1),r(this,f).setUint32(4,e,!1),this.write(r(this,d).subarray(0,8))}writeAscii(e){for(let t=0;t<e.length;t++)r(this,f).setUint8(t%8,e.charCodeAt(t)),t%8==7&&this.write(r(this,d));e.length%8!=0&&this.write(r(this,d).subarray(0,e.length%8))}writeBox(e){if(this.offsets.set(e,this.pos),e.contents&&!e.children)this.writeBoxHeader(e,e.size??e.contents.byteLength+8),this.write(e.contents);else{let t=this.pos;if(this.writeBoxHeader(e,0),e.contents&&this.write(e.contents),e.children)for(let t of e.children)t&&this.writeBox(t);let i=this.pos,s=e.size??i-t;this.seek(t),this.writeBoxHeader(e,s),this.seek(i)}}writeBoxHeader(e,t){this.writeU32(e.largeSize?1:t),this.writeAscii(e.type),e.largeSize&&this.writeU64(t)}measureBoxHeader(e){return 8+(e.largeSize?8:0)}patchBox(e){let t=this.pos;this.seek(this.offsets.get(e)),this.writeBox(e),this.seek(t)}measureBox(e){if(e.contents&&!e.children){return this.measureBoxHeader(e)+e.contents.byteLength}{let t=this.measureBoxHeader(e);if(e.contents&&(t+=e.contents.byteLength),e.children)for(let i of e.children)i&&(t+=this.measureBox(i));return t}}};d=new WeakMap,f=new WeakMap;var Me,We,Oe=class extends Ae{constructor(e){super(),n(this,w),n(this,u,void 0),n(this,m,new ArrayBuffer(65536)),n(this,p,new Uint8Array(r(this,m))),n(this,c,0),o(this,u,e)}write(e){h(this,w,g).call(this,this.pos+e.byteLength),r(this,p).set(e,this.pos),this.pos+=e.byteLength,o(this,c,Math.max(r(this,c),this.pos))}finalize(){h(this,w,g).call(this,this.pos),r(this,u).buffer=r(this,m).slice(0,Math.max(r(this,c),this.pos))}};u=new WeakMap,m=new WeakMap,p=new WeakMap,c=new WeakMap,w=new WeakSet,g=function(e){let t=r(this,m).byteLength;for(;t<e;)t*=2;if(t===r(this,m).byteLength)return;let i=new ArrayBuffer(t),s=new Uint8Array(i);s.set(r(this,p),0),o(this,m,i),o(this,p,s)};var Be=class extends Ae{constructor(e){super(),n(this,Me,void 0),n(this,We,[]),o(this,Me,e)}write(e){r(this,We).push({data:e.slice(),start:this.pos}),this.pos+=e.byteLength}flush(){if(0===r(this,We).length)return;let e=[],t=[...r(this,We)].sort(((e,t)=>e.start-t.start));e.push({start:t[0].start,size:t[0].data.byteLength});for(let i=1;i<t.length;i++){let s=e[e.length-1],a=t[i];a.start<=s.start+s.size?s.size=Math.max(s.size,a.start+a.data.byteLength-s.start):e.push({start:a.start,size:a.data.byteLength})}for(let t of e){t.data=new Uint8Array(t.size);for(let e of r(this,We))t.start<=e.start&&e.start<t.start+t.size&&t.data.set(e.data,e.start-t.start);r(this,Me).options.onData?.(t.data,t.start)}r(this,We).length=0}finalize(){}};Me=new WeakMap,We=new WeakMap;var Ue,je,De,Ie,Re,Ne,Ve,Le,Fe,$e,Pe,He=class extends Ae{constructor(e){if(super(),n(this,Ie),n(this,Ne),n(this,Le),n(this,$e),n(this,Ue,void 0),n(this,je,void 0),n(this,De,[]),o(this,Ue,e),o(this,je,e.options?.chunkSize??16777216),!Number.isInteger(r(this,je))||r(this,je)<1024)throw new Error("Invalid StreamTarget options: chunkSize must be an integer not smaller than 1024.")}write(e){h(this,Ie,Re).call(this,e,this.pos),h(this,$e,Pe).call(this),this.pos+=e.byteLength}finalize(){h(this,$e,Pe).call(this,!0)}};Ue=new WeakMap,je=new WeakMap,De=new WeakMap,Ie=new WeakSet,Re=function(e,t){let i=r(this,De).findIndex((e=>e.start<=t&&t<e.start+r(this,je)));-1===i&&(i=h(this,Le,Fe).call(this,t));let s=r(this,De)[i],a=t-s.start,n=e.subarray(0,Math.min(r(this,je)-a,e.byteLength));s.data.set(n,a);let o={start:a,end:a+n.byteLength};if(h(this,Ne,Ve).call(this,s,o),0===s.written[0].start&&s.written[0].end===r(this,je)&&(s.shouldFlush=!0),r(this,De).length>2){for(let e=0;e<r(this,De).length-1;e++)r(this,De)[e].shouldFlush=!0;h(this,$e,Pe).call(this)}n.byteLength<e.byteLength&&h(this,Ie,Re).call(this,e.subarray(n.byteLength),t+n.byteLength)},Ne=new WeakSet,Ve=function(e,t){let i=0,s=e.written.length-1,a=-1;for(;i<=s;){let r=Math.floor(i+(s-i+1)/2);e.written[r].start<=t.start?(i=r+1,a=r):s=r-1}for(e.written.splice(a+1,0,t),(-1===a||e.written[a].end<t.start)&&a++;a<e.written.length-1&&e.written[a].end>=e.written[a+1].start;)e.written[a].end=Math.max(e.written[a].end,e.written[a+1].end),e.written.splice(a+1,1)},Le=new WeakSet,Fe=function(e){let t={start:Math.floor(e/r(this,je))*r(this,je),data:new Uint8Array(r(this,je)),written:[],shouldFlush:!1};return r(this,De).push(t),r(this,De).sort(((e,t)=>e.start-t.start)),r(this,De).indexOf(t)},$e=new WeakSet,Pe=function(e=!1){for(let t=0;t<r(this,De).length;t++){let i=r(this,De)[t];if(i.shouldFlush||e){for(let e of i.written)r(this,Ue).options.onData?.(i.data.subarray(e.start,e.end),i.start+e.start);r(this,De).splice(t--,1)}}};var _e,qe,Ge,Je,Ke,Qe,Xe,Ye,Ze,et,tt,it,st,at,rt,nt,ot,ht,lt,dt,ft,ut,mt,pt,ct,wt,gt,yt,bt,kt,Tt,vt,Ct,St,xt,zt,Et,At=class extends He{constructor(e){super(new ze({onData:(t,i)=>e.stream.write({type:"write",data:t,position:i}),chunkSize:e.options?.chunkSize}))}},Mt=1e3,Wt=["avc","hevc","vp9","av1"],Ot=["aac","opus"],Bt=["strict","offset","cross-track-offset"],Ut=class{constructor(e){if(n(this,st),n(this,rt),n(this,ot),n(this,lt),n(this,ft),n(this,mt),n(this,ct),n(this,gt),n(this,bt),n(this,Tt),n(this,Ct),n(this,xt),n(this,_e,void 0),n(this,qe,void 0),n(this,Ge,void 0),n(this,Je,void 0),n(this,Ke,null),n(this,Qe,null),n(this,Xe,Math.floor(Date.now()/1e3)+2082844800),n(this,Ye,[]),n(this,Ze,1),n(this,et,[]),n(this,tt,[]),n(this,it,!1),h(this,st,at).call(this,e),e.video=D(e.video),e.audio=D(e.audio),e.fastStart=D(e.fastStart),this.target=e.target,o(this,_e,{firstTimestampBehavior:"strict",...e}),e.target instanceof xe)o(this,qe,new Oe(e.target));else if(e.target instanceof ze)o(this,qe,e.target.options?.chunked?new He(e.target):new Be(e.target));else{if(!(e.target instanceof Ee))throw new Error(`Invalid target: ${e.target}`);o(this,qe,new At(e.target))}h(this,lt,dt).call(this),h(this,rt,nt).call(this)}addVideoChunk(e,t,i,s){if(!(e instanceof EncodedVideoChunk))throw new TypeError("addVideoChunk's first argument (sample) must be of type EncodedVideoChunk.");if(t&&"object"!=typeof t)throw new TypeError("addVideoChunk's second argument (meta), when provided, must be an object.");if(void 0!==i&&(!Number.isFinite(i)||i<0))throw new TypeError("addVideoChunk's third argument (timestamp), when provided, must be a non-negative real number.");if(void 0!==s&&!Number.isFinite(s))throw new TypeError("addVideoChunk's fourth argument (compositionTimeOffset), when provided, must be a real number.");let a=new Uint8Array(e.byteLength);e.copyTo(a),this.addVideoChunkRaw(a,e.type,i??e.timestamp,e.duration,t,s)}addVideoChunkRaw(e,t,i,s,a,n){if(!(e instanceof Uint8Array))throw new TypeError("addVideoChunkRaw's first argument (data) must be an instance of Uint8Array.");if("key"!==t&&"delta"!==t)throw new TypeError("addVideoChunkRaw's second argument (type) must be either 'key' or 'delta'.");if(!Number.isFinite(i)||i<0)throw new TypeError("addVideoChunkRaw's third argument (timestamp) must be a non-negative real number.");if(!Number.isFinite(s)||s<0)throw new TypeError("addVideoChunkRaw's fourth argument (duration) must be a non-negative real number.");if(a&&"object"!=typeof a)throw new TypeError("addVideoChunkRaw's fifth argument (meta), when provided, must be an object.");if(void 0!==n&&!Number.isFinite(n))throw new TypeError("addVideoChunkRaw's sixth argument (compositionTimeOffset), when provided, must be a real number.");if(h(this,xt,zt).call(this),!r(this,_e).video)throw new Error("No video track declared.");if("object"==typeof r(this,_e).fastStart&&r(this,Ke).samples.length===r(this,_e).fastStart.expectedVideoChunks)throw new Error(`Cannot add more video chunks than specified in 'fastStart' (${r(this,_e).fastStart.expectedVideoChunks}).`);let o=h(this,mt,pt).call(this,r(this,Ke),e,t,i,s,a,n);if("fragmented"===r(this,_e).fastStart&&r(this,Qe)){for(;r(this,tt).length>0&&r(this,tt)[0].decodeTimestamp<=o.decodeTimestamp;){let e=r(this,tt).shift();h(this,ct,wt).call(this,r(this,Qe),e)}o.decodeTimestamp<=r(this,Qe).lastDecodeTimestamp?h(this,ct,wt).call(this,r(this,Ke),o):r(this,et).push(o)}else h(this,ct,wt).call(this,r(this,Ke),o)}addAudioChunk(e,t,i){if(!(e instanceof EncodedAudioChunk))throw new TypeError("addAudioChunk's first argument (sample) must be of type EncodedAudioChunk.");if(t&&"object"!=typeof t)throw new TypeError("addAudioChunk's second argument (meta), when provided, must be an object.");if(void 0!==i&&(!Number.isFinite(i)||i<0))throw new TypeError("addAudioChunk's third argument (timestamp), when provided, must be a non-negative real number.");let s=new Uint8Array(e.byteLength);e.copyTo(s),this.addAudioChunkRaw(s,e.type,i??e.timestamp,e.duration,t)}addAudioChunkRaw(e,t,i,s,a){if(!(e instanceof Uint8Array))throw new TypeError("addAudioChunkRaw's first argument (data) must be an instance of Uint8Array.");if("key"!==t&&"delta"!==t)throw new TypeError("addAudioChunkRaw's second argument (type) must be either 'key' or 'delta'.");if(!Number.isFinite(i)||i<0)throw new TypeError("addAudioChunkRaw's third argument (timestamp) must be a non-negative real number.");if(!Number.isFinite(s)||s<0)throw new TypeError("addAudioChunkRaw's fourth argument (duration) must be a non-negative real number.");if(a&&"object"!=typeof a)throw new TypeError("addAudioChunkRaw's fifth argument (meta), when provided, must be an object.");if(h(this,xt,zt).call(this),!r(this,_e).audio)throw new Error("No audio track declared.");if("object"==typeof r(this,_e).fastStart&&r(this,Qe).samples.length===r(this,_e).fastStart.expectedAudioChunks)throw new Error(`Cannot add more audio chunks than specified in 'fastStart' (${r(this,_e).fastStart.expectedAudioChunks}).`);let n=h(this,mt,pt).call(this,r(this,Qe),e,t,i,s,a);if("fragmented"===r(this,_e).fastStart&&r(this,Ke)){for(;r(this,et).length>0&&r(this,et)[0].decodeTimestamp<=n.decodeTimestamp;){let e=r(this,et).shift();h(this,ct,wt).call(this,r(this,Ke),e)}n.decodeTimestamp<=r(this,Ke).lastDecodeTimestamp?h(this,ct,wt).call(this,r(this,Qe),n):r(this,tt).push(n)}else h(this,ct,wt).call(this,r(this,Qe),n)}finalize(){if(r(this,it))throw new Error("Cannot finalize a muxer more than once.");if("fragmented"===r(this,_e).fastStart){for(let e of r(this,et))h(this,ct,wt).call(this,r(this,Ke),e);for(let e of r(this,tt))h(this,ct,wt).call(this,r(this,Qe),e);h(this,Tt,vt).call(this,!1)}else r(this,Ke)&&h(this,bt,kt).call(this,r(this,Ke)),r(this,Qe)&&h(this,bt,kt).call(this,r(this,Qe));let e=[r(this,Ke),r(this,Qe)].filter(Boolean);if("in-memory"===r(this,_e).fastStart){let t;for(let i=0;i<2;i++){let i=L(e,r(this,Xe)),s=r(this,qe).measureBox(i);t=r(this,qe).measureBox(r(this,Je));let a=r(this,qe).pos+s+t;for(let e of r(this,Ye)){e.offset=a;for(let{data:i}of e.samples)a+=i.byteLength,t+=i.byteLength}if(a<2**32)break;t>=2**32&&(r(this,Je).largeSize=!0)}let i=L(e,r(this,Xe));r(this,qe).writeBox(i),r(this,Je).size=t,r(this,qe).writeBox(r(this,Je));for(let e of r(this,Ye))for(let t of e.samples)r(this,qe).write(t.data),t.data=null}else if("fragmented"===r(this,_e).fastStart){let t=r(this,qe).pos,i=(e=>R("mfra",null,[...e.map(ye),be()]))(e);r(this,qe).writeBox(i);let s=r(this,qe).pos-t;r(this,qe).seek(r(this,qe).pos-4),r(this,qe).writeU32(s)}else{let t=r(this,qe).offsets.get(r(this,Je)),i=r(this,qe).pos-t;r(this,Je).size=i,r(this,Je).largeSize=i>=2**32,r(this,qe).patchBox(r(this,Je));let s=L(e,r(this,Xe));if("object"==typeof r(this,_e).fastStart){r(this,qe).seek(r(this,Ge)),r(this,qe).writeBox(s);let e=t-r(this,qe).pos;r(this,qe).writeBox({type:"free",size:e})}else r(this,qe).writeBox(s)}h(this,Ct,St).call(this),r(this,qe).finalize(),o(this,it,!0)}};return _e=new WeakMap,qe=new WeakMap,Ge=new WeakMap,Je=new WeakMap,Ke=new WeakMap,Qe=new WeakMap,Xe=new WeakMap,Ye=new WeakMap,Ze=new WeakMap,et=new WeakMap,tt=new WeakMap,it=new WeakMap,st=new WeakSet,at=function(e){if("object"!=typeof e)throw new TypeError("The muxer requires an options object to be passed to its constructor.");if(!(e.target instanceof Se))throw new TypeError("The target must be provided and an instance of Target.");if(e.video){if(!Wt.includes(e.video.codec))throw new TypeError(`Unsupported video codec: ${e.video.codec}`);if(!Number.isInteger(e.video.width)||e.video.width<=0)throw new TypeError(`Invalid video width: ${e.video.width}. Must be a positive integer.`);if(!Number.isInteger(e.video.height)||e.video.height<=0)throw new TypeError(`Invalid video height: ${e.video.height}. Must be a positive integer.`);const t=e.video.rotation;if("number"==typeof t&&![0,90,180,270].includes(t))throw new TypeError(`Invalid video rotation: ${t}. Has to be 0, 90, 180 or 270.`);if(Array.isArray(t)&&(9!==t.length||t.some((e=>"number"!=typeof e))))throw new TypeError(`Invalid video transformation matrix: ${t.join()}`);if(void 0!==e.video.frameRate&&(!Number.isInteger(e.video.frameRate)||e.video.frameRate<=0))throw new TypeError(`Invalid video frame rate: ${e.video.frameRate}. Must be a positive integer.`)}if(e.audio){if(!Ot.includes(e.audio.codec))throw new TypeError(`Unsupported audio codec: ${e.audio.codec}`);if(!Number.isInteger(e.audio.numberOfChannels)||e.audio.numberOfChannels<=0)throw new TypeError(`Invalid number of audio channels: ${e.audio.numberOfChannels}. Must be a positive integer.`);if(!Number.isInteger(e.audio.sampleRate)||e.audio.sampleRate<=0)throw new TypeError(`Invalid audio sample rate: ${e.audio.sampleRate}. Must be a positive integer.`)}if(e.firstTimestampBehavior&&!Bt.includes(e.firstTimestampBehavior))throw new TypeError(`Invalid first timestamp behavior: ${e.firstTimestampBehavior}`);if("object"==typeof e.fastStart){if(e.video){if(void 0===e.fastStart.expectedVideoChunks)throw new TypeError("'fastStart' is an object but is missing property 'expectedVideoChunks'.");if(!Number.isInteger(e.fastStart.expectedVideoChunks)||e.fastStart.expectedVideoChunks<0)throw new TypeError("'expectedVideoChunks' must be a non-negative integer.")}if(e.audio){if(void 0===e.fastStart.expectedAudioChunks)throw new TypeError("'fastStart' is an object but is missing property 'expectedAudioChunks'.");if(!Number.isInteger(e.fastStart.expectedAudioChunks)||e.fastStart.expectedAudioChunks<0)throw new TypeError("'expectedAudioChunks' must be a non-negative integer.")}}else if(![!1,"in-memory","fragmented"].includes(e.fastStart))throw new TypeError("'fastStart' option must be false, 'in-memory', 'fragmented' or an object.")},rt=new WeakSet,nt=function(){var e;if(r(this,qe).writeBox((e={holdsAvc:"avc"===r(this,_e).video?.codec,fragmented:"fragmented"===r(this,_e).fastStart}).fragmented?R("ftyp",[A("iso5"),C(512),A("iso5"),A("iso6"),A("mp41")]):R("ftyp",[A("isom"),C(512),A("isom"),e.holdsAvc?A("avc1"):[],A("mp41")])),o(this,Ge,r(this,qe).pos),"in-memory"===r(this,_e).fastStart)o(this,Je,V(!1));else if("fragmented"===r(this,_e).fastStart);else{if("object"==typeof r(this,_e).fastStart){let e=h(this,ot,ht).call(this);r(this,qe).seek(r(this,qe).pos+e)}o(this,Je,V(!0)),r(this,qe).writeBox(r(this,Je))}h(this,Ct,St).call(this)},ot=new WeakSet,ht=function(){if("object"!=typeof r(this,_e).fastStart)return;let e=0,t=[r(this,_e).fastStart.expectedVideoChunks,r(this,_e).fastStart.expectedAudioChunks];for(let i of t)i&&(e+=8*Math.ceil(2/3*i),e+=4*i,e+=12*Math.ceil(2/3*i),e+=4*i,e+=8*i);return e+=4096,e},lt=new WeakSet,dt=function(){if(r(this,_e).video&&o(this,Ke,{id:1,info:{type:"video",codec:r(this,_e).video.codec,width:r(this,_e).video.width,height:r(this,_e).video.height,rotation:r(this,_e).video.rotation??0,decoderConfig:null},timescale:r(this,_e).video.frameRate??57600,samples:[],finalizedChunks:[],currentChunk:null,firstDecodeTimestamp:void 0,lastDecodeTimestamp:-1,timeToSampleTable:[],compositionTimeOffsetTable:[],lastTimescaleUnits:null,lastSample:null,compactlyCodedChunkTable:[]}),r(this,_e).audio&&(o(this,Qe,{id:r(this,_e).video?2:1,info:{type:"audio",codec:r(this,_e).audio.codec,numberOfChannels:r(this,_e).audio.numberOfChannels,sampleRate:r(this,_e).audio.sampleRate,decoderConfig:null},timescale:r(this,_e).audio.sampleRate,samples:[],finalizedChunks:[],currentChunk:null,firstDecodeTimestamp:void 0,lastDecodeTimestamp:-1,timeToSampleTable:[],compositionTimeOffsetTable:[],lastTimescaleUnits:null,lastSample:null,compactlyCodedChunkTable:[]}),"aac"===r(this,_e).audio.codec)){let e=h(this,ft,ut).call(this,2,r(this,_e).audio.sampleRate,r(this,_e).audio.numberOfChannels);r(this,Qe).info.decoderConfig={codec:r(this,_e).audio.codec,description:e,numberOfChannels:r(this,_e).audio.numberOfChannels,sampleRate:r(this,_e).audio.sampleRate}}},ft=new WeakSet,ut=function(e,t,i){let s=[96e3,88200,64e3,48e3,44100,32e3,24e3,22050,16e3,12e3,11025,8e3,7350].indexOf(t),a=i,r="";r+=e.toString(2).padStart(5,"0"),r+=s.toString(2).padStart(4,"0"),15===s&&(r+=t.toString(2).padStart(24,"0")),r+=a.toString(2).padStart(4,"0");let n=8*Math.ceil(r.length/8);r=r.padEnd(n,"0");let o=new Uint8Array(r.length/8);for(let e=0;e<r.length;e+=8)o[e/8]=parseInt(r.slice(e,e+8),2);return o},mt=new WeakSet,pt=function(e,t,i,s,a,r,n){let o=s/1e6,l=(s-(n??0))/1e6,d=a/1e6,f=h(this,gt,yt).call(this,o,l,e);return o=f.presentationTimestamp,l=f.decodeTimestamp,r?.decoderConfig&&(null===e.info.decoderConfig?e.info.decoderConfig=r.decoderConfig:Object.assign(e.info.decoderConfig,r.decoderConfig)),{presentationTimestamp:o,decodeTimestamp:l,duration:d,data:t,size:t.byteLength,type:i,timescaleUnitsToNextSample:O(d,e.timescale)}},ct=new WeakSet,wt=function(e,t){"fragmented"!==r(this,_e).fastStart&&e.samples.push(t);const i=O(t.presentationTimestamp-t.decodeTimestamp,e.timescale);if(null!==e.lastTimescaleUnits){let s=O(t.decodeTimestamp,e.timescale,!1),a=Math.round(s-e.lastTimescaleUnits);if(e.lastTimescaleUnits+=a,e.lastSample.timescaleUnitsToNextSample=a,"fragmented"!==r(this,_e).fastStart){let t=M(e.timeToSampleTable);1===t.sampleCount?(t.sampleDelta=a,t.sampleCount++):t.sampleDelta===a?t.sampleCount++:(t.sampleCount--,e.timeToSampleTable.push({sampleCount:2,sampleDelta:a}));const s=M(e.compositionTimeOffsetTable);s.sampleCompositionTimeOffset===i?s.sampleCount++:e.compositionTimeOffsetTable.push({sampleCount:1,sampleCompositionTimeOffset:i})}}else e.lastTimescaleUnits=0,"fragmented"!==r(this,_e).fastStart&&(e.timeToSampleTable.push({sampleCount:1,sampleDelta:O(t.duration,e.timescale)}),e.compositionTimeOffsetTable.push({sampleCount:1,sampleCompositionTimeOffset:i}));e.lastSample=t;let s=!1;if(e.currentChunk){let i=t.presentationTimestamp-e.currentChunk.startTimestamp;if("fragmented"===r(this,_e).fastStart){e===(r(this,Ke)??r(this,Qe))&&"key"===t.type&&i>=1&&(s=!0,h(this,Tt,vt).call(this))}else s=i>=.5}else s=!0;s&&(e.currentChunk&&h(this,bt,kt).call(this,e),e.currentChunk={startTimestamp:t.presentationTimestamp,samples:[]}),e.currentChunk.samples.push(t)},gt=new WeakSet,yt=function(e,t,i){const s="strict"===r(this,_e).firstTimestampBehavior,a=-1===i.lastDecodeTimestamp;if(s&&a&&0!==t)throw new Error(`The first chunk for your media track must have a timestamp of 0 (received DTS=${t}).Non-zero first timestamps are often caused by directly piping frames or audio data from a MediaStreamTrack into the encoder. Their timestamps are typically relative to the age of thedocument, which is probably what you want.\n\nIf you want to offset all timestamps of a track such that the first one is zero, set firstTimestampBehavior: 'offset' in the options.\n`);if("offset"===r(this,_e).firstTimestampBehavior||"cross-track-offset"===r(this,_e).firstTimestampBehavior){let s;void 0===i.firstDecodeTimestamp&&(i.firstDecodeTimestamp=t),s="offset"===r(this,_e).firstTimestampBehavior?i.firstDecodeTimestamp:Math.min(r(this,Ke)?.firstDecodeTimestamp??1/0,r(this,Qe)?.firstDecodeTimestamp??1/0),t-=s,e-=s}if(t<i.lastDecodeTimestamp)throw new Error(`Timestamps must be monotonically increasing (DTS went from ${1e6*i.lastDecodeTimestamp} to ${1e6*t}).`);return i.lastDecodeTimestamp=t,{presentationTimestamp:e,decodeTimestamp:t}},bt=new WeakSet,kt=function(e){if("fragmented"===r(this,_e).fastStart)throw new Error("Can't finalize individual chunks if 'fastStart' is set to 'fragmented'.");if(e.currentChunk)if(e.finalizedChunks.push(e.currentChunk),r(this,Ye).push(e.currentChunk),0!==e.compactlyCodedChunkTable.length&&M(e.compactlyCodedChunkTable).samplesPerChunk===e.currentChunk.samples.length||e.compactlyCodedChunkTable.push({firstChunk:e.finalizedChunks.length,samplesPerChunk:e.currentChunk.samples.length}),"in-memory"!==r(this,_e).fastStart){e.currentChunk.offset=r(this,qe).pos;for(let t of e.currentChunk.samples)r(this,qe).write(t.data),t.data=null;h(this,Ct,St).call(this)}else e.currentChunk.offset=0},Tt=new WeakSet,vt=function(e=!0){if("fragmented"!==r(this,_e).fastStart)throw new Error("Can't finalize a fragment unless 'fastStart' is set to 'fragmented'.");let t=[r(this,Ke),r(this,Qe)].filter((e=>e&&e.currentChunk));if(0===t.length)return;let i=(s=this,a=Ze,{set _(e){o(s,a,e,n)},get _(){return r(s,a,l)}})._++;var s,a,n,l;if(1===i){let e=L(t,r(this,Xe),!0);r(this,qe).writeBox(e)}let d=r(this,qe).pos,f=fe(i,t);r(this,qe).writeBox(f);{let e=V(!1),i=0;for(let e of t)for(let t of e.currentChunk.samples)i+=t.size;let s=r(this,qe).measureBox(e)+i;s>=2**32&&(e.largeSize=!0,s=r(this,qe).measureBox(e)+i),e.size=s,r(this,qe).writeBox(e)}for(let e of t){e.currentChunk.offset=r(this,qe).pos,e.currentChunk.moofOffset=d;for(let t of e.currentChunk.samples)r(this,qe).write(t.data),t.data=null}let u=r(this,qe).pos;r(this,qe).seek(r(this,qe).offsets.get(f));let m=fe(i,t);r(this,qe).writeBox(m),r(this,qe).seek(u);for(let e of t)e.finalizedChunks.push(e.currentChunk),r(this,Ye).push(e.currentChunk),e.currentChunk=null;e&&h(this,Ct,St).call(this)},Ct=new WeakSet,St=function(){r(this,qe)instanceof Be&&r(this,qe).flush()},xt=new WeakSet,zt=function(){if(r(this,it))throw new Error("Cannot add new video or audio chunks after the file has been finalized.")},Et=l,((a,r,n,o)=>{if(r&&"object"==typeof r||"function"==typeof r)for(let h of i(r))s.call(a,h)||h===n||e(a,h,{get:()=>r[h],enumerable:!(o=t(r,h))||o.enumerable});return a})(e({},"__esModule",{value:!0}),Et)})();"object"==typeof module&&"object"==typeof module.exports&&Object.assign(module.exports,Mp4Muxer);
+//# sourceMappingURL=/sm/2d65509620dc68a5b97bc1c90bf2b2165147c6e410efb5392995ca68167616ab.map
+</script>
+
+  <!-- Colorama SVG filter container (populated dynamically by JS) -->
+  <svg id="coloramaSVGDefs" width="0" height="0" style="position:absolute;pointer-events:none;">
+    <defs id="coloramaDefs">
+      <!-- filters injected here by updateColoramaSVG() -->
+    </defs>
+  </svg>
+
+
+</body>
+</html>

@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>FRAMEGRID v0.07</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden; background: #000;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #fff; user-select: none; -webkit-user-select: none;
+    }
+    .app { width: 100%; height: 100%; display: flex; flex-direction: column; background: var(--bg-color, #0a0a0a); }
+
+    /* METADATA BAR */
+    .metadata-bar {
+      height: 36px; min-height: 36px; background: #000;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      display: flex; align-items: center; padding: 0 12px; gap: 16px;
+      font-size: 11px; letter-spacing: 0.04em; z-index: 10;
+    }
+    .metadata-bar.hidden { display: none; }
+    .metadata-logo { font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px; }
+    .metadata-logo::before { content: ''; width: 6px; height: 6px; background: #35f2a3; border-radius: 1px; }
+    .metadata-item { color: rgba(255,255,255,0.6); }
+    .metadata-item span { color: rgba(255,255,255,0.9); }
+    .metadata-spacer { flex: 1; }
+    .menu-toggle {
+      width: 28px; height: 28px; background: transparent;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 2px;
+      cursor: pointer; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 3px;
+    }
+    .menu-toggle:hover { background: rgba(255,255,255,0.1); }
+    .menu-toggle.active { background: rgba(53, 242, 163, 0.2); border-color: #35f2a3; }
+    .menu-toggle span { width: 12px; height: 1px; background: rgba(255,255,255,0.8); }
+
+    /* CANVAS AREA */
+    .canvas-area { flex: 1; position: relative; overflow: hidden; cursor: crosshair; }
+    .canvas-area.panning { cursor: move; }
+    .canvas-area.has-menu { margin-right: 280px; }
+    .canvas-inner { position: absolute; transform-origin: 0 0; }
+
+    /* GRID */
+    .frames-grid { display: grid; gap: var(--grid-gap, 2px); }
+    .frame-item { background: #000; position: relative; }
+    .frame-image-wrap {
+      position: relative; width: 100%;
+      aspect-ratio: var(--video-aspect, 16/9);
+      background: #111; overflow: hidden;
+    }
+    .frame-image-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .frame-timecode {
+      position: absolute; top: 0; left: 0; right: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+      padding: 4px 6px; font-size: var(--meta-font-size, 10px);
+      color: rgba(255,255,255,0.95); font-variant-numeric: tabular-nums;
+      text-shadow: 0 1px 3px rgba(0,0,0,1);
+    }
+    .frame-timecode.hidden { display: none; }
+
+    /* INFO CARD */
+    .info-card {
+      background: #000; display: flex; flex-direction: column;
+      padding: 8%; aspect-ratio: var(--video-aspect, 16/9);
+      justify-content: center; border: 1px solid rgba(255,255,255,0.2);
+    }
+    .info-card-title { font-size: clamp(8px, 2.5vw, 18px); font-weight: 700; color: #35f2a3; margin-bottom: 0.6em; }
+    .info-card-row { font-size: clamp(6px, 2vw, 14px); color: rgba(255,255,255,0.7); margin-bottom: 0.3em; }
+    .info-card-row span { color: rgba(255,255,255,0.5); min-width: 5em; }
+
+    /* DROP ZONE */
+    .drop-zone {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+      background: var(--bg-color, #0a0a0a); z-index: 5;
+    }
+    .drop-zone.hidden { opacity: 0; pointer-events: none; }
+    .drop-zone-icon {
+      width: 80px; height: 80px; border: 2px dashed rgba(255,255,255,0.3);
+      border-radius: 4px; display: flex; align-items: center; justify-content: center;
+      font-size: 32px; color: rgba(255,255,255,0.4);
+    }
+    .drop-zone-text { font-size: 14px; color: rgba(255,255,255,0.6); text-align: center; }
+    .drop-zone-btn {
+      padding: 10px 24px; background: #35f2a3; color: #000; border: none;
+      border-radius: 2px; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+    }
+    .drop-zone-btn:hover { background: #4df7b5; }
+    .drop-zone.drag-over { background: rgba(53, 242, 163, 0.1); }
+
+    /* SIDE MENU */
+    .side-menu {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 280px;
+      background: rgba(0,0,0,0.98); border-left: 1px solid rgba(255,255,255,0.15);
+      transform: translateX(100%); transition: transform 0.25s ease;
+      z-index: 20; display: flex; flex-direction: column; overflow-y: auto;
+    }
+    .side-menu.open { transform: translateX(0); }
+    .side-menu-header {
+      padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: rgba(255,255,255,0.5); display: flex; justify-content: space-between;
+    }
+    .menu-close-btn {
+      width: 24px; height: 24px; background: transparent;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 2px;
+      color: rgba(255,255,255,0.6); font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .menu-section { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .menu-section.collapsed .menu-section-content { display: none; }
+    .menu-section-title {
+      font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: rgba(255,255,255,0.4); margin-bottom: 12px; cursor: pointer;
+      display: flex; justify-content: space-between;
+    }
+    .menu-section-title::after { content: '−'; font-size: 14px; opacity: 0.5; }
+    .menu-section.collapsed .menu-section-title::after { content: '+'; }
+    .menu-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .menu-row:last-child { margin-bottom: 0; }
+    .menu-label { font-size: 11px; color: rgba(255,255,255,0.75); }
+    .menu-hint {
+      font-size: 9px; color: rgba(53, 242, 163, 0.9); margin-top: 8px;
+      padding: 8px; background: rgba(53, 242, 163, 0.1); border-radius: 2px;
+      line-height: 1.4;
+    }
+    .menu-input {
+      width: 70px; padding: 6px 8px; background: #111;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 2px;
+      color: #fff; font-size: 11px; text-align: center;
+    }
+    .menu-input:focus { outline: none; border-color: #35f2a3; }
+    .menu-select {
+      padding: 6px 8px; background: #111;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 2px;
+      color: #fff; font-size: 11px; cursor: pointer;
+    }
+    .menu-toggle-switch {
+      position: relative; width: 36px; height: 20px;
+      background: #333; border-radius: 10px; cursor: pointer;
+    }
+    .menu-toggle-switch.active { background: #35f2a3; }
+    .menu-toggle-switch::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 16px; height: 16px; background: #fff; border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+    .menu-toggle-switch.active::after { transform: translateX(16px); }
+    .menu-slider-row { display: flex; align-items: center; gap: 10px; }
+    .menu-slider {
+      flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
+      background: #333; border-radius: 2px; cursor: pointer;
+    }
+    .menu-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      background: #35f2a3; border-radius: 50%; cursor: pointer;
+    }
+    .menu-slider-value { font-size: 10px; color: rgba(255,255,255,0.6); min-width: 32px; text-align: right; }
+    .menu-btn {
+      width: 100%; padding: 10px 16px; background: transparent;
+      border: 1px solid rgba(255,255,255,0.25); border-radius: 2px;
+      color: rgba(255,255,255,0.8); font-size: 10px; letter-spacing: 0.08em;
+      text-transform: uppercase; cursor: pointer; margin-top: 8px;
+    }
+    .menu-btn:first-of-type { margin-top: 0; }
+    .menu-btn:hover { background: rgba(255,255,255,0.1); }
+    .menu-btn.primary { background: #35f2a3; border-color: #35f2a3; color: #000; }
+    .menu-btn.primary:hover { background: #4df7b5; }
+    .menu-color-input {
+      width: 36px; height: 28px; padding: 2px; background: #111;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 2px; cursor: pointer;
+    }
+
+    /* ABOUT */
+    .about-section { padding: 16px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto; }
+    .about-header { display: flex; justify-content: space-between; cursor: pointer; }
+    .about-section.collapsed .about-content { display: none; }
+    .about-title { font-size: 10px; letter-spacing: 0.12em; color: #35f2a3; }
+    .about-toggle { font-size: 14px; color: rgba(255,255,255,0.4); }
+    .about-section.collapsed .about-toggle::after { content: '+'; }
+    .about-section:not(.collapsed) .about-toggle::after { content: '−'; }
+    .about-content { margin-top: 12px; }
+    .about-version { font-size: 9px; color: rgba(255,255,255,0.4); margin-bottom: 8px; }
+    .about-description { font-size: 10px; line-height: 1.5; color: rgba(255,255,255,0.6); margin-bottom: 12px; }
+    .about-links { display: flex; flex-direction: column; gap: 6px; }
+    .about-link { font-size: 10px; color: rgba(255,255,255,0.5); text-decoration: none; display: flex; align-items: center; gap: 6px; }
+    .about-link:hover { color: #35f2a3; }
+    .about-link svg { width: 14px; height: 14px; fill: currentColor; }
+    .about-copyright { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 12px; text-align: center; }
+
+    /* MOBILE */
+    .mobile-menu-btn {
+      display: none; position: absolute; top: 8px; right: 8px;
+      width: 36px; height: 36px; background: rgba(0,0,0,0.8);
+      border: 1px solid rgba(255,255,255,0.3); border-radius: 2px; z-index: 25;
+      flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer;
+    }
+    .mobile-menu-btn span { width: 16px; height: 2px; background: #fff; }
+
+    /* PROGRESS */
+    .progress-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.1); z-index: 30; display: none; }
+    .progress-bar.visible { display: block; }
+    .progress-fill { height: 100%; background: #35f2a3; width: 0%; }
+
+    /* LOADING */
+    .loading-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.8);
+      display: none; flex-direction: column; align-items: center;
+      justify-content: center; gap: 12px; z-index: 50;
+    }
+    .loading-overlay.visible { display: flex; }
+    .loading-text { font-size: 12px; color: rgba(255,255,255,0.7); }
+    .loading-progress { font-size: 11px; color: rgba(255,255,255,0.5); }
+
+    @media (max-width: 768px) {
+      .mobile-menu-btn { display: flex; }
+      .side-menu { width: 320px; }
+      .canvas-area.has-menu { margin-right: 0; }
+    }
+    @media (max-width: 480px) {
+      .side-menu { width: 100%; }
+      .metadata-item.hide-mobile { display: none; }
+    }
+    #videoElement, #fileInput { display: none; }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="metadata-bar" id="metadataBar">
+      <div class="metadata-logo">FRAMEGRID v0.07</div>
+      <div class="metadata-item" id="metaFilename">No file</div>
+      <div class="metadata-item hide-mobile" id="metaResolution"></div>
+      <div class="metadata-item" id="metaDuration"></div>
+      <div class="metadata-item hide-mobile" id="metaDate"></div>
+      <div class="metadata-item" id="metaFrames"></div>
+      <div class="metadata-spacer"></div>
+      <button class="menu-toggle" id="menuToggleBtn"><span></span><span></span><span></span></button>
+    </div>
+
+    <div class="canvas-area" id="canvasArea">
+      <div class="canvas-inner" id="canvasInner">
+        <div class="frames-grid" id="framesGrid"></div>
+      </div>
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-icon">▶</div>
+        <div class="drop-zone-text">Drop video file here<br><span style="font-size:11px;opacity:0.6;">or click to browse</span></div>
+        <button class="drop-zone-btn" id="browseBtn">SELECT VIDEO</button>
+      </div>
+      <button class="mobile-menu-btn" id="mobileMenuBtn"><span></span><span></span><span></span></button>
+    </div>
+
+    <div class="side-menu" id="sideMenu">
+      <div class="side-menu-header">
+        <span>Settings</span>
+        <button class="menu-close-btn" id="menuCloseBtn">✕</button>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Frame Selection</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Mode</span>
+            <select class="menu-select" id="selectionMode">
+              <option value="count">Fixed Count</option>
+              <option value="seconds" selected>Every N Sec</option>
+              <option value="frames">Every N Frames</option>
+            </select>
+          </div>
+          <div class="menu-row" id="countRow" style="display:none;">
+            <span class="menu-label">Frame Count</span>
+            <input type="number" class="menu-input" id="frameCount" value="24" min="1" max="1000">
+          </div>
+          <div class="menu-row" id="intervalRow">
+            <span class="menu-label" id="intervalLabel">Seconds</span>
+            <input type="number" class="menu-input" id="intervalValue" value="3" min="1">
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Quality</span>
+            <select class="menu-select" id="qualitySelect">
+              <option value="1">Full</option>
+              <option value="0.5" selected>Half</option>
+              <option value="0.25">Quarter</option>
+            </select>
+          </div>
+          <button class="menu-btn primary" id="generateBtn">Regenerate Grid</button>
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Grid Layout</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Target Aspect</span>
+            <select class="menu-select" id="canvasAspect">
+              <option value="auto">Auto</option>
+              <option value="1:1">1:1 Square</option>
+              <option value="16:9">16:9 Wide</option>
+              <option value="9:16">9:16 Vertical</option>
+              <option value="4:3">4:3</option>
+            </select>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Columns</span>
+            <input type="number" class="menu-input" id="gridCols" value="6" min="1" max="50">
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Auto-fit</span>
+            <div class="menu-toggle-switch active" id="toggleAutoFit"></div>
+          </div>
+          <div class="menu-hint" id="gridHint">Load video to see suggestions</div>
+          <div class="menu-row">
+            <span class="menu-label">Spacing</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="spacingSlider" min="0" max="20" value="2">
+              <span class="menu-slider-value" id="spacingValue">2px</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Display</div>
+        <div class="menu-section-content">
+          <div class="menu-row">
+            <span class="menu-label">Metadata Bar</span>
+            <div class="menu-toggle-switch active" id="toggleMetadata"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Timecode</span>
+            <div class="menu-toggle-switch active" id="toggleTimecode"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Info Card</span>
+            <div class="menu-toggle-switch" id="toggleInfoCard"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Font Size</span>
+            <div class="menu-slider-row">
+              <input type="range" class="menu-slider" id="fontSizeSlider" min="2" max="28" value="10">
+              <span class="menu-slider-value" id="fontSizeValue">10px</span>
+            </div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label">Background</span>
+            <input type="color" class="menu-color-input" id="bgColor" value="#0a0a0a">
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Export</div>
+        <div class="menu-section-content">
+          <button class="menu-btn" id="fitScreenBtn">Fit to Screen</button>
+          <button class="menu-btn" id="exportSmallBtn">Export JPEG 2K (AI)</button>
+          <button class="menu-btn" id="exportMedBtn">Export JPEG 4K</button>
+          <button class="menu-btn" id="exportFullBtn">Export PNG Full</button>
+          <button class="menu-btn" id="newVideoBtn">Load New Video</button>
+        </div>
+      </div>
+
+      <div class="about-section collapsed">
+        <div class="about-header" id="aboutHeader">
+          <div class="about-title">FRAMEGRID</div>
+          <div class="about-toggle"></div>
+        </div>
+        <div class="about-content">
+          <div class="about-version">Version 0.07</div>
+          <div class="about-description">Video frame extraction tool for contact sheets and AI analysis.</div>
+          <div class="about-links">
+            <a href="https://www.instagram.com/grisha.tsvet" target="_blank" class="about-link">
+              <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073z"/></svg>
+              @grisha.tsvet
+            </a>
+            <a href="https://www.grisha-tsvetkov.com" target="_blank" class="about-link">
+              <svg viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm1 16.057v-3.057h2.994c-.059 1.143-.212 2.24-.456 3.279-.823-.12-1.674-.188-2.538-.222zm1.957 2.162c-.499 1.33-1.159 2.497-1.957 3.456v-3.62c.666.028 1.319.081 1.957.164z"/></svg>
+              grisha-tsvetkov.com
+            </a>
+          </div>
+          <div class="about-copyright">© 2025 Grisha Tsvetkov</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-text">Processing frames...</div>
+      <div class="loading-progress" id="loadingProgress">0 / 0</div>
+    </div>
+  </div>
+
+  <video id="videoElement" crossorigin="anonymous"></video>
+  <input type="file" id="fileInput" accept="video/*">
+  <canvas id="captureCanvas" style="display:none;"></canvas>
+
+  <script>
+(function() {
+  'use strict';
+
+  const state = {
+    videoFile: null, videoUrl: null, videoDuration: 0,
+    videoWidth: 0, videoHeight: 0, videoFps: 30, videoDate: null,
+    frames: [], frameCount: 24, gridCols: 6,
+    selectionMode: 'count', intervalValue: 14, quality: 0.5,
+    showMetadata: true, showTimecode: true, showInfoCard: false,
+    autoFit: true, canvasAspect: 'auto', bgColor: '#0a0a0a',
+    fontSize: 10, spacing: 2,
+    scale: 1, panX: 0, panY: 0, isPanning: false,
+    startPanX: 0, startPanY: 0, startMouseX: 0, startMouseY: 0,
+    menuOpen: false
+  };
+
+  // DOM
+  const $ = id => document.getElementById(id);
+  const app = $('app'), metadataBar = $('metadataBar'), canvasArea = $('canvasArea');
+  const canvasInner = $('canvasInner'), framesGrid = $('framesGrid'), dropZone = $('dropZone');
+  const sideMenu = $('sideMenu'), menuToggleBtn = $('menuToggleBtn'), menuCloseBtn = $('menuCloseBtn');
+  const mobileMenuBtn = $('mobileMenuBtn'), progressBar = $('progressBar'), progressFill = $('progressFill');
+  const loadingOverlay = $('loadingOverlay'), loadingProgress = $('loadingProgress');
+  const videoElement = $('videoElement'), fileInput = $('fileInput');
+  const captureCanvas = $('captureCanvas'), captureCtx = captureCanvas.getContext('2d');
+  const gridHint = $('gridHint');
+
+  const gridColsInput = $('gridCols'), canvasAspectSelect = $('canvasAspect');
+  const selectionModeSelect = $('selectionMode'), frameCountInput = $('frameCount');
+  const intervalValueInput = $('intervalValue'), qualitySelect = $('qualitySelect');
+  const countRow = $('countRow'), intervalRow = $('intervalRow'), intervalLabel = $('intervalLabel');
+  const toggleMetadata = $('toggleMetadata'), toggleTimecode = $('toggleTimecode');
+  const toggleInfoCard = $('toggleInfoCard'), toggleAutoFit = $('toggleAutoFit');
+  const fontSizeSlider = $('fontSizeSlider'), fontSizeValue = $('fontSizeValue');
+  const spacingSlider = $('spacingSlider'), spacingValue = $('spacingValue');
+  const bgColorInput = $('bgColor'), generateBtn = $('generateBtn'), fitScreenBtn = $('fitScreenBtn');
+  const exportSmallBtn = $('exportSmallBtn'), exportMedBtn = $('exportMedBtn');
+  const exportFullBtn = $('exportFullBtn'), newVideoBtn = $('newVideoBtn'), browseBtn = $('browseBtn');
+  const metaFilename = $('metaFilename'), metaResolution = $('metaResolution');
+  const metaDuration = $('metaDuration'), metaDate = $('metaDate'), metaFrames = $('metaFrames');
+
+  // MENU
+  function openMenu() {
+    state.menuOpen = true;
+    sideMenu.classList.add('open');
+    menuToggleBtn.classList.add('active');
+    if (window.innerWidth > 768) {
+      canvasArea.classList.add('has-menu');
+      if (state.autoFit && state.frames.length) setTimeout(fitToScreen, 260);
+    }
+  }
+  function closeMenu() {
+    state.menuOpen = false;
+    sideMenu.classList.remove('open');
+    menuToggleBtn.classList.remove('active');
+    canvasArea.classList.remove('has-menu');
+    if (state.autoFit && state.frames.length) setTimeout(fitToScreen, 260);
+  }
+  function toggleMenu() { state.menuOpen ? closeMenu() : openMenu(); }
+
+  menuToggleBtn.onclick = toggleMenu;
+  menuCloseBtn.onclick = closeMenu;
+  mobileMenuBtn.onclick = toggleMenu;
+  $('aboutHeader').onclick = () => $('aboutHeader').parentElement.classList.toggle('collapsed');
+  document.querySelectorAll('.menu-section-title').forEach(t => t.onclick = () => t.parentElement.classList.toggle('collapsed'));
+
+  // FILE
+  function handleFile(file) {
+    if (!file?.type.startsWith('video/')) return alert('Please select a video file');
+    state.videoFile = file;
+    state.videoDate = new Date(file.lastModified);
+    if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
+    state.videoUrl = URL.createObjectURL(file);
+    videoElement.src = state.videoUrl;
+    videoElement.load();
+    dropZone.classList.add('hidden');
+    loadingOverlay.classList.add('visible');
+  }
+
+  videoElement.onloadedmetadata = () => {
+    state.videoDuration = videoElement.duration;
+    state.videoWidth = videoElement.videoWidth;
+    state.videoHeight = videoElement.videoHeight;
+    framesGrid.style.setProperty('--video-aspect', state.videoWidth / state.videoHeight);
+    updateMetaDisplay();
+    loadingOverlay.classList.remove('visible');
+    generateFrames();
+  };
+  videoElement.onerror = () => { loadingOverlay.classList.remove('visible'); alert('Error loading video'); };
+
+  function updateMetaDisplay() {
+    metaFilename.innerHTML = `<span>${state.videoFile.name}</span>`;
+    metaResolution.innerHTML = `<span>${state.videoWidth}×${state.videoHeight}</span>`;
+    metaDuration.innerHTML = `<span>${formatTime(state.videoDuration)}</span>`;
+    if (state.videoDate) metaDate.innerHTML = `<span>${formatDate(state.videoDate)}</span>`;
+  }
+
+  // Drag & Drop
+  dropZone.ondragover = e => { e.preventDefault(); dropZone.classList.add('drag-over'); };
+  dropZone.ondragleave = () => dropZone.classList.remove('drag-over');
+  dropZone.ondrop = e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); };
+  dropZone.onclick = e => { if (!e.target.closest('.drop-zone-btn')) fileInput.click(); };
+  browseBtn.onclick = () => fileInput.click();
+  newVideoBtn.onclick = () => fileInput.click();
+  fileInput.onchange = e => { if (e.target.files[0]) handleFile(e.target.files[0]); };
+
+  // FRAMES
+  async function generateFrames() {
+    if (!state.videoUrl) return;
+    const times = calculateFrameTimes();
+    
+    // Auto-fit calculates optimal columns for target aspect
+    if (state.autoFit) {
+      state.gridCols = calculateOptimalColumns(times.length);
+      gridColsInput.value = state.gridCols;
+    }
+    
+    state.frames = [];
+    progressBar.classList.add('visible');
+    loadingOverlay.classList.add('visible');
+    captureCanvas.width = Math.round(state.videoWidth * state.quality);
+    captureCanvas.height = Math.round(state.videoHeight * state.quality);
+
+    for (let i = 0; i < times.length; i++) {
+      const time = times[i];
+      const dataUrl = await captureFrame(time);
+      state.frames.push({ time, frameNumber: Math.floor(time * state.videoFps), dataUrl });
+      progressFill.style.width = `${((i + 1) / times.length) * 100}%`;
+      loadingProgress.textContent = `${i + 1} / ${times.length}`;
+    }
+
+    progressBar.classList.remove('visible');
+    loadingOverlay.classList.remove('visible');
+    progressFill.style.width = '0%';
+    
+    metaFrames.innerHTML = `<span>${state.frames.length}f</span>`;
+    renderGrid();
+    updateGridHint();
+    if (state.autoFit) fitToScreen();
+  }
+
+  function calculateFrameTimes() {
+    const times = [], dur = state.videoDuration, max = 1000;
+    if (state.selectionMode === 'count') {
+      const n = Math.min(state.frameCount, max);
+      for (let i = 0; i < n; i++) times.push(Math.min((dur / (n + 1)) * (i + 1), dur - 0.1));
+    } else if (state.selectionMode === 'seconds') {
+      for (let t = 0; t < dur && times.length < max; t += state.intervalValue) times.push(Math.min(t, dur - 0.1));
+    } else {
+      for (let f = 0; (f / state.videoFps) < dur && times.length < max; f += state.intervalValue)
+        times.push(Math.min(f / state.videoFps, dur - 0.1));
+    }
+    return times;
+  }
+
+  function calculateOptimalColumns(totalFrames) {
+    // Frame aspect ratio (e.g., 1616/3840 = 0.42 for vertical video)
+    const frameAspect = state.videoWidth / state.videoHeight || 16/9;
+    
+    let targetCanvasAspect;
+    if (state.canvasAspect !== 'auto') {
+      const [w, h] = state.canvasAspect.split(':').map(Number);
+      targetCanvasAspect = w / h;
+    } else {
+      // Use screen aspect as target
+      const rect = canvasArea.getBoundingClientRect();
+      targetCanvasAspect = rect.width / rect.height;
+    }
+    
+    let bestCols = 4, bestScore = -Infinity;
+    
+    // Try all possible column counts
+    for (let cols = 1; cols <= Math.min(totalFrames, 40); cols++) {
+      const rows = Math.ceil(totalFrames / cols);
+      
+      // Grid aspect = (cols * frameWidth) / (rows * frameHeight)
+      // If frameWidth = frameAspect * frameHeight, then:
+      // gridAspect = (cols * frameAspect) / rows
+      const gridAspect = (cols * frameAspect) / rows;
+      
+      const emptyFrames = cols * rows - totalFrames;
+      
+      // Score calculation:
+      // 1. Aspect match - how close is grid aspect to target
+      const aspectRatio = gridAspect / targetCanvasAspect;
+      // Perfect = 1.0, penalize deviation
+      const aspectScore = 1 - Math.abs(1 - aspectRatio) * 0.5;
+      
+      // 2. Empty cell penalty
+      const emptyPenalty = (emptyFrames / totalFrames) * 0.3;
+      
+      // 3. Perfect fit bonus
+      const perfectBonus = emptyFrames === 0 ? 0.2 : 0;
+      
+      const score = aspectScore - emptyPenalty + perfectBonus;
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestCols = cols;
+      }
+    }
+    
+    return bestCols;
+  }
+
+  function updateGridHint() {
+    const n = state.frames.length;
+    if (!n) { gridHint.textContent = 'Load video to see suggestions'; return; }
+    
+    const frameAspect = state.videoWidth / state.videoHeight || 16/9;
+    const rows = Math.ceil(n / state.gridCols);
+    const gridAspect = (state.gridCols * frameAspect) / rows;
+    const empty = state.gridCols * rows - n;
+    
+    // Find perfect divisors
+    const divisors = [];
+    for (let i = 2; i <= Math.min(n, 20); i++) if (n % i === 0) divisors.push(i);
+    
+    // Closest standard aspect
+    let aspectLabel = '';
+    if (Math.abs(gridAspect - 1) < 0.15) aspectLabel = '~1:1';
+    else if (Math.abs(gridAspect - 16/9) < 0.2) aspectLabel = '~16:9';
+    else if (Math.abs(gridAspect - 9/16) < 0.15) aspectLabel = '~9:16';
+    else if (Math.abs(gridAspect - 4/3) < 0.15) aspectLabel = '~4:3';
+    else aspectLabel = `~${gridAspect.toFixed(1)}:1`;
+    
+    let html = '';
+    if (empty === 0) {
+      html = `✓ ${state.gridCols}×${rows} = ${n}f (${aspectLabel})`;
+    } else {
+      html = `${state.gridCols}×${rows} (${empty} empty) ${aspectLabel}`;
+    }
+    
+    if (state.canvasAspect !== 'auto') html += `<br>Target: ${state.canvasAspect}`;
+    if (divisors.length && empty > 0) html += `<br>Perfect: ${divisors.slice(0,5).join(', ')} cols`;
+    
+    gridHint.innerHTML = html;
+  }
+
+  function captureFrame(time) {
+    return new Promise(resolve => {
+      videoElement.currentTime = time;
+      videoElement.onseeked = () => {
+        captureCtx.drawImage(videoElement, 0, 0, captureCanvas.width, captureCanvas.height);
+        resolve(captureCanvas.toDataURL('image/jpeg', 0.9));
+      };
+    });
+  }
+
+  function renderGrid() {
+    framesGrid.innerHTML = '';
+    framesGrid.style.gridTemplateColumns = `repeat(${state.gridCols}, 1fr)`;
+    framesGrid.style.setProperty('--grid-gap', `${state.spacing}px`);
+    framesGrid.style.setProperty('--meta-font-size', `${state.fontSize}px`);
+
+    if (state.showInfoCard && state.videoFile) {
+      const item = document.createElement('div');
+      item.className = 'frame-item';
+      item.innerHTML = `<div class="info-card">
+        <div class="info-card-title">VIDEO INFO</div>
+        <div class="info-card-row"><span>File:</span> ${state.videoFile.name}</div>
+        <div class="info-card-row"><span>Res:</span> ${state.videoWidth}×${state.videoHeight}</div>
+        <div class="info-card-row"><span>Duration:</span> ${formatTime(state.videoDuration)}</div>
+        <div class="info-card-row"><span>Frames:</span> ${state.frames.length}</div>
+      </div>`;
+      framesGrid.appendChild(item);
+    }
+
+    state.frames.forEach(frame => {
+      const item = document.createElement('div');
+      item.className = 'frame-item';
+      const wrap = document.createElement('div');
+      wrap.className = 'frame-image-wrap';
+      const img = document.createElement('img');
+      img.src = frame.dataUrl;
+      wrap.appendChild(img);
+      const tc = document.createElement('div');
+      tc.className = 'frame-timecode' + (state.showTimecode ? '' : ' hidden');
+      tc.textContent = `${formatTime(frame.time)} / F${frame.frameNumber}`;
+      wrap.appendChild(tc);
+      item.appendChild(wrap);
+      framesGrid.appendChild(item);
+    });
+  }
+
+  // PAN & ZOOM
+  canvasArea.onwheel = e => {
+    if (e.target.closest('.side-menu')) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const rect = canvasArea.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const newScale = Math.max(0.1, Math.min(10, state.scale * delta));
+    const sc = newScale / state.scale;
+    state.panX = mx - (mx - state.panX) * sc;
+    state.panY = my - (my - state.panY) * sc;
+    state.scale = newScale;
+    updateTransform();
+  };
+
+  canvasArea.onmousedown = e => {
+    if (e.target.closest('.drop-zone,.side-menu') || e.button !== 0) return;
+    e.preventDefault();
+    state.isPanning = true;
+    state.startMouseX = e.clientX; state.startMouseY = e.clientY;
+    state.startPanX = state.panX; state.startPanY = state.panY;
+    canvasArea.classList.add('panning');
+  };
+
+  document.onmousemove = e => {
+    if (!state.isPanning) return;
+    state.panX = state.startPanX + (e.clientX - state.startMouseX);
+    state.panY = state.startPanY + (e.clientY - state.startMouseY);
+    updateTransform();
+  };
+
+  document.onmouseup = () => { state.isPanning = false; canvasArea.classList.remove('panning'); };
+  canvasArea.oncontextmenu = e => { if (!e.target.closest('.side-menu')) e.preventDefault(); };
+
+  // Touch
+  let lastDist = 0;
+  canvasArea.ontouchstart = e => {
+    if (e.target.closest('.drop-zone,.side-menu')) return;
+    if (e.touches.length === 1) {
+      state.isPanning = true;
+      state.startMouseX = e.touches[0].clientX; state.startMouseY = e.touches[0].clientY;
+      state.startPanX = state.panX; state.startPanY = state.panY;
+    } else if (e.touches.length === 2) {
+      state.isPanning = false;
+      lastDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+    }
+  };
+  canvasArea.ontouchmove = e => {
+    if (e.target.closest('.drop-zone,.side-menu')) return;
+    e.preventDefault();
+    if (e.touches.length === 1 && state.isPanning) {
+      state.panX = state.startPanX + (e.touches[0].clientX - state.startMouseX);
+      state.panY = state.startPanY + (e.touches[0].clientY - state.startMouseY);
+      updateTransform();
+    } else if (e.touches.length === 2 && lastDist) {
+      const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+      const rect = canvasArea.getBoundingClientRect();
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      const newScale = Math.max(0.1, Math.min(10, state.scale * (dist / lastDist)));
+      const sc = newScale / state.scale;
+      state.panX = cx - (cx - state.panX) * sc;
+      state.panY = cy - (cy - state.panY) * sc;
+      state.scale = newScale;
+      updateTransform();
+      lastDist = dist;
+    }
+  };
+  canvasArea.ontouchend = () => { state.isPanning = false; lastDist = 0; };
+
+  function updateTransform() {
+    canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+  }
+
+  function fitToScreen() {
+    if (!state.frames.length) return;
+    const rect = canvasArea.getBoundingClientRect();
+    const pad = 20;
+    const total = state.frames.length + (state.showInfoCard ? 1 : 0);
+    const rows = Math.ceil(total / state.gridCols);
+    const frameAspect = state.videoWidth / state.videoHeight;
+    const gap = state.spacing;
+    
+    const availW = rect.width - pad * 2;
+    const availH = rect.height - pad * 2;
+    
+    const maxFW = (availW - (state.gridCols - 1) * gap) / state.gridCols;
+    const maxFH = (availH - (rows - 1) * gap) / rows;
+    
+    let fw, fh;
+    if (maxFW / frameAspect <= maxFH) { fw = maxFW; fh = fw / frameAspect; }
+    else { fh = maxFH; fw = fh * frameAspect; }
+    
+    const gridW = state.gridCols * fw + (state.gridCols - 1) * gap;
+    const gridH = rows * fh + (rows - 1) * gap;
+    
+    state.scale = 1;
+    state.panX = (rect.width - gridW) / 2;
+    state.panY = (rect.height - gridH) / 2;
+    framesGrid.style.width = `${gridW}px`;
+    updateTransform();
+  }
+
+  // CONTROLS
+  gridColsInput.onchange = () => {
+    state.gridCols = Math.max(1, Math.min(50, parseInt(gridColsInput.value) || 6));
+    gridColsInput.value = state.gridCols;
+    state.autoFit = false;
+    toggleAutoFit.classList.remove('active');
+    if (state.frames.length) { renderGrid(); updateGridHint(); fitToScreen(); }
+  };
+
+  canvasAspectSelect.onchange = () => {
+    state.canvasAspect = canvasAspectSelect.value;
+    if (state.autoFit && state.frames.length) {
+      state.gridCols = calculateOptimalColumns(state.frames.length);
+      gridColsInput.value = state.gridCols;
+      renderGrid();
+      updateGridHint();
+      fitToScreen();
+    } else if (state.frames.length) {
+      updateGridHint();
+    }
+  };
+
+  selectionModeSelect.onchange = () => { state.selectionMode = selectionModeSelect.value; updateIntervalUI(); };
+  frameCountInput.onchange = () => { state.frameCount = Math.max(1, Math.min(1000, parseInt(frameCountInput.value) || 24)); frameCountInput.value = state.frameCount; };
+  intervalValueInput.onchange = () => { state.intervalValue = Math.max(1, parseInt(intervalValueInput.value) || 1); intervalValueInput.value = state.intervalValue; };
+  qualitySelect.onchange = () => { state.quality = parseFloat(qualitySelect.value); };
+
+  function updateIntervalUI() {
+    if (state.selectionMode === 'count') { countRow.style.display = 'flex'; intervalRow.style.display = 'none'; }
+    else { countRow.style.display = 'none'; intervalRow.style.display = 'flex'; intervalLabel.textContent = state.selectionMode === 'seconds' ? 'Seconds' : 'Frames'; }
+  }
+
+  toggleMetadata.onclick = () => { state.showMetadata = !state.showMetadata; toggleMetadata.classList.toggle('active', state.showMetadata); metadataBar.classList.toggle('hidden', !state.showMetadata); };
+  toggleTimecode.onclick = () => { state.showTimecode = !state.showTimecode; toggleTimecode.classList.toggle('active', state.showTimecode); document.querySelectorAll('.frame-timecode').forEach(el => el.classList.toggle('hidden', !state.showTimecode)); };
+  toggleInfoCard.onclick = () => { state.showInfoCard = !state.showInfoCard; toggleInfoCard.classList.toggle('active', state.showInfoCard); if (state.frames.length) { renderGrid(); updateGridHint(); if (state.autoFit) fitToScreen(); } };
+  toggleAutoFit.onclick = () => {
+    state.autoFit = !state.autoFit;
+    toggleAutoFit.classList.toggle('active', state.autoFit);
+    if (state.autoFit && state.frames.length) {
+      state.gridCols = calculateOptimalColumns(state.frames.length);
+      gridColsInput.value = state.gridCols;
+      renderGrid();
+      updateGridHint();
+      fitToScreen();
+    }
+  };
+
+  fontSizeSlider.oninput = () => { state.fontSize = parseInt(fontSizeSlider.value); fontSizeValue.textContent = `${state.fontSize}px`; framesGrid.style.setProperty('--meta-font-size', `${state.fontSize}px`); };
+  spacingSlider.oninput = () => { state.spacing = parseInt(spacingSlider.value); spacingValue.textContent = `${state.spacing}px`; framesGrid.style.setProperty('--grid-gap', `${state.spacing}px`); if (state.autoFit) fitToScreen(); };
+  bgColorInput.oninput = () => { state.bgColor = bgColorInput.value; app.style.setProperty('--bg-color', state.bgColor); };
+
+  generateBtn.onclick = generateFrames;
+  fitScreenBtn.onclick = fitToScreen;
+  exportSmallBtn.onclick = () => exportImage('jpeg', 2048);
+  exportMedBtn.onclick = () => exportImage('jpeg', 4096);
+  exportFullBtn.onclick = () => exportImage('png', 8192);
+
+  // EXPORT - with fontSize linked to settings
+  function exportImage(format, maxSize) {
+    if (!state.frames.length) return;
+
+    const total = state.frames.length + (state.showInfoCard ? 1 : 0);
+    const rows = Math.ceil(total / state.gridCols);
+    const frameAspect = state.videoWidth / state.videoHeight;
+    const gap = state.spacing;
+    const headerH = state.showMetadata ? 40 : 0;
+
+    // Base frame size - larger for better quality
+    let baseFrameW = 250;
+    let baseFrameH = Math.round(baseFrameW / frameAspect);
+    
+    let gridW = state.gridCols * baseFrameW + (state.gridCols - 1) * gap;
+    let gridH = rows * baseFrameH + (rows - 1) * gap;
+    let totalW = gridW;
+    let totalH = headerH + gridH;
+
+    // Scale to fit maxSize
+    const maxDim = Math.max(totalW, totalH);
+    let scale = 1;
+    if (maxDim > maxSize) {
+      scale = maxSize / maxDim;
+    }
+    
+    const frameW = Math.round(baseFrameW * scale);
+    const frameH = Math.round(baseFrameH * scale);
+    gridW = state.gridCols * frameW + (state.gridCols - 1) * gap;
+    gridH = rows * frameH + (rows - 1) * gap;
+    totalW = Math.round(gridW);
+    totalH = Math.round(headerH * scale + gridH);
+    const scaledHeaderH = Math.round(headerH * scale);
+
+    // FONT SIZE - linked to state.fontSize setting!
+    // Calculate ratio: on screen, fontSize applies to frames of certain size
+    // In export, scale that same ratio
+    // Screen: ~200px frame with 10px font = 5% ratio
+    // Export: maintain visual proportion from settings
+    const screenFrameSize = 200; // approximate screen frame size
+    const fontRatio = state.fontSize / screenFrameSize; // e.g., 10/200 = 0.05
+    const tcFontSize = Math.max(Math.round(frameW * fontRatio * 1.5), 8); // 1.5x boost for readability
+    const headerFontSize = Math.max(Math.round(scaledHeaderH * 0.35), 10);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = totalW;
+    canvas.height = totalH;
+    const ctx = canvas.getContext('2d');
+
+    // Background
+    ctx.fillStyle = state.bgColor;
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    // Header
+    if (state.showMetadata) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, totalW, scaledHeaderH);
+      
+      // Left: file info
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = `${headerFontSize}px system-ui`;
+      const dateStr = state.videoDate ? ` · ${formatDate(state.videoDate)}` : '';
+      const aspectStr = state.canvasAspect !== 'auto' ? ` · ${state.canvasAspect}` : '';
+      const info = `${state.videoFile?.name || 'video'} · ${state.videoWidth}×${state.videoHeight} · ${formatTime(state.videoDuration)} · ${state.frames.length}f${aspectStr}${dateStr}`;
+      ctx.fillText(info, 12, scaledHeaderH * 0.65);
+      
+      // Right: FRAMEGRID logo (small)
+      ctx.fillStyle = '#35f2a3';
+      const logoW = headerFontSize * 8;
+      ctx.fillRect(totalW - logoW - 8, scaledHeaderH * 0.35, 6, 6);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = `600 ${Math.round(headerFontSize * 0.8)}px system-ui`;
+      ctx.fillText('FRAMEGRID', totalW - logoW + 4, scaledHeaderH * 0.6);
+    }
+
+    // Draw frames
+    const items = [];
+    if (state.showInfoCard) items.push({ type: 'info' });
+    state.frames.forEach(f => items.push({ type: 'frame', data: f }));
+
+    const promises = items.map((item, i) => new Promise(resolve => {
+      const col = i % state.gridCols;
+      const row = Math.floor(i / state.gridCols);
+      const x = col * (frameW + gap);
+      const y = scaledHeaderH + row * (frameH + gap);
+
+      if (item.type === 'info') {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x, y, frameW, frameH);
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.strokeRect(x, y, frameW, frameH);
+        ctx.fillStyle = '#35f2a3';
+        ctx.font = `bold ${tcFontSize * 1.2}px system-ui`;
+        ctx.fillText('VIDEO INFO', x + 10, y + tcFontSize * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = `${tcFontSize}px system-ui`;
+        [`File: ${state.videoFile?.name}`, `Res: ${state.videoWidth}×${state.videoHeight}`, `Dur: ${formatTime(state.videoDuration)}`, `Frames: ${state.frames.length}`]
+          .forEach((line, li) => ctx.fillText(line, x + 10, y + tcFontSize * 3.5 + li * tcFontSize * 1.5));
+        resolve();
+      } else {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, x, y, frameW, frameH);
+          if (state.showTimecode) {
+            const gradH = Math.max(frameH * 0.18, tcFontSize * 2.5);
+            const grad = ctx.createLinearGradient(x, y, x, y + gradH);
+            grad.addColorStop(0, 'rgba(0,0,0,0.85)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(x, y, frameW, gradH);
+            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.font = `${tcFontSize}px system-ui`;
+            ctx.fillText(`${formatTime(item.data.time)} / F${item.data.frameNumber}`, x + 6, y + tcFontSize + 6);
+          }
+          resolve();
+        };
+        img.src = item.data.dataUrl;
+      }
+    }));
+
+    Promise.all(promises).then(() => {
+      const link = document.createElement('a');
+      const ext = format === 'jpeg' ? 'jpg' : 'png';
+      
+      // Filename: fg_NAME_ASPECT_Nf_MODE_cCOLS_DATE_TIME_SIZE
+      const name = (state.videoFile?.name || 'export').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 20);
+      const asp = state.canvasAspect !== 'auto' ? state.canvasAspect.replace(':', 'x') : 'auto';
+      const mode = state.selectionMode === 'count' ? `${state.frameCount}f` : state.selectionMode === 'seconds' ? `e${state.intervalValue}s` : `e${state.intervalValue}f`;
+      const now = new Date();
+      const date = `${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getFullYear()).slice(-2)}`;
+      const time = `${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+      const size = maxSize <= 2048 ? '2k' : maxSize <= 4096 ? '4k' : 'full';
+      
+      link.download = `fg_${name}_${asp}_${state.frames.length}f_${mode}_c${state.gridCols}_${date}_${time}_${size}.${ext}`;
+      link.href = canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.92 : 1);
+      link.click();
+    });
+  }
+
+  // UTILS
+  function formatTime(s) { return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
+  function formatDate(d) { return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; }
+
+  // INIT
+  updateIntervalUI();
+  app.style.setProperty('--bg-color', state.bgColor);
+  fontSizeValue.textContent = `${state.fontSize}px`;
+  spacingValue.textContent = `${state.spacing}px`;
+  framesGrid.style.setProperty('--meta-font-size', `${state.fontSize}px`);
+
+  document.onkeydown = e => {
+    if (e.target.matches('input,select')) return;
+    if (e.key === 'Escape') closeMenu();
+    if (e.key === 'f' || e.key === 'F') fitToScreen();
+    if (e.key === 'm' || e.key === 'M') toggleMenu();
+  };
+
+  window.onresize = () => { if (state.autoFit && state.frames.length) fitToScreen(); };
+
+})();
+  </script>
+</body>
+</html>
