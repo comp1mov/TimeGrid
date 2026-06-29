@@ -5068,11 +5068,56 @@ let isDrawing = false;
   let paletteDragOffset = { x: 0, y: 0 };
   let drawUndoStack = [];
   const _isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const DRAW_CANVAS_MAX_PIXELS = _isCoarsePointer ? 10_000_000 : 24_000_000;
+  const DRAW_CANVAS_MAX_SIDE = _isCoarsePointer ? 8192 : 12000;
+
   function canSnapshotCanvas(cnv) {
     if (!cnv || !cnv.width || !cnv.height) return false;
     const px = cnv.width * cnv.height;
     const limit = _isCoarsePointer ? 12_000_000 : 40_000_000;
     return px <= limit;
+  }
+
+  function readCssPx(value) {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function getDrawCanvasLayoutSize() {
+    const cs = window.getComputedStyle(canvasInner);
+    const padRight = readCssPx(cs.paddingRight);
+    const padBottom = readCssPx(cs.paddingBottom);
+    const gridRight = framesGrid ? ((framesGrid.offsetLeft || 0) + (framesGrid.offsetWidth || 0)) : 0;
+    const gridBottom = framesGrid ? ((framesGrid.offsetTop || 0) + (framesGrid.offsetHeight || 0)) : 0;
+
+    return {
+      cssW: Math.max(1, Math.ceil(Math.max(
+        canvasInner.offsetWidth || 0,
+        canvasInner.clientWidth || 0,
+        gridRight + padRight
+      ))),
+      cssH: Math.max(1, Math.ceil(Math.max(
+        canvasInner.offsetHeight || 0,
+        canvasInner.clientHeight || 0,
+        gridBottom + padBottom
+      )))
+    };
+  }
+
+  function resolveDrawCanvasDpr(cssW, cssH) {
+    const base = _isCoarsePointer ? 1 : Math.min(2, window.devicePixelRatio || 1);
+    const cssArea = Math.max(1, cssW * cssH);
+    const byArea = Math.sqrt(DRAW_CANVAS_MAX_PIXELS / cssArea);
+    const bySide = Math.min(DRAW_CANVAS_MAX_SIDE / Math.max(1, cssW), DRAW_CANVAS_MAX_SIDE / Math.max(1, cssH));
+    return Math.max(0.1, Math.min(base, byArea, bySide));
+  }
+
+  function applyCanvasCssSize(cnv, cssW, cssH) {
+    if (!cnv) return;
+    const w = `${cssW}px`;
+    const h = `${cssH}px`;
+    if (cnv.style.width !== w) cnv.style.width = w;
+    if (cnv.style.height !== h) cnv.style.height = h;
   }
 
   // ====================================
@@ -5402,12 +5447,14 @@ function toggleDrawMode() {
     }
   }
 function resizeDrawCanvas() {
-    const inner = canvasInner;
-    // Use lower resolution on touch devices to improve performance
-    const dpr = _isCoarsePointer ? 1 : Math.min(2, window.devicePixelRatio || 1);
+    const { cssW, cssH } = getDrawCanvasLayoutSize();
+    const dpr = resolveDrawCanvasDpr(cssW, cssH);
     state.drawCanvasDpr = dpr;
-    const newW = Math.round(inner.scrollWidth * dpr);
-    const newH = Math.round(inner.scrollHeight * dpr);
+    const newW = Math.max(1, Math.round(cssW * dpr));
+    const newH = Math.max(1, Math.round(cssH * dpr));
+
+    applyCanvasCssSize(drawCanvas, cssW, cssH);
+    applyCanvasCssSize(bgUnderlayCanvas, cssW, cssH);
 
     // If size unchanged, only keep template sized correctly
     if (drawCanvas.width === newW && drawCanvas.height === newH) {
@@ -5416,15 +5463,21 @@ function resizeDrawCanvas() {
     }
 
     // Snapshot BG layers before resize, because resizing clears canvas buffers
-    const oldBg = document.createElement('canvas');
-    oldBg.width = bgCanvas.width || 1;
-    oldBg.height = bgCanvas.height || 1;
-    oldBg.getContext('2d').drawImage(bgCanvas, 0, 0);
+    let oldBg = null;
+    if (canSnapshotCanvas(bgCanvas)) {
+      oldBg = document.createElement('canvas');
+      oldBg.width = bgCanvas.width || 1;
+      oldBg.height = bgCanvas.height || 1;
+      oldBg.getContext('2d').drawImage(bgCanvas, 0, 0);
+    }
 
-    const oldBgSingle = document.createElement('canvas');
-    oldBgSingle.width = bgCanvasSingle.width || 1;
-    oldBgSingle.height = bgCanvasSingle.height || 1;
-    oldBgSingle.getContext('2d').drawImage(bgCanvasSingle, 0, 0);
+    let oldBgSingle = null;
+    if (canSnapshotCanvas(bgCanvasSingle)) {
+      oldBgSingle = document.createElement('canvas');
+      oldBgSingle.width = bgCanvasSingle.width || 1;
+      oldBgSingle.height = bgCanvasSingle.height || 1;
+      oldBgSingle.getContext('2d').drawImage(bgCanvasSingle, 0, 0);
+    }
 
     // Resize overlay canvases (clears content)
     drawCanvas.width = newW;
@@ -5439,14 +5492,14 @@ function resizeDrawCanvas() {
     // Restore BGs by scaling snapshots into the new size
     try {
       bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
-      if (oldBg.width > 1 && oldBg.height > 1) {
+      if (oldBg && oldBg.width > 1 && oldBg.height > 1) {
         bgCtx.drawImage(oldBg, 0, 0, newW, newH);
       }
     } catch (e) {}
 
     try {
       bgCtxSingle.clearRect(0, 0, bgCanvasSingle.width, bgCanvasSingle.height);
-      if (oldBgSingle.width > 1 && oldBgSingle.height > 1) {
+      if (oldBgSingle && oldBgSingle.width > 1 && oldBgSingle.height > 1) {
         bgCtxSingle.drawImage(oldBgSingle, 0, 0, newW, newH);
       }
     } catch (e) {}

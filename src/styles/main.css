@@ -142,7 +142,7 @@
 
     /* GRID */
     .frames-grid { display: grid; gap: var(--grid-gap, 2px); width: max-content; align-content: start; position: relative; z-index: 2; }
-    .bg-underlay-canvas { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; }
+    .bg-underlay-canvas { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; width: 0; height: 0; }
     .frames-grid.seamless { gap: 0 !important; }
     .frames-grid.seamless .frame-item { background: var(--frame-bg, #111); }
     .frames-grid.seamless .frame-image-wrap { outline: 1px solid var(--frame-bg, #111); outline-offset: -1px; }
@@ -565,6 +565,8 @@
       left: 0;
       pointer-events: none;
       z-index: 50;
+      width: 0;
+      height: 0;
     }
     .draw-canvas.active {
       pointer-events: auto;
