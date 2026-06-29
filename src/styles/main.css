@@ -374,6 +374,16 @@
     }
     .menu-chip-btn:hover { background: #333; }
     .menu-chip-btn:active, .menu-chip-btn.active { background: var(--fg-accent, #35f2a3); color: #000; }
+    .frame-target-row { align-items: flex-start; }
+    .frame-target-control-stack {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+    }
+    .frame-target-strip {
+      display: flex; align-items: center; justify-content: flex-end; gap: 2px;
+    }
+    .frame-target-strip .menu-chip-btn {
+      min-width: 22px; height: 20px; padding: 0 5px; font-size: 9px;
+    }
 
 
     /* Quick Toolbar */

@@ -66,7 +66,7 @@
     showMetadata: true, // Timecode format options
     tcShowIndex: false,
     tcShowTime: false,
-    tcShowFrame: true, // Original frame number, shown as F0001
+    tcShowFrame: false, // Original frame number, shown as F0001
     tcShowText: false,
     tcCustomText: '',
     autoFit: true, canvasAspect: 'auto', bgColor: '#020202',
@@ -75,7 +75,7 @@
 
     fontSize: 10, spacing: 0, sequenceMode: false,
     tcTextColor: '#ffffff', tcBgColor: '#000000', tcOpacity: 0.7,
-    tcAlign: 'left', tcPosition: 'top', tcPadding: 0, tcMargin: 0,
+    tcAlign: 'center', tcPosition: 'center', tcPadding: 0, tcMargin: 0,
     // Frame image transform inside each cell (preview + export)
     frameImgScale: 1.02, frameImgScaleX: 1.02, frameImgScaleY: 1.02, frameImgScaleLink: true,
     frameImgRot: 0,
@@ -101,7 +101,7 @@
     isPlaying: false, animFrame: 0, animInterval: null,
     currentTick: 0, // global animation position
     viewMode: 'grid', // 'grid' or 'single'
-    frameTarget: 1,  // 1 = off/all frames, N>=2 = show only first N
+    frameTarget: 1,  // 1 = all frames, N>=2 = visible target slots with phase sampling
     cellSize: 1, // frames per cell (1, 2, 4, 8...)
         gridLoops: 1, // 1-5: how many distinct phase offsets are used across grid cells
     loopAfterN: 0, // 0=disabled, N=cycle each cell within its N-frame window
@@ -973,7 +973,8 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
   }
 
   function getVisibleGridCellCount() {
-    const total = Math.max(1, state.frames.length || state.frameCount || 1);
+    if (state.frames.length) return getEffectiveGridCellCount();
+    const total = Math.max(1, state.frameCount || 1);
     const cellSize = Math.max(1, Number(state.cellSize) || 1);
     return Math.max(1, Math.ceil(total / cellSize));
   }
@@ -2096,6 +2097,73 @@ function schedulePostGridSync() {
     return Math.min(state.frames.length, Math.max(2, Math.round(ft)));
   }
 
+  function getEffectiveGridCellCount(frameCount = state.frames.length) {
+    const cellSize = Math.max(1, Number(state.cellSize) || 1);
+    const sourceCount = Math.max(0, Math.floor(Number(frameCount) || 0));
+    const targetCount = sourceCount > 0
+      ? getEffectiveFrameTargetCount()
+      : Math.max(1, Math.round(Number(state.frameCount) || 1));
+    return Math.max(1, Math.ceil(Math.max(1, targetCount) / cellSize));
+  }
+
+  function normalizeFrameIndex(idx, frameCount = state.frames.length) {
+    const n = Math.max(1, Math.floor(Number(frameCount) || 1));
+    const v = Number.isFinite(Number(idx)) ? Math.floor(Number(idx)) : 0;
+    return ((v % n) + n) % n;
+  }
+
+  function getCellBaseFrameOffset(cellOrderIdx, cellCount, frameCount) {
+    const n = Math.max(1, Math.floor(Number(frameCount) || 1));
+    const cells = Math.max(1, Math.floor(Number(cellCount) || 1));
+    const idxRaw = Number(cellOrderIdx);
+    const idx = Number.isFinite(idxRaw) && idxRaw >= 0 ? Math.floor(idxRaw) : 0;
+    const phaseCount = Math.max(1, Number(state.gridLoops) || 1);
+    if (state.sequenceMode) return (idx * phaseCount) % n;
+    return Math.floor(idx * n * phaseCount / cells) % n;
+  }
+
+  function getFrameCellInfo(cellIdx, tick, opts = {}) {
+    const frameCount = Math.max(0, Math.floor(Number(opts.frameCount ?? state.frames.length) || 0));
+    if (!frameCount) {
+      return { frameIdx: 0, baseOffset: 0, cellOrderIdx: 0, cellCount: 1, frameCount: 0 };
+    }
+
+    const cellCount = Math.max(1, Math.floor(Number(opts.cellCount) || getEffectiveGridCellCount(frameCount)));
+    if (state.animPattern === 'random') ensureAnimRandomStarts(cellCount);
+    let cellOrderIdx = Number(opts.cellOrderIdx);
+
+    if (!Number.isFinite(cellOrderIdx) || cellOrderIdx < 0) {
+      const cellOrderMap = opts.cellOrderMap;
+      if (cellOrderMap && typeof cellOrderMap.get === 'function') {
+        cellOrderIdx = cellOrderMap.get(cellIdx);
+      } else if (Array.isArray(opts.cellOrder)) {
+        cellOrderIdx = opts.cellOrder.indexOf(cellIdx);
+      }
+    }
+
+    if (!Number.isFinite(cellOrderIdx) || cellOrderIdx < 0) cellOrderIdx = cellIdx;
+    const baseOffset = state.animPattern === 'random'
+      ? (state.animRandomStarts[cellIdx] ?? 0)
+      : getCellBaseFrameOffset(cellOrderIdx, cellCount, frameCount);
+
+    if (!opts.skipEnsureShuffle) ensureAnimDirShuffle(frameCount);
+    const frameIdx = applyLoopAfterN(
+      Number.isFinite(Number(tick)) ? Math.floor(Number(tick)) : 0,
+      baseOffset,
+      frameCount,
+      state.animDirection,
+      opts.shuffle || state.animDirShuffle
+    );
+
+    return {
+      frameIdx: normalizeFrameIndex(frameIdx, frameCount),
+      baseOffset,
+      cellOrderIdx,
+      cellCount,
+      frameCount
+    };
+  }
+
 function renderGrid() {
     // ── Sync setup ───────────────────────────────────────────────────────────
     invalidateCellCaches();
@@ -2124,12 +2192,22 @@ function renderGrid() {
       framesGrid.appendChild(item);
     }
 
-    const _frameLimit = getEffectiveFrameTargetCount();
-    const cellCount = Math.ceil(_frameLimit / state.cellSize);
+    const cellCount = getEffectiveGridCellCount();
+    const tick = Number.isFinite(Number(state.currentTick)) ? Math.floor(Number(state.currentTick)) : 0;
+    const cellOrder = generateCellOrder(cellCount, state.gridCols);
+    const cellOrderMap = new Map();
+    cellOrder.forEach((cell, idx) => cellOrderMap.set(cell, idx));
+    if (state.animPattern === 'random') ensureAnimRandomStarts(cellCount);
+    ensureAnimDirShuffle(state.frames.length);
 
     // ── Reusable cell-node builder ───────────────────────────────────────────
     function _buildCell(c) {
-      const displayFrameIdx = Math.floor(c * _frameLimit * state.gridLoops / cellCount) % _frameLimit;
+      const displayFrameIdx = getFrameCellInfo(c, tick, {
+        cellCount,
+        cellOrderMap,
+        shuffle: state.animDirShuffle,
+        skipEnsureShuffle: true
+      }).frameIdx;
       const frame = state.frames[displayFrameIdx];
       if (!frame) return null;
       const item  = document.createElement('div');
@@ -2637,12 +2715,22 @@ function fitToSingleFrame() {
 
   const frameTargetInput = $('frameTargetInput');
   const frameTargetMinus = $('frameTargetMinus'), frameTargetPlus = $('frameTargetPlus');
+  const frameTargetPresets = $('frameTargetPresets');
   if (frameTargetInput) {
     frameTargetInput.value = state.frameTarget || 1;
+    const syncFrameTargetPresetUI = () => {
+      if (!frameTargetPresets) return;
+      const cur = Math.max(1, parseInt(frameTargetInput.value, 10) || state.frameTarget || 1);
+      frameTargetPresets.querySelectorAll('[data-frame-target]').forEach(btn => {
+        const presetValue = Math.max(1, parseInt(btn.dataset.frameTarget, 10) || 1);
+        btn.classList.toggle('active', presetValue === cur);
+      });
+    };
     const applyFrameTarget = () => {
       const v = Math.max(1, parseInt(frameTargetInput.value, 10) || 1);
       state.frameTarget = v;
       frameTargetInput.value = v;
+      syncFrameTargetPresetUI();
       if (state.autoFit && state.frames.length) {
         const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
         state.gridCols = calculateOptimalColumns(cellCount);
@@ -2659,6 +2747,15 @@ function fitToSingleFrame() {
       frameTargetInput.value = Math.max(1, (parseInt(frameTargetInput.value)||1) + 1);
       applyFrameTarget();
     };
+    if (frameTargetPresets) {
+      frameTargetPresets.querySelectorAll('[data-frame-target]').forEach(btn => {
+        btn.onclick = () => {
+          frameTargetInput.value = Math.max(1, parseInt(btn.dataset.frameTarget, 10) || 1);
+          applyFrameTarget();
+        };
+      });
+    }
+    syncFrameTargetPresetUI();
   }
 
   if (gridLoopsInput) {
@@ -4328,9 +4425,6 @@ function updateAllCells() {
     const { map: cellOrderMap } = getCachedCellOrder(totalCells, state.gridCols);
 
     // Hoist loop-invariants out of per-cell loop
-    const phaseCount  = Math.max(1, state.gridLoops || 1);
-    const isRandom    = state.animPattern === 'random';
-    const isSeq       = !!state.sequenceMode;
     const showTC      = computeShowTimecode();
     const hasOnion    = !!(state.drawOnion && state.drawMode && state.drawTarget === 'frame');
     ensureAnimDirShuffle(frameCount); // once, not per-cell
@@ -4338,19 +4432,19 @@ function updateAllCells() {
     const tick    = state.currentTick;
     const dir     = state.animDirection;
     const shuffle = state.animDirShuffle;
-    const tcTotal = Math.ceil(frameCount / state.cellSize);
+    const tcTotal = totalCells;
 
     coloramaSetCellCount(totalCells);
     for (let cellIdx = 0; cellIdx < totalCells; cellIdx++) {
       const cellOrderIdx = cellOrderMap.get(cellIdx) ?? 0;
-      let cellOffset;
-      if (isSeq) {
-        cellOffset = (cellOrderIdx * phaseCount) % frameCount;
-      } else {
-        cellOffset = Math.floor(cellOrderIdx * frameCount * phaseCount / totalCells) % frameCount;
-      }
-      const baseOffset = isRandom ? (state.animRandomStarts[cellIdx] ?? 0) : cellOffset;
-      const frameIdx   = applyLoopAfterN(tick, baseOffset, frameCount, dir, shuffle);
+      const cellInfo = getFrameCellInfo(cellIdx, tick, {
+        cellCount: totalCells,
+        cellOrderIdx,
+        shuffle,
+        skipEnsureShuffle: true
+      });
+      const baseOffset = cellInfo.baseOffset;
+      const frameIdx   = cellInfo.frameIdx;
 
       const frame = state.frames[frameIdx];
       if (!frame) continue;
@@ -4766,19 +4860,8 @@ function updateAllCells() {
 
   // Unified frame calculation for any cell at any tick
   function getFrameForCell(cellIdx, tick) {
-    const frameCount = state.frames.length;
-    const cellCount = Math.ceil(frameCount / state.cellSize);
-    const cellOrder = generateCellOrder(cellCount, state.gridCols);
-    const cellOrderIdx = cellOrder.indexOf(cellIdx);
-    const rawOffset = cellOrderIdx >= 0 ? cellOrderIdx : 0;
-    const phaseCount = Math.max(1, state.gridLoops || 1);
-    const offset = Math.floor(rawOffset * frameCount * phaseCount / Math.max(1, cellCount)) % frameCount;
-
-    if (state.animPattern === 'random') ensureAnimRandomStarts(cellCount);
-    const baseOffset = (state.animPattern === 'random') ? (state.animRandomStarts[cellIdx] ?? 0) : offset;
-
-    ensureAnimDirShuffle(frameCount);
-    return applyLoopAfterN(tick, baseOffset, frameCount, state.animDirection, state.animDirShuffle);
+    if (state.animPattern === 'random') ensureAnimRandomStarts(getEffectiveGridCellCount());
+    return getFrameCellInfo(cellIdx, tick).frameIdx;
   }
 
   // Update all cells to show frames at current tick
@@ -9160,8 +9243,12 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
     const frameH = frameHLogical * sy;
     const gapX = gap * sx;
     const gapY = gap * sy;
-    const cellCount = Math.ceil(window._fgState.frames.length / window._fgState.cellSize);
+    const cellCount = getEffectiveGridCellCount(window._fgState.frames.length);
     const frameCount = window._fgState.frames.length;
+    const cellOrderMap = new Map();
+    if (Array.isArray(cellOrder)) cellOrder.forEach((cell, idx) => cellOrderMap.set(cell, idx));
+    if (window._fgState.animPattern === 'random') ensureAnimRandomStarts(cellCount);
+    ensureAnimDirShuffle(frameCount);
 
     if (window._fgState.exportShowMetadata && outHeaderH > 0) {
       const metaText = buildExportMetaText({ mode: 'grid', cols: window._fgState.gridCols, frameW: frameWLogical, frameH: frameHLogical, frames: frameCount, fps: window._fgState.animFps, srcW: window._fgState.videoWidth, srcH: window._fgState.videoHeight, duration: window._fgState.videoDuration, date: window._fgState.videoDate });
@@ -9191,17 +9278,14 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
       const cellDrawH = (gapY > 0) ? Math.ceil(frameH) : (exactY2 - exactY1 + 1);
 
       const uiC = c + (0);
-      const cellOrderIdx = cellOrder.indexOf(c);
-      const phaseCount = Math.max(1, window._fgState.gridLoops || 1);
-      let cellOffset;
-      if (window._fgState.sequenceMode) {
-         cellOffset = (cellOrderIdx * phaseCount) % frameCount;
-      } else {
-         cellOffset = Math.floor(cellOrderIdx * frameCount * phaseCount / Math.max(1, cellCount)) % frameCount;
-      }
-      const baseOffset = (window._fgState.animPattern === 'random') ? (window._fgState.animRandomStarts[c] ?? 0) : cellOffset;
-      ensureAnimDirShuffle(frameCount);
-      const animFrameIdx = applyLoopAfterN(tick, baseOffset, frameCount, window._fgState.animDirection, window._fgState.animDirShuffle);
+      const cellInfo = getFrameCellInfo(c, tick, {
+        cellCount,
+        cellOrderIdx: cellOrderMap.get(c),
+        shuffle: window._fgState.animDirShuffle,
+        skipEnsureShuffle: true
+      });
+      const baseOffset = cellInfo.baseOffset;
+      const animFrameIdx = cellInfo.frameIdx;
       const frame = window._fgState.frames[animFrameIdx];
       const img = frameImages ? frameImages[animFrameIdx] : null;
 
@@ -10119,11 +10203,10 @@ async function recordAudioSeqAV(mode = 'grid') {
     let tick = 0;
     const totalTicks = sequence.length;
     const _audioSeqPlayheads = (state.audioSeq && Array.isArray(state.audioSeq.playheads)) ? state.audioSeq.playheads.slice() : [];
-    const _audioSeqPhaseCount = Math.max(1, state.gridLoops || 1);
     const _audioSeqOffsets = _audioSeqPlayheads.map(cellIdx => {
       const cellOrderIdx = cellOrder.indexOf(cellIdx);
       const rawOffset = (cellOrderIdx >= 0) ? cellOrderIdx : 0;
-      const off = Math.floor(rawOffset * frameCount * _audioSeqPhaseCount / Math.max(1, cellCount)) % frameCount;
+      const off = getCellBaseFrameOffset(rawOffset, cellCount, frameCount);
       return { cellIdx, off };
     });
 
@@ -10980,6 +11063,7 @@ const canvas = document.createElement('canvas');
   // Draw frames
   const offset = 0;
   const __exportCells = [];
+  const previewItems = framesGrid ? framesGrid.querySelectorAll('.frame-item') : null;
 
   // Pre-load Frame Diff plate image
   if (state.frameDiffEnabled && state.frames.length) {
@@ -11022,23 +11106,17 @@ const canvas = document.createElement('canvas');
     // WYSIWYG export: take the currently displayed frame per cell when possible
     let frameIdx = NaN;
     try {
-      const items = framesGrid ? framesGrid.querySelectorAll('.frame-item') : null;
-      const item = items && items[i];
+      const item = previewItems && previewItems[i];
       const di = item && item.dataset ? parseInt(item.dataset.frameIdx, 10) : NaN;
       if (Number.isFinite(di)) frameIdx = di;
     } catch (e) {}
 
     // Fallback: exact match to UI preview distribution
     if (!Number.isFinite(frameIdx)) {
-      const phaseCount = Math.max(1, state.gridLoops || 1);
-      if (state.sequenceMode) {
-        frameIdx = (cellIdx * phaseCount) % state.frames.length;
-      } else {
-        frameIdx = Math.floor(cellIdx * state.frames.length * phaseCount / Math.max(1, cellCount)) % state.frames.length;
-      }
+      frameIdx = getFrameCellInfo(cellIdx, state.currentTick, { cellCount }).frameIdx;
     }
 
-    frameIdx = ((frameIdx % state.frames.length) + state.frames.length) % state.frames.length;
+    frameIdx = normalizeFrameIndex(frameIdx, state.frames.length);
 
     const frame = state.frames[frameIdx];
     if (!frame) continue;

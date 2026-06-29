@@ -463,12 +463,21 @@
               <button class="menu-input-btn" id="colsPlus">+</button>
             </div>
           </div>
-          <div class="menu-row">
-            <span class="menu-label" title="1 = off/show all. 2,3,4... show only first N frames in grid.">Frame Target</span>
-            <div class="menu-input-group">
-              <button class="menu-input-btn" id="frameTargetMinus">−</button>
-              <input type="number" class="menu-input menu-input-narrow" id="frameTargetInput" value="1" min="1" max="9999" style="width:44px;" inputmode="decimal" placeholder="auto">
-              <button class="menu-input-btn" id="frameTargetPlus">+</button>
+          <div class="menu-row frame-target-row">
+            <span class="menu-label" title="1 = all frames. 2,3,4... set visible target slots with phase sampling.">Frame Target</span>
+            <div class="frame-target-control-stack">
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="frameTargetMinus">−</button>
+                <input type="number" class="menu-input menu-input-narrow" id="frameTargetInput" value="1" min="1" max="9999" style="width:44px;" inputmode="decimal" placeholder="auto">
+                <button class="menu-input-btn" id="frameTargetPlus">+</button>
+              </div>
+              <div class="frame-target-strip" id="frameTargetPresets" aria-label="Frame Target presets">
+                <button type="button" class="menu-chip-btn active" data-frame-target="1" title="All frames">1</button>
+                <button type="button" class="menu-chip-btn" data-frame-target="4">4</button>
+                <button type="button" class="menu-chip-btn" data-frame-target="6">6</button>
+                <button type="button" class="menu-chip-btn" data-frame-target="8">8</button>
+                <button type="button" class="menu-chip-btn" data-frame-target="12">12</button>
+              </div>
             </div>
           </div>
           <div class="menu-row">
@@ -626,7 +635,7 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <button class="menu-btn" id="toggleTcIndex" style="margin:0;">Index</button>
             <button class="menu-btn" id="toggleTcTime" style="margin:0;">Sec</button>
-            <button class="menu-btn active-toggle" id="toggleTcFrame" style="margin:0;">Frame</button>
+            <button class="menu-btn" id="toggleTcFrame" style="margin:0;">Frame</button>
             <button class="menu-btn" id="toggleTcText" style="margin:0;">Text</button>
           </div>
           <div class="menu-row" id="tcCustomTextRow" style="display:none;">
@@ -637,16 +646,16 @@
           <div style="margin-bottom:6px;">
             <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Align</div>
             <div class="tc-btn-group" id="tcAlignGroup">
-              <button class="menu-btn active-toggle" data-val="left">Left</button>
-              <button class="menu-btn" data-val="center">Center</button>
+              <button class="menu-btn" data-val="left">Left</button>
+              <button class="menu-btn active-toggle" data-val="center">Center</button>
               <button class="menu-btn" data-val="right">Right</button>
             </div>
           </div>
           <div style="margin-bottom:4px;">
             <div style="font-size:9px;color:#666;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Position</div>
             <div class="tc-btn-group" id="tcPositionGroup">
-              <button class="menu-btn active-toggle" data-val="top">Top</button>
-              <button class="menu-btn" data-val="center">Center</button>
+              <button class="menu-btn" data-val="top">Top</button>
+              <button class="menu-btn active-toggle" data-val="center">Center</button>
               <button class="menu-btn" data-val="bottom">Bottom</button>
             </div>
           </div>
@@ -691,8 +700,8 @@
             </div>
           </div>
           <!-- keep hidden selects for JS compatibility -->
-          <select id="tcAlign" style="display:none;"><option value="left" selected>Left</option><option value="center">Center</option><option value="right">Right</option></select>
-          <select id="tcPosition" style="display:none;"><option value="top" selected>Top</option><option value="center">Center</option><option value="bottom">Bottom</option></select>
+          <select id="tcAlign" style="display:none;"><option value="left">Left</option><option value="center" selected>Center</option><option value="right">Right</option></select>
+          <select id="tcPosition" style="display:none;"><option value="top">Top</option><option value="center" selected>Center</option><option value="bottom">Bottom</option></select>
 
           </div>
       </div>
@@ -1011,7 +1020,7 @@
         </div>
       </div>
 
-<div class="menu-section" id="audioSeqSection">
+<div class="menu-section collapsed" id="audioSeqSection">
         <div class="menu-section-title">Audio Collision Seq</div>
         <div class="menu-section-content">
 
