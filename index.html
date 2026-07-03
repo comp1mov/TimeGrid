@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 ╔════════════════════════════════════════════════════════════════╗
-║      TimeGrid v28.14                                         ║
+║      TimeGrid v28.15                                         ║
 ╚════════════════════════════════════════════════════════════════╝
 -->
 
@@ -20,7 +20,7 @@
     gtag('js', new Date());
     gtag('config', 'G-JG9JL2MG9E');
   </script>
-  <title>TimeGrid v28.14</title>
+  <title>TimeGrid v28.15</title>
   <link rel="stylesheet" href="/src/styles/main.css">
 </head>
 <body>
@@ -33,7 +33,7 @@
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell"></span>
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell active2"></span>
           </span>
-          <span class="metadata-logo-text" id="fgLogoText">TimeGrid v28.14</span>
+          <span class="metadata-logo-text" id="fgLogoText">TimeGrid v28.15</span>
         </div>
         <div class="metadata-gap"></div>
         <div class="metadata-group">
@@ -645,10 +645,19 @@
             <button class="menu-btn" id="toggleTcTime" style="margin:0;">Sec</button>
             <button class="menu-btn" id="toggleTcFrame" style="margin:0;">Frame</button>
             <button class="menu-btn" id="toggleTcText" style="margin:0;">Text</button>
+            <button class="menu-btn" id="toggleTcFilename" style="margin:0;">File</button>
           </div>
           <div class="menu-row" id="tcCustomTextRow" style="display:none;">
             <span class="menu-label">Text</span>
             <input type="text" class="menu-input" id="tcCustomTextInput" placeholder="Enter label" value="">
+          </div>
+          <div class="menu-row" id="tcFilenameTailRow" style="display:none;">
+            <span class="menu-label" title="0 = full filename; otherwise show the last N characters">Tail chars</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="tcFilenameTailMinus">-</button>
+              <input type="number" class="menu-input menu-input-narrow" id="tcFilenameTailInput" value="24" min="0" max="300" style="width:56px;">
+              <button class="menu-input-btn" id="tcFilenameTailPlus">+</button>
+            </div>
           </div>
 
           <div style="margin-bottom:6px;">
@@ -1540,7 +1549,7 @@
           <div class="about-toggle"></div>
         </div>
         <div class="about-content">
-          <div class="about-version">Version v28.14</div>
+          <div class="about-version">Version v28.15</div>
           <div class="about-description">Video frame extraction tool for contact sheets, storyboards, and AI analysis.</div>
           
                     <div class="menu-row" style="margin-bottom: 12px; justify-content: space-between; padding-right: 4px;">

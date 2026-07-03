@@ -213,6 +213,8 @@
       color: var(--tc-text-color, #fff); font-variant-numeric: tabular-nums;
       width: fit-content; max-width: 90%;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
       line-height: 1.0;
     }
     /* Vertical */

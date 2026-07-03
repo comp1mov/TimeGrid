@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.14`
+Текущая версия приложения в коде: `TimeGrid v28.15`
 
 ## 1. Короткое описание
 
@@ -595,3 +595,12 @@ Chronophoto now has two separate loop-related controls:
 - `Frame Full`: preserves the first v28.13 behavior for comparison.
 
 `Seam Strength` controls the maximum opacity for `Chrono Only` and `Frame Soft`; default is `0.55`. Preview, MP4 grid/single, PNG sequence, and still exports all use the same opacity helpers.
+
+### 2026-07-04 Filename labels v28.15
+
+Timecode overlay can now show the source filename per frame:
+
+- `File` toggle adds the frame's `sourceName` to the overlay.
+- Image-sequence imports store `sourceName` and `sourceIndex` in each generated frame.
+- `Tail chars` controls truncation from the end of the filename; `0` means full filename, default is `24`.
+- Preview and exports use the same `formatTimecode(...)` path.

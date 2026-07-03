@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.14';
+  const APP_VERSION = 'v28.15';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
 
   const EXPORT_CONF = {
@@ -73,6 +73,8 @@ inject();
     tcShowFrame: false, // Original frame number, shown as F0001
     tcShowText: false,
     tcCustomText: '',
+    tcShowFilename: false,
+    tcFilenameTail: 24,
     autoFit: true, canvasAspect: 'auto', bgColor: '#020202',
     bgGridShow: false, bgGridType: 'lines', bgGridColor: '#ffffff', bgGridOpacity: 0.12, bgGridSize: 24,
     previewCellW: 240, // preview cell width in CSS px (stabilizes iPad grid sizing)
@@ -1055,6 +1057,12 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
     ctx.drawImage(tmp, 0, 0, curW, curH, dx, dy, dw, dh);
   }
 
+  function getImageImportFileName(index) {
+    const files = Array.isArray(state.imageFiles) ? state.imageFiles : [];
+    const idx = Math.max(0, Math.min(files.length - 1, Math.floor(Number(index) || 0)));
+    return files[idx] && files[idx].name ? String(files[idx].name) : '';
+  }
+
   async function generateFrames() {
     // Regenerate Grid should also reset drawings and caches, to avoid mismatched resolutions.
     hardClearAllDrawingsAndUndo();
@@ -1106,7 +1114,7 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
               tileCtx.clearRect(0, 0, dsW, dsH);
               drawImageHQ(tileCtx, img, sx, sy, sw, sh, 0, 0, dsW, dsH);
 
-              state.frames.push({ time: idx / state.videoFps, frameNumber: idx, dataUrl: tileCanvas.toDataURL('image/png') });
+              state.frames.push({ time: idx / state.videoFps, frameNumber: idx, dataUrl: tileCanvas.toDataURL('image/png'), sourceName: getImageImportFileName(0), sourceIndex: 0 });
               if (idx === 0) {
                 firstTileW = dsW;
                 firstTileH = dsH;
@@ -1126,7 +1134,7 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
         for (let i = 0; i < n; i++) {
           const time = i / state.videoFps;
           const idx = Math.min(k - 1, Math.floor((i * k) / n));
-          state.frames.push({ time, frameNumber: i, dataUrl: urls[idx] || '' });
+          state.frames.push({ time, frameNumber: i, dataUrl: urls[idx] || '', sourceName: getImageImportFileName(idx), sourceIndex: idx });
           progressFill.style.width = `${((i + 1) / n) * 100}%`;
           loadingProgress.textContent = `${i + 1} / ${n}`;
         }
@@ -1197,7 +1205,7 @@ for (let i = 0; i < times.length; i++) {
         dataUrl = await captureFrame(time);
       }
       if (!dataUrl) dataUrl = '';
-      state.frames.push({ time, frameNumber: Math.floor(time * state.videoFps), dataUrl });
+      state.frames.push({ time, frameNumber: Math.floor(time * state.videoFps), dataUrl, sourceName: state.videoFile && state.videoFile.name ? String(state.videoFile.name) : '' });
       progressFill.style.width = `${((i + 1) / times.length) * 100}%`;
       loadingProgress.textContent = `${i + 1} / ${times.length}`;
     }
@@ -1639,7 +1647,7 @@ function updateInfoPanel() {
 
   function computeShowTimecode() {
     const hasText = !!(state.tcShowText && String(state.tcCustomText || '').trim());
-    return !!(state.tcShowIndex || state.tcShowTime || state.tcShowFrame || hasText);
+    return !!(state.tcShowIndex || state.tcShowTime || state.tcShowFrame || hasText || state.tcShowFilename);
   }
 
   // Draw a timecode overlay on a canvas export (PNG/JPEG/MP4) using the same visual logic as the UI.
@@ -1698,7 +1706,12 @@ function updateInfoPanel() {
         : (state.tcAlign === 'right') ? (bx + boxW - pad)
         : (bx + pad);
 
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(bx, by, boxW, boxH);
+      ctx.clip();
       ctx.fillText(label, tx, by + pad);
+      ctx.restore();
       ctx.restore();
     } catch (e) {}
   }
@@ -3698,8 +3711,15 @@ function fitToSingleFrame() {
   const toggleTcTime = $('toggleTcTime');
   const toggleTcFrame = $('toggleTcFrame');
   const toggleTcText = $('toggleTcText');
+  const toggleTcFilename = $('toggleTcFilename');
   const tcCustomTextRow = $('tcCustomTextRow');
   const tcCustomTextInput = $('tcCustomTextInput');
+  const tcFilenameTailRow = $('tcFilenameTailRow');
+  const tcFilenameTailInput = $('tcFilenameTailInput');
+  const tcFilenameTailMinus = $('tcFilenameTailMinus');
+  const tcFilenameTailPlus = $('tcFilenameTailPlus');
+  if (state.tcShowFilename === undefined) state.tcShowFilename = false;
+  if (state.tcFilenameTail === undefined) state.tcFilenameTail = 24;
   
   function updateAllTimecodes() {
     const items = framesGrid.querySelectorAll('.frame-item');
@@ -3730,6 +3750,41 @@ function fitToSingleFrame() {
     updateAllTimecodes();
     updateTimecodeVisibility();
   };
+
+  function syncTcFilenameUI() {
+    const enabled = !!state.tcShowFilename;
+    const tail = Math.max(0, Math.min(300, Math.round(Number(state.tcFilenameTail) || 0)));
+    state.tcFilenameTail = tail;
+    if (toggleTcFilename) toggleTcFilename.classList.toggle('active-toggle', enabled);
+    if (tcFilenameTailRow) tcFilenameTailRow.style.display = enabled ? 'flex' : 'none';
+    if (tcFilenameTailInput) tcFilenameTailInput.value = tail;
+  }
+
+  function applyTcFilenameTail(value) {
+    state.tcFilenameTail = Math.max(0, Math.min(300, Math.round(Number(value) || 0)));
+    syncTcFilenameUI();
+    updateAllTimecodes();
+    updateTimecodeVisibility();
+  }
+
+  if (toggleTcFilename) {
+    toggleTcFilename.onclick = () => {
+      state.tcShowFilename = !state.tcShowFilename;
+      syncTcFilenameUI();
+      updateAllTimecodes();
+      updateTimecodeVisibility();
+    };
+  }
+  if (tcFilenameTailInput) {
+    tcFilenameTailInput.onchange = () => applyTcFilenameTail(tcFilenameTailInput.value);
+  }
+  if (tcFilenameTailMinus) {
+    tcFilenameTailMinus.onclick = () => applyTcFilenameTail((Number(state.tcFilenameTail) || 0) - 1);
+  }
+  if (tcFilenameTailPlus) {
+    tcFilenameTailPlus.onclick = () => applyTcFilenameTail((Number(state.tcFilenameTail) || 0) + 1);
+  }
+
   if (tcCustomTextInput) {
     tcCustomTextInput.value = state.tcCustomText || '';
     tcCustomTextInput.oninput = () => {
@@ -3739,8 +3794,9 @@ function fitToSingleFrame() {
     };
   }
   // Init text toggle UI
-  if (toggleTcText) toggleTcText.classList.toggle('active', !!state.tcShowText);
+  if (toggleTcText) toggleTcText.classList.toggle('active-toggle', !!state.tcShowText);
   if (tcCustomTextRow) tcCustomTextRow.style.display = state.tcShowText ? 'flex' : 'none';
+  syncTcFilenameUI();
 
   toggleAutoFit.onclick = () => {
     syncGridAspectMode();
@@ -12098,7 +12154,35 @@ const canvas = document.createElement('canvas');
     return Math.floor(fi / step);
   }
 
+  function cleanFrameFilename(name) {
+    const raw = String(name || '').trim();
+    if (!raw) return '';
+    const parts = raw.split(/[\\/]/);
+    return (parts[parts.length - 1] || raw).trim();
+  }
 
+  function getFrameFilename(frame, frameIdx) {
+    const direct = cleanFrameFilename(frame && (frame.sourceName || frame.fileName || frame.filename || frame.name));
+    if (direct) return direct;
+
+    if (state.isSingleImage && Array.isArray(state.imageFiles) && state.imageFiles.length) {
+      let idx = Number(frame && frame.sourceIndex);
+      if (!Number.isFinite(idx)) idx = Number(frameIdx);
+      idx = Math.max(0, Math.min(state.imageFiles.length - 1, Math.floor(idx || 0)));
+      const fromFile = cleanFrameFilename(state.imageFiles[idx] && state.imageFiles[idx].name);
+      if (fromFile) return fromFile;
+    }
+
+    return cleanFrameFilename(state.videoFile && state.videoFile.name);
+  }
+
+  function formatFrameFilename(frame, frameIdx) {
+    const name = getFrameFilename(frame, frameIdx);
+    if (!name) return '';
+    const tail = Math.max(0, Math.min(300, Math.round(Number(state.tcFilenameTail) || 0)));
+    if (tail > 0 && name.length > tail) return name.slice(-tail);
+    return name;
+  }
 
   function formatTimecode(frame, derivedIndex, totalFrames, frameIdx) {
     const parts = [];
@@ -12142,6 +12226,10 @@ const canvas = document.createElement('canvas');
     if (state.tcShowText) {
       const txt = String(state.tcCustomText || '').trim();
       if (txt) parts.push(txt);
+    }
+    if (state.tcShowFilename) {
+      const filename = formatFrameFilename(frame, frameIdx);
+      if (filename) parts.push(filename);
     }
     return parts.join(' ');
   }

@@ -162,3 +162,12 @@ Refined Seam Blend after testing showed that the first implementation could feel
 - `Frame Soft` keeps the base-frame blend but caps opacity by strength.
 - `Frame Full` preserves the v28.13 behavior for comparison.
 - Preview and export now share current-stack opacity scaling so `Chrono Only` is a real ghost-stack crossfade, not just an extra overlay.
+
+## 2026-07-04 Filename labels v28.15
+
+Added filename labels to the existing Timecode overlay.
+
+- New `File` toggle adds the source filename to the cell label.
+- New `Tail chars` control shows the last N filename characters; `0` shows the full name.
+- Image-sequence imports now store `sourceName` and `sourceIndex` per generated frame.
+- Preview and export use the same `formatTimecode(...)` function, so labels stay WYSIWYG.
