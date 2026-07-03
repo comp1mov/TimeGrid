@@ -233,6 +233,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .frame-timecode-line.tc-wrap {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      text-overflow: clip;
+    }
     .frame-timecode.tc-bg-lines {
       background: transparent;
       padding: 0;
@@ -242,6 +248,9 @@
       max-width: 100%;
       padding: var(--tc-padding, 0);
       background: var(--tc-bg-color, rgba(0,0,0,0.7));
+    }
+    .frame-timecode.tc-bg-lines .frame-timecode-line.tc-wrap {
+      min-width: 0;
     }
     .frame-timecode.tc-bg-lines.align-left { align-items: flex-start; }
     .frame-timecode.tc-bg-lines.align-center { align-items: center; }

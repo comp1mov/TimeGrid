@@ -229,3 +229,12 @@ Fixed a Timecode UI regression and added background fill modes.
 - `Lines` draws individual background boxes per enabled label line.
 - Canvas export uses the same fill mode.
 - Updated Timecode defaults to opacity `100%`, font size `32px`, box pad `4px`, margin `0px`.
+
+## 2026-07-04 Timecode wrapping defaults v28.21
+
+Adjusted the default Timecode look and made long text labels more resilient.
+
+- `Lines` is now the default `BG Fill` mode.
+- Default Timecode font size is now `15px`.
+- Custom `TEXT`, display `NAME`, and source `FILE` lines are marked as wrappable in the DOM preview.
+- Canvas export wraps those text-like labels using measured line breaks before drawing backgrounds and text.

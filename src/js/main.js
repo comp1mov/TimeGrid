@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.20';
+  const APP_VERSION = 'v28.21';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -90,10 +90,10 @@ inject();
     bgGridShow: false, bgGridType: 'lines', bgGridColor: '#ffffff', bgGridOpacity: 0.12, bgGridSize: 24,
     previewCellW: 240, // preview cell width in CSS px (stabilizes iPad grid sizing)
 
-    fontSize: 32, spacing: 0, sequenceMode: false,
+    fontSize: 15, spacing: 0, sequenceMode: false,
     tcTextColor: '#ffffff', tcBgColor: '#000000', tcOpacity: 1.0,
     tcFontPreset: 'monoItalic', tcFontStyle: 'italic', tcFontWeight: 600,
-    tcAlign: 'center', tcPosition: 'center', tcPadding: 4, tcMargin: 0, tcBgFill: 'stack',
+    tcAlign: 'center', tcPosition: 'center', tcPadding: 4, tcMargin: 0, tcBgFill: 'lines',
     // Frame image transform inside each cell (preview + export)
     frameImgScale: 1.02, frameImgScaleX: 1.02, frameImgScaleY: 1.02, frameImgScaleLink: true,
     frameImgRot: 0,
@@ -1728,18 +1728,42 @@ function updateInfoPanel() {
     return !!(state.tcShowIndex || state.tcShowTime || state.tcShowFrame || hasText || state.tcShowFilename || state.tcShowDisplayName);
   }
 
+  function normalizeTimecodePart(part) {
+    if (typeof part === 'string') return { text: part, type: 'plain', wrap: false };
+    const type = String(part && part.type || 'plain');
+    return {
+      text: String(part && part.text || ''),
+      type,
+      wrap: !!(part && part.wrap)
+    };
+  }
+
+  function getTimecodeLabelParts(label) {
+    if (Array.isArray(label)) {
+      return label
+        .map(normalizeTimecodePart)
+        .map(part => ({ ...part, text: part.text.replace(/\s+/g, ' ').trim() }))
+        .filter(part => part.text);
+    }
+    return String(label || '')
+      .split(/\r?\n/)
+      .map(line => ({ text: line.trim(), type: 'plain', wrap: false }))
+      .filter(part => part.text);
+  }
+
   function getTimecodeLabelLines(label) {
-    return String(label || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    return getTimecodeLabelParts(label).map(part => part.text);
   }
 
   function setTimecodeElementLabel(el, label) {
     if (!el) return;
-    const lines = getTimecodeLabelLines(label);
+    const lines = getTimecodeLabelParts(label);
     el.replaceChildren();
-    lines.forEach(line => {
+    lines.forEach(part => {
       const span = document.createElement('span');
-      span.className = 'frame-timecode-line';
-      span.textContent = line;
+      span.className = `frame-timecode-line${part.wrap ? ' tc-wrap' : ''}`;
+      span.dataset.tcPart = part.type;
+      span.textContent = part.text;
       el.appendChild(span);
     });
   }
@@ -1756,13 +1780,92 @@ function updateInfoPanel() {
     return `${cfg.style} ${cfg.weight} ${fontSize}px ${cfg.family}`;
   }
 
+  function breakCanvasToken(ctx, token, maxWidth) {
+    const raw = String(token || '');
+    const limit = Math.max(0, Number(maxWidth) || 0);
+    if (!raw) return [];
+    if (limit <= 0 || ctx.measureText(raw).width <= limit) return [raw];
+
+    const chunks = [];
+    let rest = raw;
+    while (rest) {
+      let lo = 1;
+      let hi = rest.length;
+      let fit = 1;
+      while (lo <= hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        const test = rest.slice(0, mid);
+        if (ctx.measureText(test).width <= limit || mid === 1) {
+          fit = mid;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      chunks.push(rest.slice(0, fit));
+      rest = rest.slice(fit);
+    }
+    return chunks;
+  }
+
+  function wrapCanvasTextLines(ctx, text, maxWidth) {
+    const raw = String(text || '').replace(/\s+/g, ' ').trim();
+    const limit = Math.max(0, Number(maxWidth) || 0);
+    if (!raw || limit <= 0) return [];
+    if (ctx.measureText(raw).width <= limit) return [raw];
+
+    const lines = [];
+    let current = '';
+    raw.split(' ').forEach(word => {
+      if (!word) return;
+      const candidate = current ? `${current} ${word}` : word;
+      if (ctx.measureText(candidate).width <= limit) {
+        current = candidate;
+        return;
+      }
+      if (current) {
+        lines.push(current);
+        current = '';
+      }
+      const chunks = breakCanvasToken(ctx, word, limit);
+      if (chunks.length > 1) {
+        lines.push(...chunks.slice(0, -1));
+        current = chunks[chunks.length - 1] || '';
+      } else {
+        current = chunks[0] || '';
+      }
+    });
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  function fitCanvasTimecodeParts(ctx, parts, maxTextW, maxLines) {
+    const lineLimit = Math.max(1, Math.floor(Number(maxLines) || 1));
+    const out = [];
+    getTimecodeLabelParts(parts).forEach(part => {
+      const rawLines = part.wrap
+        ? wrapCanvasTextLines(ctx, part.text, maxTextW)
+        : [ellipsizeRight(ctx, part.text, maxTextW)];
+      rawLines.forEach(text => {
+        const clean = String(text || '').trim();
+        if (clean) out.push({ ...part, text: clean });
+      });
+    });
+    if (out.length <= lineLimit) return out;
+    const limited = out.slice(0, lineLimit);
+    const last = limited[limited.length - 1];
+    if (last) {
+      last.text = ellipsizeRight(ctx, `${last.text}...`, maxTextW) || ellipsizeRight(ctx, last.text, maxTextW);
+    }
+    return limited.filter(part => part.text);
+  }
+
   // Draw a timecode overlay on a canvas export (PNG/JPEG/MP4) using the same visual logic as the UI.
   function drawTimecodeOverlay(ctx, x, y, w, h, frame, derivedIndex, totalFrames, frameIdx, opts = {}) {
     try {
       if (!frame) return;
-      const label = formatTimecode(frame, derivedIndex, totalFrames, frameIdx);
-      const lines = getTimecodeLabelLines(label);
-      if (!lines.length) return;
+      const parts = formatTimecodeParts(frame, derivedIndex, totalFrames, frameIdx);
+      if (!parts.length) return;
 
       // Calculate scale to perfectly match the preview UI proportions.
       // In preview, the font size and margins are rendered relative to the previewCellW.
@@ -1785,14 +1888,14 @@ function updateInfoPanel() {
       const bgMode = state.tcBgFill === 'lines' ? 'lines' : 'stack';
       const lineBoxH = bgMode === 'lines' ? (lineHeight + pad * 2) : lineHeight;
       const maxTextH = Math.max(0, bgMode === 'lines' ? maxBoxH : maxBoxH - pad * 2);
-      const maxLines = Math.max(1, Math.min(lines.length, Math.floor(maxTextH / lineBoxH) || 1));
-      const fittedLines = lines.slice(0, maxLines).map(line => ellipsizeRight(ctx, line, maxTextW)).filter(Boolean);
+      const maxLines = Math.max(1, Math.floor(maxTextH / lineBoxH) || 1);
+      const fittedLines = fitCanvasTimecodeParts(ctx, parts, maxTextW, maxLines);
       if (!fittedLines.length) {
         ctx.restore();
         return;
       }
 
-      const lineWidths = fittedLines.map(line => Math.ceil(ctx.measureText(line).width));
+      const lineWidths = fittedLines.map(line => Math.ceil(ctx.measureText(line.text).width));
       const textW = Math.ceil(Math.max(...lineWidths));
       const boxW = Math.min(maxBoxW, textW + pad * 2);
       const boxH = Math.min(maxBoxH, bgMode === 'lines'
@@ -1838,6 +1941,7 @@ function updateInfoPanel() {
         ctx.clip();
       }
       fittedLines.forEach((line, i) => {
+        const text = line.text;
         if (bgMode === 'lines') {
           const lineW = Math.min(maxBoxW, lineWidths[i] + pad * 2);
           const lx = state.tcAlign === 'center' ? bx + (boxW - lineW) / 2
@@ -1854,11 +1958,11 @@ function updateInfoPanel() {
           ctx.beginPath();
           ctx.rect(lx, ly, lineW, lineBoxH);
           ctx.clip();
-          ctx.fillText(line, ltx, ly + pad);
+          ctx.fillText(text, ltx, ly + pad);
           ctx.restore();
           return;
         }
-        ctx.fillText(line, stackTx, by + pad + i * lineHeight);
+        ctx.fillText(text, stackTx, by + pad + i * lineHeight);
       });
       ctx.restore();
       ctx.restore();
@@ -2537,7 +2641,7 @@ function renderGrid() {
       const bgFill = state.tcBgFill === 'lines' ? 'lines' : 'stack';
       tc.className = `frame-timecode pos-${state.tcPosition} align-${state.tcAlign} tc-bg-${bgFill}` + (showTC ? '' : ' hidden');
       const derivedIdx = getDerivedIndexFromFrameIdx(displayFrameIdx);
-      setTimecodeElementLabel(tc, formatTimecode(frame, derivedIdx, cellCount, displayFrameIdx));
+      setTimecodeElementLabel(tc, formatTimecodeParts(frame, derivedIdx, cellCount, displayFrameIdx));
       wrap.appendChild(tc);
       item.appendChild(wrap);
       if (state.viewMode === 'single' && c > 0) item.style.display = 'none';
@@ -3926,7 +4030,7 @@ function fitToSingleFrame() {
       const tc = item.querySelector('.frame-timecode');
       if (tc && frame) {
         const derivedIdx = getDerivedIndexFromFrameIdx(frameIdx);
-        setTimecodeElementLabel(tc, formatTimecode(frame, derivedIdx, cellCount, frameIdx));
+        setTimecodeElementLabel(tc, formatTimecodeParts(frame, derivedIdx, cellCount, frameIdx));
       }
     });
     updateTimecodeVisibility();
@@ -5135,7 +5239,7 @@ function updateAllCells() {
 
       if (showTC && timecodeEl) {
         const derivedIdx = getDerivedIndexFromFrameIdx(frameIdx);
-        setTimecodeElementLabel(timecodeEl, formatTimecode(frame, derivedIdx, tcTotal, frameIdx));
+        setTimecodeElementLabel(timecodeEl, formatTimecodeParts(frame, derivedIdx, tcTotal, frameIdx));
       }
       item.dataset.frameIdx = frameIdx;
     }
@@ -12494,7 +12598,7 @@ const canvas = document.createElement('canvas');
     return formatFilenameLabel(getDisplayFilename());
   }
 
-  function formatTimecode(frame, derivedIndex, totalFrames, frameIdx) {
+  function formatTimecodeParts(frame, derivedIndex, totalFrames, frameIdx) {
     const parts = [];
 
     const idx0 = Number.isFinite(Number(derivedIndex)) ? Math.max(0, Math.floor(Number(derivedIndex))) : 0;
@@ -12509,7 +12613,7 @@ const canvas = document.createElement('canvas');
       : (Number.isFinite(Number(frameIdx)) ? (Math.floor(Number(frameIdx)) + 1) : idxVal);
 
     if (state.tcShowIndex) {
-      parts.push(String(Math.max(0, idxVal)).padStart(idxW, '0'));
+      parts.push({ type: 'index', text: String(Math.max(0, idxVal)).padStart(idxW, '0'), wrap: false });
     }
     if (state.tcShowTime) {
       const t = Number(frame && frame.time);
@@ -12527,25 +12631,31 @@ const canvas = document.createElement('canvas');
         } else {
           timeStr = `${s}.${String(ms).padStart(2,'0')}`;
         }
-        parts.push(timeStr);
+        parts.push({ type: 'time', text: timeStr, wrap: false });
       }
     }
     if (state.tcShowFrame) {
-      parts.push(`F${String(Math.max(0, srcVal)).padStart(frameW, '0')}`);
+      parts.push({ type: 'frame', text: `F${String(Math.max(0, srcVal)).padStart(frameW, '0')}`, wrap: false });
     }
     if (state.tcShowText) {
       const txt = String(state.tcCustomText || '').trim();
-      if (txt) parts.push(txt);
+      if (txt) parts.push({ type: 'text', text: txt, wrap: true });
     }
     if (state.tcShowDisplayName) {
       const displayName = formatDisplayFilename();
-      if (displayName) parts.push(displayName);
+      if (displayName) parts.push({ type: 'display-name', text: displayName, wrap: true });
     }
     if (state.tcShowFilename) {
       const filename = formatFrameFilename(frame, frameIdx);
-      if (filename) parts.push(filename);
+      if (filename) parts.push({ type: 'filename', text: filename, wrap: true });
     }
-    return parts.map(part => String(part || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+    return getTimecodeLabelParts(parts);
+  }
+
+  function formatTimecode(frame, derivedIndex, totalFrames, frameIdx) {
+    return formatTimecodeParts(frame, derivedIndex, totalFrames, frameIdx)
+      .map(part => part.text)
+      .join('\n');
   }
   function formatDate(d) { return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 

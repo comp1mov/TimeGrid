@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.20`
+Текущая версия приложения в коде: `TimeGrid v28.21`
 
 ## 1. Короткое описание
 
@@ -650,3 +650,12 @@ Timecode alignment now only changes the overlay text/box placement and does not 
 - `BG Fill` in the font panel switches between one shared stack background and separate per-line backgrounds.
 - Canvas export mirrors the selected fill mode.
 - Timecode defaults are now opacity `100%`, font size `32px`, box pad `4px`, margin `0px`.
+
+### 2026-07-04 Timecode wrapping defaults v28.21
+
+Long text-like Timecode fields now wrap instead of hard-clipping immediately.
+
+- `BG Fill` defaults to `Lines`.
+- Default Timecode font size is now `15px`.
+- Custom `TEXT`, display `NAME`, and source `FILE` labels are marked as wrappable in preview.
+- Canvas export wraps the same text-like labels with measured line breaks.
