@@ -223,6 +223,9 @@
       text-overflow: ellipsis;
       line-height: 1.12;
       letter-spacing: 0.01em;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
     }
     .frame-timecode-line {
       display: block;
@@ -230,6 +233,19 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .frame-timecode.tc-bg-lines {
+      background: transparent;
+      padding: 0;
+    }
+    .frame-timecode.tc-bg-lines .frame-timecode-line {
+      width: max-content;
+      max-width: 100%;
+      padding: var(--tc-padding, 0);
+      background: var(--tc-bg-color, rgba(0,0,0,0.7));
+    }
+    .frame-timecode.tc-bg-lines.align-left { align-items: flex-start; }
+    .frame-timecode.tc-bg-lines.align-center { align-items: center; }
+    .frame-timecode.tc-bg-lines.align-right { align-items: flex-end; }
     /* Vertical */
     .frame-timecode.pos-top { top: var(--tc-margin, 0px); }
     .frame-timecode.pos-center { top: 50%; transform: translateY(-50%); }

@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.19';
+  const APP_VERSION = 'v28.20';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -90,10 +90,10 @@ inject();
     bgGridShow: false, bgGridType: 'lines', bgGridColor: '#ffffff', bgGridOpacity: 0.12, bgGridSize: 24,
     previewCellW: 240, // preview cell width in CSS px (stabilizes iPad grid sizing)
 
-    fontSize: 10, spacing: 0, sequenceMode: false,
-    tcTextColor: '#ffffff', tcBgColor: '#000000', tcOpacity: 0.7,
+    fontSize: 32, spacing: 0, sequenceMode: false,
+    tcTextColor: '#ffffff', tcBgColor: '#000000', tcOpacity: 1.0,
     tcFontPreset: 'monoItalic', tcFontStyle: 'italic', tcFontWeight: 600,
-    tcAlign: 'center', tcPosition: 'center', tcPadding: 0, tcMargin: 0,
+    tcAlign: 'center', tcPosition: 'center', tcPadding: 4, tcMargin: 0, tcBgFill: 'stack',
     // Frame image transform inside each cell (preview + export)
     frameImgScale: 1.02, frameImgScaleX: 1.02, frameImgScaleY: 1.02, frameImgScaleLink: true,
     frameImgRot: 0,
@@ -561,6 +561,7 @@ function getTargetFrameOutputDims() {
   const tcAlignSelect = $('tcAlign'), tcPositionSelect = $('tcPosition');
   const tcFontBtn = $('tcFontBtn'), tcFontPanel = $('tcFontPanel');
   const tcFontPresetGroup = $('tcFontPresetGroup'), tcFontStyleGroup = $('tcFontStyleGroup'), tcFontWeightGroup = $('tcFontWeightGroup');
+  const tcBgFillGroup = $('tcBgFillGroup');
 
   // Draw (spray) tuning inside Display & Style
   const sprayScatterSlider = $('sprayScatterSlider'), sprayScatterValue = $('sprayScatterValue');
@@ -1781,17 +1782,22 @@ function updateInfoPanel() {
       const maxBoxH = Math.max(1, h - margin * 2);
       const maxTextW = Math.max(0, maxBoxW - pad * 2);
       const lineHeight = Math.max(fontSize, Math.round(fontSize * 1.12));
-      const maxTextH = Math.max(0, maxBoxH - pad * 2);
-      const maxLines = Math.max(1, Math.min(lines.length, Math.floor(maxTextH / lineHeight) || 1));
+      const bgMode = state.tcBgFill === 'lines' ? 'lines' : 'stack';
+      const lineBoxH = bgMode === 'lines' ? (lineHeight + pad * 2) : lineHeight;
+      const maxTextH = Math.max(0, bgMode === 'lines' ? maxBoxH : maxBoxH - pad * 2);
+      const maxLines = Math.max(1, Math.min(lines.length, Math.floor(maxTextH / lineBoxH) || 1));
       const fittedLines = lines.slice(0, maxLines).map(line => ellipsizeRight(ctx, line, maxTextW)).filter(Boolean);
       if (!fittedLines.length) {
         ctx.restore();
         return;
       }
 
-      const textW = Math.ceil(Math.max(...fittedLines.map(line => ctx.measureText(line).width)));
+      const lineWidths = fittedLines.map(line => Math.ceil(ctx.measureText(line).width));
+      const textW = Math.ceil(Math.max(...lineWidths));
       const boxW = Math.min(maxBoxW, textW + pad * 2);
-      const boxH = Math.min(maxBoxH, fittedLines.length * lineHeight + pad * 2);
+      const boxH = Math.min(maxBoxH, bgMode === 'lines'
+        ? fittedLines.length * lineBoxH
+        : fittedLines.length * lineHeight + pad * 2);
 
       // Position inside the cell
       let bx = x + margin;
@@ -1813,23 +1819,46 @@ function updateInfoPanel() {
       const bb = parseInt(bg.slice(5, 7), 16) || 0;
       const aa = Math.max(0, Math.min(1, Number(state.tcOpacity) || 0));
 
-      ctx.fillStyle = `rgba(${rr},${gg},${bb},${aa})`;
-      ctx.fillRect(bx, by, boxW, boxH);
+      const bgFill = `rgba(${rr},${gg},${bb},${aa})`;
+      ctx.fillStyle = bgFill;
+      if (bgMode === 'stack') ctx.fillRect(bx, by, boxW, boxH);
 
       // Text
       ctx.fillStyle = state.tcTextColor || '#ffffff';
       ctx.textAlign = (state.tcAlign === 'center') ? 'center' : (state.tcAlign === 'right') ? 'right' : 'left';
 
-      const tx = (state.tcAlign === 'center') ? (bx + boxW / 2)
+      const stackTx = (state.tcAlign === 'center') ? (bx + boxW / 2)
         : (state.tcAlign === 'right') ? (bx + boxW - pad)
         : (bx + pad);
 
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(bx, by, boxW, boxH);
-      ctx.clip();
+      if (bgMode === 'stack') {
+        ctx.beginPath();
+        ctx.rect(bx, by, boxW, boxH);
+        ctx.clip();
+      }
       fittedLines.forEach((line, i) => {
-        ctx.fillText(line, tx, by + pad + i * lineHeight);
+        if (bgMode === 'lines') {
+          const lineW = Math.min(maxBoxW, lineWidths[i] + pad * 2);
+          const lx = state.tcAlign === 'center' ? bx + (boxW - lineW) / 2
+            : state.tcAlign === 'right' ? bx + boxW - lineW
+            : bx;
+          const ly = by + i * lineBoxH;
+          ctx.fillStyle = bgFill;
+          ctx.fillRect(lx, ly, lineW, lineBoxH);
+          ctx.fillStyle = state.tcTextColor || '#ffffff';
+          const ltx = state.tcAlign === 'center' ? lx + lineW / 2
+            : state.tcAlign === 'right' ? lx + lineW - pad
+            : lx + pad;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(lx, ly, lineW, lineBoxH);
+          ctx.clip();
+          ctx.fillText(line, ltx, ly + pad);
+          ctx.restore();
+          return;
+        }
+        ctx.fillText(line, stackTx, by + pad + i * lineHeight);
       });
       ctx.restore();
       ctx.restore();
@@ -1839,6 +1868,16 @@ function updateInfoPanel() {
   function updateTimecodeVisibility() {
     const show = computeShowTimecode();
     document.querySelectorAll('.frame-timecode').forEach(el => el.classList.toggle('hidden', !show));
+  }
+
+  function updateTimecodePlacementClasses() {
+    const align = ['left', 'center', 'right'].includes(state.tcAlign) ? state.tcAlign : 'center';
+    const pos = ['top', 'center', 'bottom'].includes(state.tcPosition) ? state.tcPosition : 'center';
+    const bgFill = state.tcBgFill === 'lines' ? 'lines' : 'stack';
+    document.querySelectorAll('.frame-timecode').forEach(el => {
+      el.classList.remove('align-left', 'align-center', 'align-right', 'pos-top', 'pos-center', 'pos-bottom', 'tc-bg-stack', 'tc-bg-lines');
+      el.classList.add(`align-${align}`, `pos-${pos}`, `tc-bg-${bgFill}`);
+    });
   }
 
   function updateTimecodeStyles() {
@@ -1858,6 +1897,7 @@ function updateInfoPanel() {
     const m = state.tcMargin || 0;
     framesGrid.style.setProperty('--tc-padding', `${p}px ${Math.round(p * 1.5)}px`);
     framesGrid.style.setProperty('--tc-margin', `${m}px`);
+    updateTimecodePlacementClasses();
   }
 
   
@@ -2494,7 +2534,8 @@ function renderGrid() {
       wrap.appendChild(xform);
       const tc = document.createElement('div');
       const showTC = computeShowTimecode();
-      tc.className = `frame-timecode pos-${state.tcPosition} align-${state.tcAlign}` + (showTC ? '' : ' hidden');
+      const bgFill = state.tcBgFill === 'lines' ? 'lines' : 'stack';
+      tc.className = `frame-timecode pos-${state.tcPosition} align-${state.tcAlign} tc-bg-${bgFill}` + (showTC ? '' : ' hidden');
       const derivedIdx = getDerivedIndexFromFrameIdx(displayFrameIdx);
       setTimecodeElementLabel(tc, formatTimecode(frame, derivedIdx, cellCount, displayFrameIdx));
       wrap.appendChild(tc);
@@ -4010,6 +4051,8 @@ function fitToSingleFrame() {
     bgGridLayer.style.backgroundPosition = '0 0';
   }
 
+  fontSizeSlider.value = String(state.fontSize);
+  fontSizeValue.textContent = `${state.fontSize}px`;
   fontSizeSlider.oninput = () => { state.fontSize = parseInt(fontSizeSlider.value); fontSizeValue.textContent = `${state.fontSize}px`; framesGrid.style.setProperty('--meta-font-size', `${state.fontSize}px`); };
   function applySpacing(val) {
     state.spacing = Math.max(0, val);
@@ -4189,6 +4232,12 @@ function fitToSingleFrame() {
         btn.classList.toggle('active-toggle', btn.dataset.weight === weight);
       });
     }
+    if (tcBgFillGroup) {
+      const bgFill = state.tcBgFill === 'lines' ? 'lines' : 'stack';
+      tcBgFillGroup.querySelectorAll('[data-bg-fill]').forEach(btn => {
+        btn.classList.toggle('active-toggle', btn.dataset.bgFill === bgFill);
+      });
+    }
   }
 
   function applyTimecodeFontPreset(presetKey) {
@@ -4202,6 +4251,8 @@ function fitToSingleFrame() {
 
   tcTextColorInput.oninput = () => { state.tcTextColor = tcTextColorInput.value; updateTimecodeStyles(); };
   tcBgColorInput.oninput = () => { state.tcBgColor = tcBgColorInput.value; updateTimecodeStyles(); };
+  if (tcOpacitySlider) tcOpacitySlider.value = String(Math.round((Number(state.tcOpacity) || 0) * 100));
+  if (tcOpacityValue) tcOpacityValue.textContent = `${Math.round((Number(state.tcOpacity) || 0) * 100)}%`;
   tcOpacitySlider.oninput = () => { state.tcOpacity = parseInt(tcOpacitySlider.value) / 100; tcOpacityValue.textContent = `${tcOpacitySlider.value}%`; updateTimecodeStyles(); };
   if (tcFontBtn) tcFontBtn.onclick = () => setTimecodeFontPanelOpen(!(tcFontPanel && tcFontPanel.style.display !== 'none'));
   if (tcFontPresetGroup) {
@@ -4229,11 +4280,24 @@ function fitToSingleFrame() {
       syncTimecodeFontUI();
     };
   }
-  tcAlignSelect.onchange = () => { state.tcAlign = tcAlignSelect.value; renderGrid(); if (state.autoFit) { requestFitToActiveView(); } };
-  tcPositionSelect.onchange = () => { state.tcPosition = tcPositionSelect.value; renderGrid(); if (state.autoFit) { requestFitToActiveView(); } };
+  if (tcBgFillGroup) {
+    tcBgFillGroup.onclick = (e) => {
+      const btn = e.target.closest('[data-bg-fill]');
+      if (!btn) return;
+      state.tcBgFill = btn.dataset.bgFill === 'lines' ? 'lines' : 'stack';
+      updateTimecodeStyles();
+      syncTimecodeFontUI();
+    };
+  }
+  tcAlignSelect.onchange = () => { state.tcAlign = tcAlignSelect.value; updateTimecodePlacementClasses(); };
+  tcPositionSelect.onchange = () => { state.tcPosition = tcPositionSelect.value; updateTimecodePlacementClasses(); };
   const tcPaddingSlider = $('tcPaddingSlider'), tcPaddingValue = $('tcPaddingValue');
+  if (tcPaddingSlider) tcPaddingSlider.value = String(state.tcPadding);
+  if (tcPaddingValue) tcPaddingValue.textContent = `${state.tcPadding}px`;
   if (tcPaddingSlider) tcPaddingSlider.oninput = () => { state.tcPadding = parseInt(tcPaddingSlider.value); tcPaddingValue.textContent = `${state.tcPadding}px`; updateTimecodeStyles(); };
   const tcMarginSlider = $('tcMarginSlider'), tcMarginValue = $('tcMarginValue');
+  if (tcMarginSlider) tcMarginSlider.value = String(state.tcMargin);
+  if (tcMarginValue) tcMarginValue.textContent = `${state.tcMargin}px`;
   if (tcMarginSlider) tcMarginSlider.oninput = () => { state.tcMargin = parseInt(tcMarginSlider.value); tcMarginValue.textContent = `${state.tcMargin}px`; updateTimecodeStyles(); };
   syncTimecodeFontUI();
   updateTimecodeStyles();

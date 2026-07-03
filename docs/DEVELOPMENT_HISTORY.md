@@ -218,3 +218,14 @@ Added a compact font settings panel to the Timecode menu.
 - The panel offers mono italic, mono, sans, and serif italic presets.
 - Regular/italic and weight controls update the live preview.
 - Canvas export uses the same resolved font config as preview.
+
+## 2026-07-04 Timecode placement and fill modes v28.20
+
+Fixed a Timecode UI regression and added background fill modes.
+
+- Changing `Align` or `Position` now updates only existing timecode overlay classes, avoiding grid re-render and auto-fit recentering.
+- Added `BG Fill` with `Stack` and `Lines` modes.
+- `Stack` draws one shared background box for the full label stack.
+- `Lines` draws individual background boxes per enabled label line.
+- Canvas export uses the same fill mode.
+- Updated Timecode defaults to opacity `100%`, font size `32px`, box pad `4px`, margin `0px`.

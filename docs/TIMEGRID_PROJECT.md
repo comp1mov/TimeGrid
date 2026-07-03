@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.19`
+Текущая версия приложения в коде: `TimeGrid v28.20`
 
 ## 1. Короткое описание
 
@@ -641,3 +641,12 @@ Timecode styling now has a compact font panel next to the `Text` and `BG` color 
 - Font presets include mono italic, mono, sans, and serif italic.
 - Style and weight controls update preview immediately.
 - Canvas export reads the same font family, style, and weight as the DOM preview.
+
+### 2026-07-04 Timecode placement and fill modes v28.20
+
+Timecode alignment now only changes the overlay text/box placement and does not rebuild or re-fit the grid.
+
+- `Align` updates `.frame-timecode` classes live instead of calling `renderGrid()`.
+- `BG Fill` in the font panel switches between one shared stack background and separate per-line backgrounds.
+- Canvas export mirrors the selected fill mode.
+- Timecode defaults are now opacity `100%`, font size `32px`, box pad `4px`, margin `0px`.
