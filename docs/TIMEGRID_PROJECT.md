@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.17`
+Текущая версия приложения в коде: `TimeGrid v28.18`
 
 ## 1. Короткое описание
 
@@ -623,3 +623,12 @@ TimeGrid now uses Google Fonts for a cleaner default presentation:
 - Canvas-drawn labels use the same font stacks as preview.
 - Timecode labels stay on one line and ellipsize if the combined number/name label is wider than the cell.
 - `Tail chars` remains the intentional control for keeping the useful end of long file/name labels visible.
+
+### 2026-07-04 Stacked timecode labels v28.18
+
+Timecode fields now stack vertically inside one overlay box instead of forming one long row:
+
+- `Index`, `Sec`, `Frame`, `Text`, `Name`, and `File` each render as their own line when enabled.
+- `Top` position grows downward from the top margin; `Bottom` remains bottom-anchored, so the stack grows upward.
+- Preview and canvas export share the same line splitting and per-line ellipsis behavior.
+- Frame labels use italic `JetBrains Mono` to give the overlay a more editorial caption feel while keeping digits readable.

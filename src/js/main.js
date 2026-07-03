@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.17';
+  const APP_VERSION = 'v28.18';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -1657,12 +1657,29 @@ function updateInfoPanel() {
     return !!(state.tcShowIndex || state.tcShowTime || state.tcShowFrame || hasText || state.tcShowFilename || state.tcShowDisplayName);
   }
 
+  function getTimecodeLabelLines(label) {
+    return String(label || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  }
+
+  function setTimecodeElementLabel(el, label) {
+    if (!el) return;
+    const lines = getTimecodeLabelLines(label);
+    el.replaceChildren();
+    lines.forEach(line => {
+      const span = document.createElement('span');
+      span.className = 'frame-timecode-line';
+      span.textContent = line;
+      el.appendChild(span);
+    });
+  }
+
   // Draw a timecode overlay on a canvas export (PNG/JPEG/MP4) using the same visual logic as the UI.
   function drawTimecodeOverlay(ctx, x, y, w, h, frame, derivedIndex, totalFrames, frameIdx, opts = {}) {
     try {
       if (!frame) return;
       const label = formatTimecode(frame, derivedIndex, totalFrames, frameIdx);
-      if (!label) return;
+      const lines = getTimecodeLabelLines(label);
+      if (!lines.length) return;
 
       // Calculate scale to perfectly match the preview UI proportions.
       // In preview, the font size and margins are rendered relative to the previewCellW.
@@ -1675,20 +1692,24 @@ function updateInfoPanel() {
       const margin = Math.max(0, Math.round((Number(state.tcMargin) || 0) * scale));
 
       ctx.save();
-      ctx.font = `${fontSize}px ${TIMECODE_FONT_FAMILY}`;
+      ctx.font = `italic 600 ${fontSize}px ${TIMECODE_FONT_FAMILY}`;
       ctx.textBaseline = 'top';
 
       const maxBoxW = Math.max(1, w - margin * 2);
+      const maxBoxH = Math.max(1, h - margin * 2);
       const maxTextW = Math.max(0, maxBoxW - pad * 2);
-      const fittedLabel = ellipsizeRight(ctx, label, maxTextW);
-      if (!fittedLabel) {
+      const lineHeight = Math.max(fontSize, Math.round(fontSize * 1.12));
+      const maxTextH = Math.max(0, maxBoxH - pad * 2);
+      const maxLines = Math.max(1, Math.min(lines.length, Math.floor(maxTextH / lineHeight) || 1));
+      const fittedLines = lines.slice(0, maxLines).map(line => ellipsizeRight(ctx, line, maxTextW)).filter(Boolean);
+      if (!fittedLines.length) {
         ctx.restore();
         return;
       }
 
-      const textW = Math.ceil(ctx.measureText(fittedLabel).width);
+      const textW = Math.ceil(Math.max(...fittedLines.map(line => ctx.measureText(line).width)));
       const boxW = Math.min(maxBoxW, textW + pad * 2);
-      const boxH = fontSize + pad * 2;
+      const boxH = Math.min(maxBoxH, fittedLines.length * lineHeight + pad * 2);
 
       // Position inside the cell
       let bx = x + margin;
@@ -1725,7 +1746,9 @@ function updateInfoPanel() {
       ctx.beginPath();
       ctx.rect(bx, by, boxW, boxH);
       ctx.clip();
-      ctx.fillText(fittedLabel, tx, by + pad);
+      fittedLines.forEach((line, i) => {
+        ctx.fillText(line, tx, by + pad + i * lineHeight);
+      });
       ctx.restore();
       ctx.restore();
     } catch (e) {}
@@ -2384,7 +2407,7 @@ function renderGrid() {
       const showTC = computeShowTimecode();
       tc.className = `frame-timecode pos-${state.tcPosition} align-${state.tcAlign}` + (showTC ? '' : ' hidden');
       const derivedIdx = getDerivedIndexFromFrameIdx(displayFrameIdx);
-      tc.textContent = formatTimecode(frame, derivedIdx, cellCount, displayFrameIdx);
+      setTimecodeElementLabel(tc, formatTimecode(frame, derivedIdx, cellCount, displayFrameIdx));
       wrap.appendChild(tc);
       item.appendChild(wrap);
       if (state.viewMode === 'single' && c > 0) item.style.display = 'none';
@@ -3750,7 +3773,7 @@ function fitToSingleFrame() {
       const tc = item.querySelector('.frame-timecode');
       if (tc && frame) {
         const derivedIdx = getDerivedIndexFromFrameIdx(frameIdx);
-        tc.textContent = formatTimecode(frame, derivedIdx, cellCount, frameIdx);
+        setTimecodeElementLabel(tc, formatTimecode(frame, derivedIdx, cellCount, frameIdx));
       }
     });
     updateTimecodeVisibility();
@@ -4873,7 +4896,7 @@ function updateAllCells() {
 
       if (showTC && timecodeEl) {
         const derivedIdx = getDerivedIndexFromFrameIdx(frameIdx);
-        timecodeEl.textContent = formatTimecode(frame, derivedIdx, tcTotal, frameIdx);
+        setTimecodeElementLabel(timecodeEl, formatTimecode(frame, derivedIdx, tcTotal, frameIdx));
       }
       item.dataset.frameIdx = frameIdx;
     }
@@ -12282,7 +12305,7 @@ const canvas = document.createElement('canvas');
       const filename = formatFrameFilename(frame, frameIdx);
       if (filename) parts.push(filename);
     }
-    return parts.join(' ');
+    return parts.map(part => String(part || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
   }
   function formatDate(d) { return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 

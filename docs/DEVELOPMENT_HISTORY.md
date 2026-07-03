@@ -189,3 +189,12 @@ Refined the default typography and made long frame labels more predictable.
 - Updated canvas-drawn labels to use the same font stacks as DOM preview.
 - Timecode labels now keep a single-line layout and ellipsize when wider than the cell.
 - Long file/name workflows still use `Tail chars` so the end of the filename remains available.
+
+## 2026-07-04 Stacked timecode labels v28.18
+
+Changed the timecode overlay from one long inline label into a vertical stack.
+
+- Enabled fields render as separate lines inside one overlay box.
+- `Top` stacks downward, `Center` centers the full stack, and `Bottom` keeps the stack bottom-anchored.
+- Preview updates use DOM line spans, while export draws the same lines manually on canvas.
+- Caption labels now use italic `JetBrains Mono` with heavier weight for a more styled look.
