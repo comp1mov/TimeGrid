@@ -1,6 +1,6 @@
 {
   "name": "timegrid",
-  "version": "28.16.0",
+  "version": "28.17.0",
   "description": "An experimental spatial montage and frame-sampling browser application",
   "scripts": {
     "dev": "vite",

@@ -180,3 +180,12 @@ Split filename labeling into two Timecode toggles.
 - `Name` shows the editable top-bar metadata/export name.
 - Editing the top-bar name refreshes visible timecode labels immediately.
 - `Tail chars` applies to both `File` and `Name` labels.
+
+## 2026-07-04 Typography and label overflow v28.17
+
+Refined the default typography and made long frame labels more predictable.
+
+- Added Google Fonts: `Inter` for the app UI and `JetBrains Mono` for timecode/file labels.
+- Updated canvas-drawn labels to use the same font stacks as DOM preview.
+- Timecode labels now keep a single-line layout and ellipsize when wider than the cell.
+- Long file/name workflows still use `Tail chars` so the end of the filename remains available.

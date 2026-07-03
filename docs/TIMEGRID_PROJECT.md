@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.16`
+Текущая версия приложения в коде: `TimeGrid v28.17`
 
 ## 1. Короткое описание
 
@@ -613,3 +613,13 @@ Timecode overlay now separates two naming concepts:
 - `Name`: the display/export name from the editable metadata filename at the top of the app.
 
 `Name` follows `state.filenameOverride` immediately after the user edits the metadata filename. If there is no override, it falls back to the same visible default used by the top metadata bar.
+
+### 2026-07-04 Typography and label overflow v28.17
+
+TimeGrid now uses Google Fonts for a cleaner default presentation:
+
+- `Inter` is the app UI font.
+- `JetBrains Mono` is the frame timecode/name/file label font.
+- Canvas-drawn labels use the same font stacks as preview.
+- Timecode labels stay on one line and ellipsize if the combined number/name label is wider than the cell.
+- `Tail chars` remains the intentional control for keeping the useful end of long file/name labels visible.

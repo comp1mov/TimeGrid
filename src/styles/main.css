@@ -1,6 +1,8 @@
 :root {
       --fg-accent: #35f2a3;
       --fg-accent2: #f28c35;
+      --fg-font-ui: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --fg-font-mono: "JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
     /* Prevent page scrollbars (keep scrolling inside the side menu only) */
@@ -13,7 +15,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; touch-action: pan-x pan-y; }
     html, body {
       width: 100%; height: 100%; overflow: hidden; background: #000;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: var(--fg-font-ui);
       color: #fff; user-select: none; -webkit-user-select: none;
       touch-action: none;
     }
@@ -209,12 +211,13 @@
       position: absolute; z-index: 2;
       background: var(--tc-bg-color, rgba(0,0,0,0.7));
       padding: var(--tc-padding, 0);
+      font-family: var(--fg-font-mono);
       font-size: var(--meta-font-size, 10px);
-      color: var(--tc-text-color, #fff); font-variant-numeric: tabular-nums;
-      width: fit-content; max-width: 90%;
+      color: var(--tc-text-color, #fff); font-variant-numeric: tabular-nums slashed-zero;
+      width: fit-content; max-width: calc(100% - var(--tc-margin, 0px) - var(--tc-margin, 0px));
       white-space: nowrap;
       overflow: hidden;
-      text-overflow: clip;
+      text-overflow: ellipsis;
       line-height: 1.0;
     }
     /* Vertical */
@@ -516,7 +519,7 @@
     .hotkey-row { font-size: 10px; color: rgba(255,255,255,0.5); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
     .hotkey { 
       background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px; 
-      font-family: monospace; font-size: 9px; color: rgba(255,255,255,0.7);
+      font-family: var(--fg-font-mono); font-size: 9px; color: rgba(255,255,255,0.7);
       min-width: 32px; text-align: center;
     }
 
@@ -951,7 +954,7 @@
       max-height: 180px;
       background: rgba(0,0,0,0.85);
       color: #fff;
-      font-family: monospace;
+      font-family: var(--fg-font-mono);
       font-size: 10px;
       padding: 8px;
       border-radius: 4px;

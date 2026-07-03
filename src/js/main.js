@@ -7,8 +7,10 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.16';
+  const APP_VERSION = 'v28.17';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
+  const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
   const EXPORT_CONF = {
     RES: { low: 540, medium: 720, hd: 1080, high: 2160, max: Infinity },
@@ -1673,11 +1675,19 @@ function updateInfoPanel() {
       const margin = Math.max(0, Math.round((Number(state.tcMargin) || 0) * scale));
 
       ctx.save();
-      ctx.font = `${fontSize}px system-ui`;
+      ctx.font = `${fontSize}px ${TIMECODE_FONT_FAMILY}`;
       ctx.textBaseline = 'top';
 
-      const textW = Math.ceil(ctx.measureText(label).width);
-      const boxW = Math.min(w, textW + pad * 2);
+      const maxBoxW = Math.max(1, w - margin * 2);
+      const maxTextW = Math.max(0, maxBoxW - pad * 2);
+      const fittedLabel = ellipsizeRight(ctx, label, maxTextW);
+      if (!fittedLabel) {
+        ctx.restore();
+        return;
+      }
+
+      const textW = Math.ceil(ctx.measureText(fittedLabel).width);
+      const boxW = Math.min(maxBoxW, textW + pad * 2);
       const boxH = fontSize + pad * 2;
 
       // Position inside the cell
@@ -1715,7 +1725,7 @@ function updateInfoPanel() {
       ctx.beginPath();
       ctx.rect(bx, by, boxW, boxH);
       ctx.clip();
-      ctx.fillText(label, tx, by + pad);
+      ctx.fillText(fittedLabel, tx, by + pad);
       ctx.restore();
       ctx.restore();
     } catch (e) {}
@@ -9986,7 +9996,7 @@ function drawExportBgLayer(ctx, dstX, dstY, dstW, dstH, mode = 'grid') {
         const fs = Math.max(10, Math.round(Math.min(w, h) * 0.11));
         const pad = Math.max(3, Math.round(fs * 0.25));
         ctx.save();
-        ctx.font = `600 ${Math.round(fs * 0.55)}px system-ui, -apple-system, Segoe UI, sans-serif`;
+        ctx.font = `600 ${Math.round(fs * 0.55)}px ${UI_FONT_FAMILY}`;
         const tw = ctx.measureText(label).width;
         const bw = tw + pad*2 + 6;
         const bh = Math.round(fs * 0.75) + pad*2;
@@ -11287,14 +11297,17 @@ function padFrameNumber(value, total) {
 function ellipsizeRight(ctx, text, maxWidth) {
   const raw = String(text || '');
   if (!raw) return '';
-  if (ctx.measureText(raw).width <= maxWidth) return raw;
+  const limit = Math.max(0, Number(maxWidth) || 0);
+  if (limit <= 0) return '';
+  if (ctx.measureText(raw).width <= limit) return raw;
   const ell = '...';
+  if (ctx.measureText(ell).width > limit) return '';
   let lo = 0;
   let hi = raw.length;
   while (lo < hi) {
     const mid = Math.floor((lo + hi + 1) / 2);
     const test = raw.slice(0, mid).replace(/\s+$/, '') + ell;
-    if (ctx.measureText(test).width <= maxWidth) lo = mid;
+    if (ctx.measureText(test).width <= limit) lo = mid;
     else hi = mid - 1;
   }
   return raw.slice(0, lo).replace(/\s+$/, '') + ell;
@@ -11424,7 +11437,7 @@ function getExportMetadataLayout(ctx, w, headerH, metaInput) {
 
   // Шрифт на 20% меньше (было 0.48 * iconSize, стало ~0.38)
   let fontSize = iconSize * 0.38;
-  const family = 'system-ui, -apple-system, Segoe UI, Roboto, Arial';
+  const family = UI_FONT_FAMILY;
 
   const topRight = String(meta.topRight || '');
   const topLeft = String(meta.topLeft || '');
@@ -11472,7 +11485,7 @@ function drawExportMetadataBar(ctx, w, headerH, metaInput, opts = {}) {
 
   const textX = layout.textX;
   const textW = layout.textW;
-  const family = 'system-ui, -apple-system, Segoe UI, Roboto, Arial';
+  const family = UI_FONT_FAMILY;
   const topRight = String(meta.topRight || '');
   const topLeft = String(meta.topLeft || '');
   const bottom = String(meta.bottom || '');
