@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.13';
+  const APP_VERSION = 'v28.14';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
 
   const EXPORT_CONF = {
@@ -89,7 +89,7 @@ inject();
     // Color Correction
     cc: { enabled: false, brightness: 1.0, contrast: 1.0, saturation: 1.0, hue: 0, invert: false, allLayers: true },
     colorama: { enabled: false, allLayers: true, colorA: '#0a0a2e', colorB: '#ff4400', colorC: '#ffee00', offset: 0, blend: 'normal', opacity: 1.0, speed: 0, cascade: false, cascadeAmt: 1.0 },
-    chronoEnabled: false, chronoBlend: 'darken', chronoDepth: 5, chronoOpacity: 1.0, chronoCascade: false, chronoCascadeMirror: false, chronoCascadeConst: 1, chronoStride: 1, chronoCleanLoop: false, chronoSeamBlend: false, chronoSeamLength: 0,
+    chronoEnabled: false, chronoBlend: 'darken', chronoDepth: 5, chronoOpacity: 1.0, chronoCascade: false, chronoCascadeMirror: false, chronoCascadeConst: 1, chronoStride: 1, chronoCleanLoop: false, chronoSeamBlend: false, chronoSeamLength: 0, chronoSeamMode: 'chrono', chronoSeamStrength: 0.55,
     frameDiffEnabled: false, frameDiffPlateIdx: 0, frameDiffPlateMode: 'static', frameDiffPlateStep: 1, frameDiffPlateLoopN: 8, frameDiffPlateOffset: 0, frameDiffBlend: 'difference', frameDiffOpacity: 1.0,
     frameImgFill: 'empty', // 'empty' or 'edge'
 
@@ -2174,6 +2174,47 @@ function schedulePostGridSync() {
     return t * t * (3 - 2 * t);
   }
 
+  function normalizeChronoSeamMode(value) {
+    if (value === 'frame-soft' || value === 'frame-full') return value;
+    return 'chrono';
+  }
+
+  function getChronoSeamMode() {
+    return normalizeChronoSeamMode(state.chronoSeamMode);
+  }
+
+  function getChronoSeamStrength() {
+    const v = Number(state.chronoSeamStrength);
+    if (!Number.isFinite(v)) return 0.55;
+    return Math.max(0.05, Math.min(1, v));
+  }
+
+  function getChronoSeamBaseOpacity(seamInfo) {
+    if (!seamInfo) return 0;
+    const alpha = Number.isFinite(Number(seamInfo.alpha)) ? Math.max(0, Math.min(1, Number(seamInfo.alpha))) : 0;
+    if (alpha <= 0) return 0;
+    const mode = normalizeChronoSeamMode(seamInfo.mode || state.chronoSeamMode);
+    if (mode === 'frame-full') return alpha;
+    if (mode === 'frame-soft') return alpha * getChronoSeamStrength();
+    return 0;
+  }
+
+  function getChronoSeamGhostOpacityScale(seamInfo) {
+    if (!seamInfo) return 0;
+    const alpha = Number.isFinite(Number(seamInfo.alpha)) ? Math.max(0, Math.min(1, Number(seamInfo.alpha))) : 0;
+    if (alpha <= 0) return 0;
+    const mode = normalizeChronoSeamMode(seamInfo.mode || state.chronoSeamMode);
+    if (mode === 'frame-full') return alpha;
+    return alpha * getChronoSeamStrength();
+  }
+
+  function getChronoCurrentOpacityScale(seamInfo) {
+    if (!seamInfo || !state.chronoSeamBlend) return 1;
+    const mode = normalizeChronoSeamMode(seamInfo.mode || state.chronoSeamMode);
+    if (mode !== 'chrono') return 1;
+    return 1 - getChronoSeamGhostOpacityScale(seamInfo);
+  }
+
   function getChronoSeamAutoLength() {
     const depth = Math.max(1, Math.round(Number(state.chronoDepth) || 3));
     const stride = Math.max(1, Math.round(Number(state.chronoStride) || 1));
@@ -2236,6 +2277,8 @@ function schedulePostGridSync() {
 
     return {
       ...seam,
+      mode: getChronoSeamMode(),
+      strength: getChronoSeamStrength(),
       targetFrameIdx: targetInfo.frameIdx,
       targetBaseOffset: targetInfo.baseOffset,
       targetGhostIndices: state.chronoEnabled
@@ -3078,6 +3121,11 @@ function fitToSingleFrame() {
   const chronoOpacityNum = $('chronoOpacityNum');
   const toggleChronoCascade = $('toggleChronoCascade');
   const toggleChronoSeamBlend = $('toggleChronoSeamBlend');
+  const chronoSeamModeSelect = $('chronoSeamMode');
+  const chronoSeamModeRow = $('chronoSeamModeRow');
+  const chronoSeamStrengthInput = $('chronoSeamStrength');
+  const chronoSeamStrengthNum = $('chronoSeamStrengthNum');
+  const chronoSeamStrengthRow = $('chronoSeamStrengthRow');
   const chronoSeamLengthInput = $('chronoSeamLength');
   const chronoSeamLengthMinus = $('chronoSeamLengthMinus');
   const chronoSeamLengthPlus = $('chronoSeamLengthPlus');
@@ -3090,6 +3138,8 @@ function fitToSingleFrame() {
   if (state.chronoCleanLoop === undefined) state.chronoCleanLoop = false;
   if (state.chronoSeamBlend === undefined) state.chronoSeamBlend = false;
   if (state.chronoSeamLength === undefined) state.chronoSeamLength = 0;
+  state.chronoSeamMode = normalizeChronoSeamMode(state.chronoSeamMode);
+  if (state.chronoSeamStrength === undefined) state.chronoSeamStrength = 0.55;
   if (state.frameDiffEnabled === undefined)  state.frameDiffEnabled  = false;
   if (state.frameDiffPlateIdx === undefined) state.frameDiffPlateIdx = 0;
   if (state.frameDiffBlend === undefined)    state.frameDiffBlend    = 'difference';
@@ -3279,9 +3329,17 @@ function fitToSingleFrame() {
   };
 
   function syncChronoSeamUI() {
+    const seamEnabled = !!state.chronoSeamBlend;
+    const seamMode = getChronoSeamMode();
+    const seamStrength = getChronoSeamStrength();
     if (toggleChronoSeamBlend) toggleChronoSeamBlend.classList.toggle('active', !!state.chronoSeamBlend);
+    if (chronoSeamModeSelect) chronoSeamModeSelect.value = seamMode;
+    if (chronoSeamModeRow) chronoSeamModeRow.style.display = seamEnabled ? '' : 'none';
+    if (chronoSeamStrengthInput) chronoSeamStrengthInput.value = seamStrength.toFixed(2);
+    if (chronoSeamStrengthNum) chronoSeamStrengthNum.value = seamStrength.toFixed(2);
+    if (chronoSeamStrengthRow) chronoSeamStrengthRow.style.display = seamEnabled && seamMode !== 'frame-full' ? '' : 'none';
     if (chronoSeamLengthInput) chronoSeamLengthInput.value = Math.max(0, Math.round(Number(state.chronoSeamLength) || 0));
-    if (chronoSeamLengthRow) chronoSeamLengthRow.style.display = state.chronoSeamBlend ? '' : 'none';
+    if (chronoSeamLengthRow) chronoSeamLengthRow.style.display = seamEnabled ? '' : 'none';
   }
 
   if (toggleChronoCascade) {
@@ -3367,6 +3425,32 @@ function fitToSingleFrame() {
       state.chronoSeamBlend = !state.chronoSeamBlend;
       syncChronoSeamUI();
       updateChronoUI();
+    };
+  }
+
+  if (chronoSeamModeSelect) {
+    chronoSeamModeSelect.onchange = () => {
+      state.chronoSeamMode = normalizeChronoSeamMode(chronoSeamModeSelect.value);
+      syncChronoSeamUI();
+      updateChronoUI();
+    };
+  }
+
+  function applyChronoSeamStrength(value) {
+    const v = Math.max(0.05, Math.min(1, Number(value) || 0.55));
+    state.chronoSeamStrength = v;
+    if (chronoSeamStrengthInput) chronoSeamStrengthInput.value = v.toFixed(2);
+    if (chronoSeamStrengthNum) chronoSeamStrengthNum.value = v.toFixed(2);
+    updateChronoUI();
+  }
+
+  if (chronoSeamStrengthInput) {
+    chronoSeamStrengthInput.oninput = () => applyChronoSeamStrength(chronoSeamStrengthInput.value);
+  }
+  if (chronoSeamStrengthNum) {
+    chronoSeamStrengthNum.oninput = () => applyChronoSeamStrength(chronoSeamStrengthNum.value);
+    chronoSeamStrengthNum.onchange = () => {
+      chronoSeamStrengthNum.value = getChronoSeamStrength().toFixed(2);
     };
   }
 
@@ -4215,7 +4299,7 @@ function fitToSingleFrame() {
     return indices;
   }
 
-  function updateChronoForItem(item, ghostIndices) {
+  function updateChronoForItem(item, ghostIndices, opacityScale = 1) {
     const xform = item.querySelector('.frame-media-xform');
     if (!xform) return;
 
@@ -4226,6 +4310,7 @@ function fitToSingleFrame() {
 
     const blendMode = state.chronoBlend   || 'screen';
     const alphaBase = (state.chronoOpacity !== undefined) ? state.chronoOpacity : 1.0;
+    const stackScale = Number.isFinite(Number(opacityScale)) ? Math.max(0, Math.min(1, Number(opacityScale))) : 1;
     const depth     = ghostIndices.length;
     const imgArr    = Array.from(xform.querySelectorAll('.frame-chrono'));
     let slot = 0;
@@ -4246,6 +4331,7 @@ function fitToSingleFrame() {
       if (state.chronoCascade) {
         finalOpacity = computeCascadeOpacity(step, depth, alphaBase);
       }
+      finalOpacity *= stackScale;
 
       let img = imgArr[slot];
       if (!img) {
@@ -4306,24 +4392,29 @@ function fitToSingleFrame() {
       return;
     }
 
-    const frame = state.frames[normalizeFrameIndex(seamInfo.targetFrameIdx, state.frames.length)];
-    if (!frame) {
-      clearSeamBlendForItem(xform);
-      return;
-    }
-
+    const baseOpacity = getChronoSeamBaseOpacity(seamInfo);
+    const ghostOpacityScale = getChronoSeamGhostOpacityScale(seamInfo);
     let base = xform.querySelector('.frame-seam-blend');
-    if (!base) {
-      base = createFrameOverlayImg('frame-seam-blend', 2);
-      xform.appendChild(base);
+    if (baseOpacity > 0) {
+      const frame = state.frames[normalizeFrameIndex(seamInfo.targetFrameIdx, state.frames.length)];
+      if (!frame) {
+        clearSeamBlendForItem(xform);
+        return;
+      }
+      if (!base) {
+        base = createFrameOverlayImg('frame-seam-blend', 2);
+        xform.appendChild(base);
+      }
+      if (base.src !== frame.dataUrl) base.src = frame.dataUrl;
+      base.style.display = '';
+      base.style.mixBlendMode = 'normal';
+      base.style.opacity = (baseOpacity * Math.max(0, Math.min(1, Number(state.frameImgOpacity) || 1))).toFixed(3);
+      base.style.filter = (state.cc && state.cc.enabled) ? buildCCFilter() : '';
+    } else if (base) {
+      base.remove();
     }
-    if (base.src !== frame.dataUrl) base.src = frame.dataUrl;
-    base.style.display = '';
-    base.style.mixBlendMode = 'normal';
-    base.style.opacity = (alpha * Math.max(0, Math.min(1, Number(state.frameImgOpacity) || 1))).toFixed(3);
-    base.style.filter = (state.cc && state.cc.enabled) ? buildCCFilter() : '';
 
-    const ghostIndices = state.chronoEnabled ? (seamInfo.targetGhostIndices || []) : [];
+    const ghostIndices = state.chronoEnabled && ghostOpacityScale > 0 ? (seamInfo.targetGhostIndices || []) : [];
     const ghostArr = Array.from(xform.querySelectorAll('.frame-seam-chrono'));
     let slot = 0;
     const blendMode = state.chronoBlend || 'screen';
@@ -4344,7 +4435,7 @@ function fitToSingleFrame() {
 
       let finalOpacity = alphaBase;
       if (state.chronoCascade) finalOpacity = computeCascadeOpacity(step, depth, alphaBase);
-      finalOpacity *= alpha;
+      finalOpacity *= ghostOpacityScale;
 
       let img = ghostArr[slot];
       if (!img) {
@@ -4684,7 +4775,6 @@ function updateAllCells() {
       const _ghostIndices = state.chronoEnabled
         ? buildChronoGhostIndices(tick, baseOffset, frameCount, dir, shuffle)
         : [];
-      updateChronoForItem(item, _ghostIndices);
       const _seamInfo = getChronoSeamForCell(cellIdx, tick, {
         frameCount,
         cellCount: totalCells,
@@ -4694,6 +4784,7 @@ function updateAllCells() {
         mode: state.viewMode,
         skipEnsureShuffle: true
       });
+      updateChronoForItem(item, _ghostIndices, getChronoCurrentOpacityScale(_seamInfo));
       updateSeamBlendForItem(item, _seamInfo);
       updateFrameDiffForItem(item);
       updateColoramaForItem(item, cellIdx);
@@ -9582,9 +9673,6 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
           _st.animDirection, _st.animDirShuffle,
           _st.chronoDepth||3, Math.max(1,_st.chronoStride||1),
           !!_st.chronoCleanLoop, _st.frames.length);
-        drawChronophotoStack(ctx, _gIdx, x, y, cellDrawW, cellDrawH);
-        drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, frameImages);
-        applyColoramaToCanvas(ctx, x, y, cellDrawW, cellDrawH, img, coloramaFilterId(c));
         const _seamInfo = getChronoSeamForCell(c, tick, {
           frameCount,
           cellCount,
@@ -9594,6 +9682,11 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
           mode: 'grid',
           skipEnsureShuffle: true
         });
+        drawChronophotoStack(ctx, _gIdx, x, y, cellDrawW, cellDrawH, {
+          opacityScale: getChronoCurrentOpacityScale(_seamInfo)
+        });
+        drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, frameImages);
+        applyColoramaToCanvas(ctx, x, y, cellDrawW, cellDrawH, img, coloramaFilterId(c));
         drawChronoSeamBlend(ctx, _seamInfo, x, y, cellDrawW, cellDrawH, frameImages, coloramaFilterId(c));
       }
       _cells.push({ c, uiC, x, y, frameW: cellDrawW, frameH: cellDrawH, animFrameIdx, frame });
@@ -10347,14 +10440,18 @@ function drawChronoSeamBlend(ctx, seamInfo, x, y, w, h, frameImages = null, filt
     const alpha = Number.isFinite(Number(seamInfo.alpha)) ? Math.max(0, Math.min(1, Number(seamInfo.alpha))) : 0;
     if (alpha <= 0) return;
 
-    const baseImg = getFrameImageForCanvas(seamInfo.targetFrameIdx, frameImages);
-    if (baseImg && (baseImg.naturalWidth || baseImg.videoWidth || baseImg.width)) {
-      drawFrameImageOverlay(ctx, baseImg, x, y, w, h, alpha, filterId);
+    const baseOpacity = getChronoSeamBaseOpacity(seamInfo);
+    if (baseOpacity > 0) {
+      const baseImg = getFrameImageForCanvas(seamInfo.targetFrameIdx, frameImages);
+      if (baseImg && (baseImg.naturalWidth || baseImg.videoWidth || baseImg.width)) {
+        drawFrameImageOverlay(ctx, baseImg, x, y, w, h, baseOpacity, filterId);
+      }
     }
 
-    if (window._fgState.chronoEnabled && seamInfo.targetGhostIndices && seamInfo.targetGhostIndices.length) {
+    const ghostOpacityScale = getChronoSeamGhostOpacityScale(seamInfo);
+    if (window._fgState.chronoEnabled && ghostOpacityScale > 0 && seamInfo.targetGhostIndices && seamInfo.targetGhostIndices.length) {
       drawChronophotoStack(ctx, seamInfo.targetGhostIndices, x, y, w, h, {
-        opacityScale: alpha,
+        opacityScale: ghostOpacityScale,
         frameImages,
         filterId
       });
@@ -10443,9 +10540,6 @@ function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout,
           window._fgState.animDirection, window._fgState.animDirShuffle,
           _st2.chronoDepth||3, Math.max(1,_st2.chronoStride||1),
           !!_st2.chronoCleanLoop, _st2.frames.length);
-      drawChronophotoStack(ctx, _gIdx2, innerX, innerY, innerW, innerH);
-      drawFrameDiffStack(ctx, innerX, innerY, innerW, innerH, frameImages);
-      applyColoramaToCanvas(ctx, innerX, innerY, innerW, innerH, img, coloramaFilterId(0));
       const _singleTick = animTick !== null ? animTick : frameIdx;
       const _seamInfoSingle = getChronoSeamForCell(0, _singleTick, {
         frameCount,
@@ -10456,6 +10550,11 @@ function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout,
         mode: 'single',
         skipEnsureShuffle: true
       });
+      drawChronophotoStack(ctx, _gIdx2, innerX, innerY, innerW, innerH, {
+        opacityScale: getChronoCurrentOpacityScale(_seamInfoSingle)
+      });
+      drawFrameDiffStack(ctx, innerX, innerY, innerW, innerH, frameImages);
+      applyColoramaToCanvas(ctx, innerX, innerY, innerW, innerH, img, coloramaFilterId(0));
       drawChronoSeamBlend(ctx, _seamInfoSingle, innerX, innerY, innerW, innerH, frameImages, coloramaFilterId(0));
     }
 
@@ -10784,29 +10883,6 @@ async function exportPngSeqDrawings() {
 
     for (let i = 0; i < frameCount; i++) {
       tmpCtx.clearRect(0, 0, outW, outH);
-
-      if (state.isSingleImage) {
-        const url = state.frames[i]?.dataUrl || '';
-        const img = await loadImgCached(url);
-        if (img) drawFrameCell(tmpCtx, img, 0, 0, outW, outH);
-        const _gIdxP = buildChronoGhostIndicesStill(i, window._fgState.frames.length);
-        drawChronophotoStack(tmpCtx, _gIdxP, 0, 0, outW, outH);
-        drawFrameDiffStack(tmpCtx, 0, 0, outW, outH, null);
-      } else {
-        const time = state.frames[i]?.time || 0;
-        await seekVideo(time);
-
-        // Always export the base frame. Drawings are optional overlay.
-        try {
-          drawFrameCell(tmpCtx, videoElement, 0, 0, outW, outH);
-          const _gIdxP2 = buildChronoGhostIndicesStill(i, window._fgState.frames.length);
-          drawChronophotoStack(tmpCtx, _gIdxP2, 0, 0, outW, outH);
-          drawFrameDiffStack(tmpCtx, 0, 0, outW, outH, null);
-        } catch (e) {
-          // If drawImage fails (rare on iOS), leave frame blank.
-        }
-      }
-
       const _seamInfoPng = getChronoSeamForCell(0, i, {
         frameCount,
         cellCount: 1,
@@ -10816,6 +10892,34 @@ async function exportPngSeqDrawings() {
         mode: 'single',
         skipEnsureShuffle: true
       });
+      const _seamCurrentScalePng = getChronoCurrentOpacityScale(_seamInfoPng);
+
+      if (state.isSingleImage) {
+        const url = state.frames[i]?.dataUrl || '';
+        const img = await loadImgCached(url);
+        if (img) drawFrameCell(tmpCtx, img, 0, 0, outW, outH);
+        const _gIdxP = buildChronoGhostIndicesStill(i, window._fgState.frames.length);
+        drawChronophotoStack(tmpCtx, _gIdxP, 0, 0, outW, outH, {
+          opacityScale: _seamCurrentScalePng
+        });
+        drawFrameDiffStack(tmpCtx, 0, 0, outW, outH, null);
+      } else {
+        const time = state.frames[i]?.time || 0;
+        await seekVideo(time);
+
+        // Always export the base frame. Drawings are optional overlay.
+        try {
+          drawFrameCell(tmpCtx, videoElement, 0, 0, outW, outH);
+          const _gIdxP2 = buildChronoGhostIndicesStill(i, window._fgState.frames.length);
+          drawChronophotoStack(tmpCtx, _gIdxP2, 0, 0, outW, outH, {
+            opacityScale: _seamCurrentScalePng
+          });
+          drawFrameDiffStack(tmpCtx, 0, 0, outW, outH, null);
+        } catch (e) {
+          // If drawImage fails (rare on iOS), leave frame blank.
+        }
+      }
+
       await ensureChronoSeamBlendImagesReady(_seamInfoPng);
       drawChronoSeamBlend(tmpCtx, _seamInfoPng, 0, 0, outW, outH, null, coloramaFilterId(0));
 
@@ -11559,8 +11663,6 @@ const canvas = document.createElement('canvas');
         const _gIdx2 = state.chronoEnabled
           ? buildChronoGhostIndices(state.currentTick, stillCellInfo.baseOffset, state.frames.length, state.animDirection, state.animDirShuffle)
           : [];
-        drawChronophotoStack(ctx, _gIdx2, x, y, cellDrawW, cellDrawH);
-        drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, null);
         const _seamInfoStill = getChronoSeamForCell(cellIdx, state.currentTick, {
           frameCount: state.frames.length,
           cellCount,
@@ -11570,6 +11672,10 @@ const canvas = document.createElement('canvas');
           mode: 'grid',
           skipEnsureShuffle: true
         });
+        drawChronophotoStack(ctx, _gIdx2, x, y, cellDrawW, cellDrawH, {
+          opacityScale: getChronoCurrentOpacityScale(_seamInfoStill)
+        });
+        drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, null);
         await ensureChronoSeamBlendImagesReady(_seamInfoStill);
         drawChronoSeamBlend(ctx, _seamInfoStill, x, y, cellDrawW, cellDrawH, null, coloramaFilterId(cellIdx));
       } else {
@@ -11737,7 +11843,10 @@ const canvas = document.createElement('canvas');
 
   async function ensureChronoSeamBlendImagesReady(seamInfo) {
     if (!seamInfo || !seamInfo.alpha || seamInfo.alpha <= 0 || !state.frames.length) return;
-    const ids = [seamInfo.targetFrameIdx];
+    const ids = [];
+    if (getChronoSeamBaseOpacity(seamInfo) > 0 && Number.isFinite(Number(seamInfo.targetFrameIdx))) {
+      ids.push(seamInfo.targetFrameIdx);
+    }
     if (state.chronoEnabled && Array.isArray(seamInfo.targetGhostIndices)) {
       seamInfo.targetGhostIndices.forEach(idx => {
         if (idx !== null && Number.isFinite(Number(idx))) ids.push(idx);
@@ -11889,8 +11998,6 @@ const canvas = document.createElement('canvas');
         const _gIdx2 = state.chronoEnabled
           ? buildChronoGhostIndices(state.currentTick, _singleStillInfo.baseOffset, state.frames.length, state.animDirection, state.animDirShuffle)
           : [];
-        drawChronophotoStack(ctx, _gIdx2, dx, dy, frameW, frameH);
-        drawFrameDiffStack(ctx, dx, dy, frameW, frameH, null);
         const _seamInfoSingleStill = getChronoSeamForCell(0, state.currentTick, {
           frameCount: state.frames.length,
           cellCount: 1,
@@ -11900,6 +12007,10 @@ const canvas = document.createElement('canvas');
           mode: 'single',
           skipEnsureShuffle: true
         });
+        drawChronophotoStack(ctx, _gIdx2, dx, dy, frameW, frameH, {
+          opacityScale: getChronoCurrentOpacityScale(_seamInfoSingleStill)
+        });
+        drawFrameDiffStack(ctx, dx, dy, frameW, frameH, null);
         await ensureChronoSeamBlendImagesReady(_seamInfoSingleStill);
         drawChronoSeamBlend(ctx, _seamInfoSingleStill, dx, dy, frameW, frameH, null, coloramaFilterId(0));
       } else {

@@ -163,7 +163,7 @@ Chronophoto превращает движение в видимую истори
 ### Технические заметки
 
 - текущий `Clean Loop` — это скорее `No Wrap Ghosts`, а не smooth loop;
-- будущий `Seam Blend` должен быть отдельным режимом;
+- `Seam Blend` должен оставаться отдельным режимом от `Clean Loop`;
 - preview и export должны использовать общую ghost-логику;
 - Chronophoto зависит от `state.currentTick`, direction, pattern, stride и frame count.
 

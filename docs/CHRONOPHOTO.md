@@ -74,7 +74,7 @@ Clean Loop влияет только на пункт 2. Он даже может
 
 Если нужен действительно плавный loop, нужно подмешивать начало клипа ещё до шва, на последних кадрах цикла.
 
-## Предлагаемый будущий режим: Seam Blend
+## Режим Seam Blend
 
 Новый режим лучше не смешивать с Clean Loop. Рабочее название:
 
@@ -135,7 +135,7 @@ getChronoStack({ tick, baseOffset, frameCount, direction, depth, stride, cleanLo
 ## Термины
 
 - **Clean Loop** — текущий режим clipping ghost history.
-- **Seam Blend** — будущий режим crossfade/composite на loop seam.
+- **Seam Blend** — crossfade/composite на loop seam.
 - **Ghost frame** — предыдущий/соседний кадр, наложенный Chronophoto.
 - **Base frame** — основной кадр ячейки до overlay.
 ## 2026-07-03 Seam Blend implementation
@@ -146,6 +146,8 @@ State:
 
 - `chronoSeamBlend`: on/off.
 - `chronoSeamLength`: manual seam length in frames; `0` means Auto.
+- `chronoSeamMode`: `chrono`, `frame-soft`, or `frame-full`.
+- `chronoSeamStrength`: max opacity for `chrono` and `frame-soft`.
 
 Auto length:
 
@@ -164,7 +166,7 @@ Behavior:
 - The last `seamLength` ticks of each loop fade toward tick `0`.
 - The target is computed per cell, not globally, through `getFrameCellInfo(cellIdx, 0, ...)`.
 - Preview uses `.frame-seam-blend` and `.frame-seam-chrono` DOM layers.
-- Canvas export draws the same target base frame and target Chronophoto stack.
+- Canvas export draws the same seam mode as preview: ghost-only, soft base+ghost, or full base+ghost.
 - `Clean Loop` still only clips wrapped ghost history; it is not a crossfade.
 
 Export coverage:
@@ -172,3 +174,15 @@ Export coverage:
 - MP4 grid and single paths use tick-based seam alpha.
 - PNG/JPEG still exports preload seam target images before drawing.
 - PNG sequence export applies the single-frame seam path.
+
+## 2026-07-03 Seam Modes v28.14
+
+The first v28.13 implementation could look frozen when the first and last base frames were very different, because it faded the first visible base frame over the loop end.
+
+v28.14 keeps that behavior available as `Frame Full`, but adds safer test modes:
+
+- `Chrono Only`: crossfades the current ghost stack into the wrapped ghost stack and never draws the first base frame.
+- `Frame Soft`: draws the first base frame and wrapped ghost stack, capped by `Seam Strength`.
+- `Frame Full`: the original full-strength base-frame seam for A/B comparison.
+
+`Chrono Only` is the default. It will not hide a huge `last -> first` base-frame jump by itself, but it should keep Chronophoto continuity without the static-frame freeze artifact.

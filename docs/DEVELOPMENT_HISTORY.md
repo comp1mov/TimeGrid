@@ -22,7 +22,7 @@
 
 Production тестируется через Vercel:
 
-- `https://time-grid-sand.vercel.app/`
+- `https://timegri.vercel.app/`
 - `main` считается production-веткой;
 - экспериментальные ветки можно использовать для preview deployments.
 
@@ -151,3 +151,14 @@ Implemented the first production version of Chronophoto loop smoothing.
 - Preview renders `.frame-seam-blend` plus `.frame-seam-chrono` layers.
 - MP4 grid/single, PNG/JPEG still, and PNG sequence export now draw the seam target.
 - `Clean Loop` remains a ghost-history clipping mode and is intentionally separate from Seam Blend.
+
+## 2026-07-03 Seam Modes v28.14
+
+Refined Seam Blend after testing showed that the first implementation could feel like a static frame floating over the animation.
+
+- Added `Seam Mode`: `Chrono Only`, `Frame Soft`, `Frame Full`.
+- Added `Seam Strength`, default `0.55`.
+- `Chrono Only` crossfades Chronophoto ghost history only and is now the default.
+- `Frame Soft` keeps the base-frame blend but caps opacity by strength.
+- `Frame Full` preserves the v28.13 behavior for comparison.
+- Preview and export now share current-stack opacity scaling so `Chrono Only` is a real ghost-stack crossfade, not just an extra overlay.

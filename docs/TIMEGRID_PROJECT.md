@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.13`
+Текущая версия приложения в коде: `TimeGrid v28.14`
 
 ## 1. Короткое описание
 
@@ -242,7 +242,7 @@ Vite настроен через `vite-plugin-singlefile`, чтобы итого
 
 Текущий практический путь тестирования на устройствах — Vercel.
 
-- production URL: `https://time-grid-sand.vercel.app/`
+- production URL: `https://timegri.vercel.app/`
 - `main` можно держать как стабильную production-ветку;
 - experimental branches можно использовать для preview deployments;
 - GitHub Pages пока не является основным путём деплоя.
@@ -585,3 +585,13 @@ Chronophoto now has two separate loop-related controls:
 - `Seam Blend`: crossfades the end of the cycle toward the first visible state of each cell.
 
 `Seam Blend` uses `chronoSeamLength`, where `0` means Auto (`chronoDepth * chronoStride`). The target frame is resolved through `getFrameCellInfo(cellIdx, 0, ...)`, so grid pattern, Frame Target, Sequence Mode, direction, and cell offset remain part of the same temporal model. Preview and export both use the shared seam helpers in `src/js/main.js`.
+
+### 2026-07-03 Chronophoto Seam Modes v28.14
+
+`Seam Blend` now has testable modes:
+
+- `Chrono Only`: crossfades the current Chronophoto ghost stack into the wrapped ghost stack without drawing the first base frame. This is the default because it avoids the static-frame freeze artifact.
+- `Frame Soft`: also draws the first visible base frame, but caps it with `chronoSeamStrength`.
+- `Frame Full`: preserves the first v28.13 behavior for comparison.
+
+`Seam Strength` controls the maximum opacity for `Chrono Only` and `Frame Soft`; default is `0.55`. Preview, MP4 grid/single, PNG sequence, and still exports all use the same opacity helpers.
