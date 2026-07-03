@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.15';
+  const APP_VERSION = 'v28.16';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
 
   const EXPORT_CONF = {
@@ -74,6 +74,7 @@ inject();
     tcShowText: false,
     tcCustomText: '',
     tcShowFilename: false,
+    tcShowDisplayName: false,
     tcFilenameTail: 24,
     autoFit: true, canvasAspect: 'auto', bgColor: '#020202',
     bgGridShow: false, bgGridType: 'lines', bgGridColor: '#ffffff', bgGridOpacity: 0.12, bgGridSize: 24,
@@ -331,6 +332,10 @@ function getTargetFrameOutputDims() {
     const v = String(next || '').trim();
     state.filenameOverride = v;
     updateMetaDisplay();
+    if (typeof updateAllTimecodes === 'function') {
+      updateAllTimecodes();
+      updateTimecodeVisibility();
+    }
   }
 
   function beginMetaFilenameEdit() {
@@ -1647,7 +1652,7 @@ function updateInfoPanel() {
 
   function computeShowTimecode() {
     const hasText = !!(state.tcShowText && String(state.tcCustomText || '').trim());
-    return !!(state.tcShowIndex || state.tcShowTime || state.tcShowFrame || hasText || state.tcShowFilename);
+    return !!(state.tcShowIndex || state.tcShowTime || state.tcShowFrame || hasText || state.tcShowFilename || state.tcShowDisplayName);
   }
 
   // Draw a timecode overlay on a canvas export (PNG/JPEG/MP4) using the same visual logic as the UI.
@@ -3712,6 +3717,7 @@ function fitToSingleFrame() {
   const toggleTcFrame = $('toggleTcFrame');
   const toggleTcText = $('toggleTcText');
   const toggleTcFilename = $('toggleTcFilename');
+  const toggleTcDisplayName = $('toggleTcDisplayName');
   const tcCustomTextRow = $('tcCustomTextRow');
   const tcCustomTextInput = $('tcCustomTextInput');
   const tcFilenameTailRow = $('tcFilenameTailRow');
@@ -3719,6 +3725,7 @@ function fitToSingleFrame() {
   const tcFilenameTailMinus = $('tcFilenameTailMinus');
   const tcFilenameTailPlus = $('tcFilenameTailPlus');
   if (state.tcShowFilename === undefined) state.tcShowFilename = false;
+  if (state.tcShowDisplayName === undefined) state.tcShowDisplayName = false;
   if (state.tcFilenameTail === undefined) state.tcFilenameTail = 24;
   
   function updateAllTimecodes() {
@@ -3752,10 +3759,11 @@ function fitToSingleFrame() {
   };
 
   function syncTcFilenameUI() {
-    const enabled = !!state.tcShowFilename;
+    const enabled = !!(state.tcShowFilename || state.tcShowDisplayName);
     const tail = Math.max(0, Math.min(300, Math.round(Number(state.tcFilenameTail) || 0)));
     state.tcFilenameTail = tail;
-    if (toggleTcFilename) toggleTcFilename.classList.toggle('active-toggle', enabled);
+    if (toggleTcFilename) toggleTcFilename.classList.toggle('active-toggle', !!state.tcShowFilename);
+    if (toggleTcDisplayName) toggleTcDisplayName.classList.toggle('active-toggle', !!state.tcShowDisplayName);
     if (tcFilenameTailRow) tcFilenameTailRow.style.display = enabled ? 'flex' : 'none';
     if (tcFilenameTailInput) tcFilenameTailInput.value = tail;
   }
@@ -3770,6 +3778,14 @@ function fitToSingleFrame() {
   if (toggleTcFilename) {
     toggleTcFilename.onclick = () => {
       state.tcShowFilename = !state.tcShowFilename;
+      syncTcFilenameUI();
+      updateAllTimecodes();
+      updateTimecodeVisibility();
+    };
+  }
+  if (toggleTcDisplayName) {
+    toggleTcDisplayName.onclick = () => {
+      state.tcShowDisplayName = !state.tcShowDisplayName;
       syncTcFilenameUI();
       updateAllTimecodes();
       updateTimecodeVisibility();
@@ -12176,12 +12192,30 @@ const canvas = document.createElement('canvas');
     return cleanFrameFilename(state.videoFile && state.videoFile.name);
   }
 
-  function formatFrameFilename(frame, frameIdx) {
-    const name = getFrameFilename(frame, frameIdx);
+  function getDisplayFilename() {
+    const override = cleanFrameFilename(state.filenameOverride);
+    if (override) return override;
+
+    if (state.isSingleImage && Array.isArray(state.imageFiles) && state.imageFiles.length > 1) {
+      return `${state.imageFiles.length} images`;
+    }
+
+    return cleanFrameFilename(state.videoFile && state.videoFile.name);
+  }
+
+  function formatFilenameLabel(name) {
     if (!name) return '';
     const tail = Math.max(0, Math.min(300, Math.round(Number(state.tcFilenameTail) || 0)));
     if (tail > 0 && name.length > tail) return name.slice(-tail);
     return name;
+  }
+
+  function formatFrameFilename(frame, frameIdx) {
+    return formatFilenameLabel(getFrameFilename(frame, frameIdx));
+  }
+
+  function formatDisplayFilename() {
+    return formatFilenameLabel(getDisplayFilename());
   }
 
   function formatTimecode(frame, derivedIndex, totalFrames, frameIdx) {
@@ -12226,6 +12260,10 @@ const canvas = document.createElement('canvas');
     if (state.tcShowText) {
       const txt = String(state.tcCustomText || '').trim();
       if (txt) parts.push(txt);
+    }
+    if (state.tcShowDisplayName) {
+      const displayName = formatDisplayFilename();
+      if (displayName) parts.push(displayName);
     }
     if (state.tcShowFilename) {
       const filename = formatFrameFilename(frame, frameIdx);

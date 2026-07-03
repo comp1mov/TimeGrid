@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.15`
+Текущая версия приложения в коде: `TimeGrid v28.16`
 
 ## 1. Короткое описание
 
@@ -604,3 +604,12 @@ Timecode overlay can now show the source filename per frame:
 - Image-sequence imports store `sourceName` and `sourceIndex` in each generated frame.
 - `Tail chars` controls truncation from the end of the filename; `0` means full filename, default is `24`.
 - Preview and exports use the same `formatTimecode(...)` path.
+
+### 2026-07-04 Display name labels v28.16
+
+Timecode overlay now separates two naming concepts:
+
+- `File`: per-frame source filename, useful for image sequences.
+- `Name`: the display/export name from the editable metadata filename at the top of the app.
+
+`Name` follows `state.filenameOverride` immediately after the user edits the metadata filename. If there is no override, it falls back to the same visible default used by the top metadata bar.

@@ -171,3 +171,12 @@ Added filename labels to the existing Timecode overlay.
 - New `Tail chars` control shows the last N filename characters; `0` shows the full name.
 - Image-sequence imports now store `sourceName` and `sourceIndex` per generated frame.
 - Preview and export use the same `formatTimecode(...)` function, so labels stay WYSIWYG.
+
+## 2026-07-04 Display name labels v28.16
+
+Split filename labeling into two Timecode toggles.
+
+- `File` remains the per-frame source filename.
+- `Name` shows the editable top-bar metadata/export name.
+- Editing the top-bar name refreshes visible timecode labels immediately.
+- `Tail chars` applies to both `File` and `Name` labels.
