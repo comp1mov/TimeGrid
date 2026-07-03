@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 ╔════════════════════════════════════════════════════════════════╗
-║      TimeGrid v28.12                                         ║
+║      TimeGrid v28.13                                         ║
 ╚════════════════════════════════════════════════════════════════╝
 -->
 
@@ -20,7 +20,7 @@
     gtag('js', new Date());
     gtag('config', 'G-JG9JL2MG9E');
   </script>
-  <title>TimeGrid v28.12</title>
+  <title>TimeGrid v28.13</title>
   <link rel="stylesheet" href="/src/styles/main.css">
 </head>
 <body>
@@ -33,7 +33,7 @@
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell"></span>
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell active2"></span>
           </span>
-          <span class="metadata-logo-text" id="fgLogoText">TimeGrid v28.12</span>
+          <span class="metadata-logo-text" id="fgLogoText">TimeGrid v28.13</span>
         </div>
         <div class="metadata-gap"></div>
         <div class="metadata-group">
@@ -229,7 +229,7 @@
 
         <div class="drop-zone-support">
           <div class="drop-zone-support-text">
-            <p>An independent passion project, shared with the audiovisual community.<br>If it helps your creative process, <a class="drop-zone-support-link" href="https://buymeacoffee.com/comp1mov" target="_blank" rel="noopener noreferrer">your support</a> keeps the late-night sessions going.<br>Vibecoded by <a class="drop-zone-support-link" href="https://grisha-tsvetkov.com" target="_blank" rel="noopener noreferrer">Grisha Tsvetkov</a>.</p></div>
+            <p>An independent passion project, shared with the audiovisual community.<br>If it helps your creative process, <a class="drop-zone-support-link" href="https://buymeacoffee.com/comp1mov" target="_blank" rel="noopener noreferrer">your support</a> keeps the late-night sessions going.<br>Developed by <a class="drop-zone-support-link" href="https://grisha-tsvetkov.com" target="_blank" rel="noopener noreferrer">Grisha Tsvetkov</a>.</p></div>
         </div>
 
       </div>
@@ -480,12 +480,20 @@
               </div>
             </div>
           </div>
-          <div class="menu-row">
+          <div class="menu-row cell-size-row">
             <span class="menu-label">HIDE</span>
-            <div class="menu-input-group">
-              <button class="menu-input-btn" id="cellMinus">-</button>
-              <input type="number" class="menu-input menu-input-narrow" id="cellSizeInput" value="1" min="1" max="999" style="width:44px;">
-              <button class="menu-input-btn" id="cellPlus">+</button>
+            <div class="cell-size-control-stack">
+              <div class="menu-input-group">
+                <button class="menu-input-btn" id="cellMinus">-</button>
+                <input type="number" class="menu-input menu-input-narrow" id="cellSizeInput" value="1" min="1" max="999" style="width:44px;">
+                <button class="menu-input-btn" id="cellPlus">+</button>
+              </div>
+              <div class="cell-size-strip" id="cellSizePresets" aria-label="Hide presets">
+                <button type="button" class="menu-chip-btn" data-cell-size="8">8</button>
+                <button type="button" class="menu-chip-btn" data-cell-size="16">16</button>
+                <button type="button" class="menu-chip-btn" data-cell-size="32">32</button>
+                <button type="button" class="menu-chip-btn" data-cell-size="64">64</button>
+              </div>
             </div>
           </div>
           <div class="menu-row">
@@ -940,8 +948,20 @@
             </div>
           </div>
           <div class="menu-row">
-            <span class="menu-label" title="Fade ghost opacity at loop seam to prevent jump cuts">Clean Loop</span>
+            <span class="menu-label" title="Clip wrapped ghost frames at the loop start">Clean Loop</span>
             <div class="menu-toggle-switch" id="toggleChronoCleanLoop"></div>
+          </div>
+          <div class="menu-row">
+            <span class="menu-label" title="Crossfade the end of the loop into the first visible frame state">Seam Blend</span>
+            <div class="menu-toggle-switch" id="toggleChronoSeamBlend"></div>
+          </div>
+          <div class="menu-row" id="chronoSeamLengthRow">
+            <span class="menu-label" title="0 = Auto, based on depth and stride">Seam Frames</span>
+            <div class="menu-input-group">
+              <button class="menu-input-btn" id="chronoSeamLengthMinus">-</button>
+              <input type="number" class="menu-input menu-input-narrow" id="chronoSeamLength" value="0" min="0" max="300">
+              <button class="menu-input-btn" id="chronoSeamLengthPlus">+</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1505,7 +1525,7 @@
           <div class="about-toggle"></div>
         </div>
         <div class="about-content">
-          <div class="about-version">Version v28.12</div>
+          <div class="about-version">Version v28.13</div>
           <div class="about-description">Video frame extraction tool for contact sheets, storyboards, and AI analysis.</div>
           
                     <div class="menu-row" style="margin-bottom: 12px; justify-content: space-between; padding-right: 4px;">
@@ -1542,8 +1562,8 @@
             <div class="hotkey-row"><span class="hotkey">Z</span> Undo (also Ctrl/Cmd+Z)</div>
             <div class="hotkey-row"><span class="hotkey">C</span> Clear Current Target</div>
             <div class="hotkey-row"><span class="hotkey">L</span> Long Stroke</div>
-                        <div class="hotkey-row"><span class="hotkey">↑ / ↓</span> Cycle Direction</div>
-            <div class="hotkey-row"><span class="hotkey">Ctrl/Cmd + ↑ / ↓</span> Cycle Pattern</div>
+                        <div class="hotkey-row"><span class="hotkey">↑ / ↓</span> Cycle Pattern</div>
+            <div class="hotkey-row"><span class="hotkey">Ctrl/Cmd + ↑ / ↓</span> Cycle Direction</div>
             <div class="hotkey-row"><span class="hotkey">Shift + ↑ / ↓</span> Columns (Grid Size)</div>
             <div class="hotkey-row"><span class="hotkey">Ctrl/Cmd + ← / →</span> Hide frames (- / +)</div>
             <div class="hotkey-row"><span class="hotkey">Shift + ← / →</span> Loop Phases (- / +)</div>

@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.12';
+  const APP_VERSION = 'v28.13';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
 
   const EXPORT_CONF = {
@@ -89,7 +89,7 @@ inject();
     // Color Correction
     cc: { enabled: false, brightness: 1.0, contrast: 1.0, saturation: 1.0, hue: 0, invert: false, allLayers: true },
     colorama: { enabled: false, allLayers: true, colorA: '#0a0a2e', colorB: '#ff4400', colorC: '#ffee00', offset: 0, blend: 'normal', opacity: 1.0, speed: 0, cascade: false, cascadeAmt: 1.0 },
-    chronoEnabled: false, chronoBlend: 'darken', chronoDepth: 5, chronoOpacity: 1.0, chronoCascade: false, chronoCascadeMirror: false, chronoCascadeConst: 1, chronoStride: 1, chronoCleanLoop: false,
+    chronoEnabled: false, chronoBlend: 'darken', chronoDepth: 5, chronoOpacity: 1.0, chronoCascade: false, chronoCascadeMirror: false, chronoCascadeConst: 1, chronoStride: 1, chronoCleanLoop: false, chronoSeamBlend: false, chronoSeamLength: 0,
     frameDiffEnabled: false, frameDiffPlateIdx: 0, frameDiffPlateMode: 'static', frameDiffPlateStep: 1, frameDiffPlateLoopN: 8, frameDiffPlateOffset: 0, frameDiffBlend: 'difference', frameDiffOpacity: 1.0,
     frameImgFill: 'empty', // 'empty' or 'edge'
 
@@ -490,6 +490,7 @@ function getTargetFrameOutputDims() {
   // Column +/- buttons
   const colsMinus = $('colsMinus'), colsPlus = $('colsPlus');
   const cellSizeInput = $('cellSizeInput'), cellMinus = $('cellMinus'), cellPlus = $('cellPlus');
+  const cellSizePresets = $('cellSizePresets');
   const toggleSequenceMode = $('toggleSequenceMode');
   if (toggleSequenceMode) {
     toggleSequenceMode.onclick = () => {
@@ -2168,6 +2169,81 @@ function schedulePostGridSync() {
     };
   }
 
+  function smoothstep01(v) {
+    const t = Math.max(0, Math.min(1, Number(v) || 0));
+    return t * t * (3 - 2 * t);
+  }
+
+  function getChronoSeamAutoLength() {
+    const depth = Math.max(1, Math.round(Number(state.chronoDepth) || 3));
+    const stride = Math.max(1, Math.round(Number(state.chronoStride) || 1));
+    return Math.max(1, depth * stride);
+  }
+
+  function getChronoSeamCycleLength(frameCount, dir, mode) {
+    const n = Math.max(1, Math.floor(Number(frameCount) || 1));
+    const viewMode = mode || state.viewMode || 'grid';
+    const loopN = Math.max(0, Math.floor(Number(state.loopAfterN) || 0));
+    if (viewMode !== 'single' && loopN > 0 && loopN < n) return Math.max(1, loopN);
+    return Math.max(1, getAnimDirectionCycleLength(n, dir || state.animDirection));
+  }
+
+  function getChronoSeamLengthForCycle(cycleLength) {
+    const cycle = Math.max(1, Math.floor(Number(cycleLength) || 1));
+    const manual = Math.max(0, Math.round(Number(state.chronoSeamLength) || 0));
+    let len = manual > 0 ? manual : getChronoSeamAutoLength();
+    if (cycle <= 1) return 0;
+    return Math.max(1, Math.min(cycle - 1, len));
+  }
+
+  function getChronoSeamBlendInfo(tick, frameCount, opts = {}) {
+    if (!state.chronoSeamBlend || frameCount <= 1) return { alpha: 0 };
+
+    const dir = opts.dir || state.animDirection;
+    const cycleLength = getChronoSeamCycleLength(frameCount, dir, opts.mode);
+    const seamLength = getChronoSeamLengthForCycle(cycleLength);
+    if (seamLength <= 0) return { alpha: 0, cycleLength, seamLength };
+
+    const rawTick = Number.isFinite(Number(tick)) ? Math.floor(Number(tick)) : 0;
+    const phase = ((rawTick % cycleLength) + cycleLength) % cycleLength;
+    const start = Math.max(0, cycleLength - seamLength);
+    if (phase < start) return { alpha: 0, cycleLength, seamLength, phase };
+
+    const progress = seamLength <= 1 ? 1 : (phase - start) / Math.max(1, seamLength - 1);
+    return {
+      alpha: smoothstep01(progress),
+      cycleLength,
+      seamLength,
+      phase,
+      progress: Math.max(0, Math.min(1, progress))
+    };
+  }
+
+  function getChronoSeamForCell(cellIdx, tick, opts = {}) {
+    const frameCount = Math.max(0, Math.floor(Number(opts.frameCount ?? state.frames.length) || 0));
+    const seam = getChronoSeamBlendInfo(tick, frameCount, opts);
+    if (!seam || seam.alpha <= 0) return seam || { alpha: 0 };
+
+    const targetInfo = getFrameCellInfo(cellIdx, 0, {
+      frameCount,
+      cellCount: opts.cellCount,
+      cellOrderIdx: opts.cellOrderIdx,
+      cellOrderMap: opts.cellOrderMap,
+      cellOrder: opts.cellOrder,
+      shuffle: opts.shuffle || state.animDirShuffle,
+      skipEnsureShuffle: true
+    });
+
+    return {
+      ...seam,
+      targetFrameIdx: targetInfo.frameIdx,
+      targetBaseOffset: targetInfo.baseOffset,
+      targetGhostIndices: state.chronoEnabled
+        ? buildChronoGhostIndices(0, targetInfo.baseOffset, frameCount, opts.dir || state.animDirection, opts.shuffle || state.animDirShuffle)
+        : []
+    };
+  }
+
 function renderGrid() {
     // ── Sync setup ───────────────────────────────────────────────────────────
     invalidateCellCaches();
@@ -2692,6 +2768,16 @@ function fitToSingleFrame() {
     refreshActiveViewLayout();
   }
 
+  function cycleSelectOption(selectId, delta) {
+    const sel = document.getElementById(selectId);
+    if (!sel || !sel.options || sel.options.length <= 0) return false;
+    const count = sel.options.length;
+    sel.selectedIndex = (sel.selectedIndex + delta + count) % count;
+    if (typeof sel.onchange === 'function') sel.onchange();
+    else sel.dispatchEvent(new Event('change'));
+    return true;
+  }
+
   // CONTROLS
   syncGridAspectMode();
   gridColsInput.onchange = () => {
@@ -2704,17 +2790,36 @@ function fitToSingleFrame() {
   };
 
 
+  function syncCellSizePresetUI() {
+    if (!cellSizePresets) return;
+    const cur = Math.max(1, parseInt(cellSizeInput?.value, 10) || state.cellSize || 1);
+    cellSizePresets.querySelectorAll('[data-cell-size]').forEach(btn => {
+      const presetValue = Math.max(1, parseInt(btn.dataset.cellSize, 10) || 1);
+      btn.classList.toggle('active', presetValue === cur);
+    });
+  }
+
+  function applyCellSizeValue(value) {
+    state.cellSize = Math.max(1, Math.min(9999, parseInt(value, 10) || 1));
+    if (cellSizeInput) cellSizeInput.value = state.cellSize;
+    syncCellSizePresetUI();
+    if (state.autoFit && state.frames.length) {
+      const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
+      state.gridCols = calculateOptimalColumns(cellCount);
+      if (gridColsInput) gridColsInput.value = state.gridCols;
+    }
+    updateMetaLayoutInfo();
+    if (state.frames.length) debouncedRenderGrid();
+  }
+
   if (cellSizeInput) {
-    cellSizeInput.onchange = () => {
-      state.cellSize = resolveIntMenuValue(cellSizeInput, state.cellSize || 1, 1, 9999);
-      cellSizeInput.value = state.cellSize;
-      if (state.autoFit && state.frames.length) {
-        const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-        state.gridCols = calculateOptimalColumns(cellCount);
-        if (gridColsInput) gridColsInput.value = state.gridCols;
-      }
-      if (state.frames.length) debouncedRenderGrid();
-    };
+    cellSizeInput.onchange = () => applyCellSizeValue(cellSizeInput.value);
+    syncCellSizePresetUI();
+  }
+  if (cellSizePresets) {
+    cellSizePresets.querySelectorAll('[data-cell-size]').forEach(btn => {
+      btn.onclick = () => applyCellSizeValue(btn.dataset.cellSize);
+    });
   }
 
   const frameTargetInput = $('frameTargetInput');
@@ -2972,12 +3077,19 @@ function fitToSingleFrame() {
   const chronoOpacity = $('chronoOpacity');
   const chronoOpacityNum = $('chronoOpacityNum');
   const toggleChronoCascade = $('toggleChronoCascade');
+  const toggleChronoSeamBlend = $('toggleChronoSeamBlend');
+  const chronoSeamLengthInput = $('chronoSeamLength');
+  const chronoSeamLengthMinus = $('chronoSeamLengthMinus');
+  const chronoSeamLengthPlus = $('chronoSeamLengthPlus');
+  const chronoSeamLengthRow = $('chronoSeamLengthRow');
   // Initialize state from HTML default if needed
   if (state.chronoDepth === undefined) state.chronoDepth = 5;
   if (state.chronoOpacity === undefined) state.chronoOpacity = 1.0;
   if (state.chronoBlend === undefined) state.chronoBlend = 'darken';
   if (state.chronoStride === undefined) state.chronoStride = 1;
   if (state.chronoCleanLoop === undefined) state.chronoCleanLoop = false;
+  if (state.chronoSeamBlend === undefined) state.chronoSeamBlend = false;
+  if (state.chronoSeamLength === undefined) state.chronoSeamLength = 0;
   if (state.frameDiffEnabled === undefined)  state.frameDiffEnabled  = false;
   if (state.frameDiffPlateIdx === undefined) state.frameDiffPlateIdx = 0;
   if (state.frameDiffBlend === undefined)    state.frameDiffBlend    = 'difference';
@@ -3162,8 +3274,15 @@ function fitToSingleFrame() {
   }
 
   const updateChronoUI = () => {
+    syncChronoSeamUI();
     updateAllCells();
   };
+
+  function syncChronoSeamUI() {
+    if (toggleChronoSeamBlend) toggleChronoSeamBlend.classList.toggle('active', !!state.chronoSeamBlend);
+    if (chronoSeamLengthInput) chronoSeamLengthInput.value = Math.max(0, Math.round(Number(state.chronoSeamLength) || 0));
+    if (chronoSeamLengthRow) chronoSeamLengthRow.style.display = state.chronoSeamBlend ? '' : 'none';
+  }
 
   if (toggleChronoCascade) {
     toggleChronoCascade.onclick = () => {
@@ -3241,6 +3360,33 @@ function fitToSingleFrame() {
       updateChronoUI();
     };
   }
+
+  if (toggleChronoSeamBlend) {
+    syncChronoSeamUI();
+    toggleChronoSeamBlend.onclick = () => {
+      state.chronoSeamBlend = !state.chronoSeamBlend;
+      syncChronoSeamUI();
+      updateChronoUI();
+    };
+  }
+
+  function applyChronoSeamLength(value) {
+    const v = Math.max(0, Math.min(300, Math.round(Number(value) || 0)));
+    state.chronoSeamLength = v;
+    if (chronoSeamLengthInput) chronoSeamLengthInput.value = v;
+    updateChronoUI();
+  }
+
+  if (chronoSeamLengthInput) {
+    chronoSeamLengthInput.onchange = () => applyChronoSeamLength(chronoSeamLengthInput.value);
+  }
+  if (chronoSeamLengthMinus) {
+    chronoSeamLengthMinus.onclick = () => applyChronoSeamLength((Number(state.chronoSeamLength) || 0) - 1);
+  }
+  if (chronoSeamLengthPlus) {
+    chronoSeamLengthPlus.onclick = () => applyChronoSeamLength((Number(state.chronoSeamLength) || 0) + 1);
+  }
+  syncChronoSeamUI();
 
   // ── Frame Diff ─────────────────────────────────────────────────────────────
   const toggleFrameDiff      = $('toggleFrameDiff');
@@ -3869,28 +4015,13 @@ function fitToSingleFrame() {
   // HIDE (cell size / subdivision) - combines N frames into 1 cell
   cellMinus.onclick = () => {
     if (state.cellSize > 1) {
-      state.cellSize -= 1;
-      if(cellSizeInput) cellSizeInput.value = state.cellSize;
-      if (state.autoFit && state.frames.length) {
-        const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-        state.gridCols = calculateOptimalColumns(cellCount);
-        gridColsInput.value = state.gridCols;
-      }
-      if (state.frames.length) debouncedRenderGrid();
+      applyCellSizeValue(state.cellSize - 1);
     }
   };
   cellPlus.onclick = () => {
     const maxCellSize = state.frames.length || 1;
     if (state.cellSize < maxCellSize && state.cellSize < 64) {
-      state.cellSize += 1;
-      if(cellSizeInput) cellSizeInput.value = state.cellSize;
-      if (state.autoFit && state.frames.length) {
-        const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-        state.gridCols = calculateOptimalColumns(cellCount);
-        gridColsInput.value = state.gridCols;
-      }
-      updateMetaLayoutInfo();
-      if (state.frames.length) debouncedRenderGrid();
+      applyCellSizeValue(state.cellSize + 1);
     }
   };
   
@@ -4145,6 +4276,93 @@ function fitToSingleFrame() {
     for (let i = slot; i < imgArr.length; i++) imgArr[i].remove();
   }
 
+  function createFrameOverlayImg(className, zIndex) {
+    const img = document.createElement('img');
+    img.className = className;
+    img.setAttribute('nopin', 'nopin');
+    img.setAttribute('data-pin-nopin', 'true');
+    img.setAttribute('data-pin-no-hover', 'true');
+    img.style.position = 'absolute';
+    img.style.inset = '0';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'contain';
+    img.style.pointerEvents = 'none';
+    img.style.zIndex = String(zIndex);
+    return img;
+  }
+
+  function clearSeamBlendForItem(xform) {
+    xform.querySelectorAll('.frame-seam-blend,.frame-seam-chrono').forEach(el => el.remove());
+  }
+
+  function updateSeamBlendForItem(item, seamInfo) {
+    const xform = item.querySelector('.frame-media-xform');
+    if (!xform) return;
+
+    const alpha = seamInfo && Number.isFinite(Number(seamInfo.alpha)) ? Math.max(0, Math.min(1, Number(seamInfo.alpha))) : 0;
+    if (!state.chronoSeamBlend || !state.frames.length || alpha <= 0 || !Number.isFinite(Number(seamInfo && seamInfo.targetFrameIdx))) {
+      clearSeamBlendForItem(xform);
+      return;
+    }
+
+    const frame = state.frames[normalizeFrameIndex(seamInfo.targetFrameIdx, state.frames.length)];
+    if (!frame) {
+      clearSeamBlendForItem(xform);
+      return;
+    }
+
+    let base = xform.querySelector('.frame-seam-blend');
+    if (!base) {
+      base = createFrameOverlayImg('frame-seam-blend', 2);
+      xform.appendChild(base);
+    }
+    if (base.src !== frame.dataUrl) base.src = frame.dataUrl;
+    base.style.display = '';
+    base.style.mixBlendMode = 'normal';
+    base.style.opacity = (alpha * Math.max(0, Math.min(1, Number(state.frameImgOpacity) || 1))).toFixed(3);
+    base.style.filter = (state.cc && state.cc.enabled) ? buildCCFilter() : '';
+
+    const ghostIndices = state.chronoEnabled ? (seamInfo.targetGhostIndices || []) : [];
+    const ghostArr = Array.from(xform.querySelectorAll('.frame-seam-chrono'));
+    let slot = 0;
+    const blendMode = state.chronoBlend || 'screen';
+    const alphaBase = (state.chronoOpacity !== undefined) ? state.chronoOpacity : 1.0;
+    const depth = ghostIndices.length;
+
+    for (let step = 0; step < depth; step++) {
+      const ghostFrameIdx = ghostIndices[step];
+      if (ghostFrameIdx === null) {
+        const img = ghostArr[slot];
+        if (img) { img.style.opacity = '0'; img.style.display = 'none'; }
+        slot++;
+        continue;
+      }
+
+      const ghostFrame = state.frames[normalizeFrameIndex(ghostFrameIdx, state.frames.length)];
+      if (!ghostFrame) { slot++; continue; }
+
+      let finalOpacity = alphaBase;
+      if (state.chronoCascade) finalOpacity = computeCascadeOpacity(step, depth, alphaBase);
+      finalOpacity *= alpha;
+
+      let img = ghostArr[slot];
+      if (!img) {
+        img = createFrameOverlayImg('frame-seam-chrono', 2);
+        xform.appendChild(img);
+        ghostArr.push(img);
+      }
+      if (img.src !== ghostFrame.dataUrl) img.src = ghostFrame.dataUrl;
+      img.style.display = '';
+      img.style.mixBlendMode = blendMode;
+      img.style.opacity = Math.max(0, Math.min(1, finalOpacity)).toFixed(3);
+      img.style.filter = (state.cc && state.cc.enabled) ? buildCCFilter() : '';
+      slot++;
+    }
+
+    for (let i = slot; i < ghostArr.length; i++) ghostArr[i].remove();
+  }
+
   function updateFrameDiffForItem(item) {
     const xform = item.querySelector('.frame-media-xform');
     if (!xform) return;
@@ -4206,7 +4424,7 @@ function fitToSingleFrame() {
     const applyToLayers = ca && ca.enabled;
     const filterId = (ca && ca.enabled) ? coloramaFilterId(cellIdx) : '';
 
-    xform.querySelectorAll('.frame-chrono').forEach(img => {
+    xform.querySelectorAll('.frame-chrono,.frame-seam-blend,.frame-seam-chrono').forEach(img => {
       const ccf = buildCCFilter();
       const base = ccf === 'none' ? '' : ccf;
       const caf = (applyToLayers && filterId) ? ' url(#' + filterId + ')' : '';
@@ -4467,6 +4685,16 @@ function updateAllCells() {
         ? buildChronoGhostIndices(tick, baseOffset, frameCount, dir, shuffle)
         : [];
       updateChronoForItem(item, _ghostIndices);
+      const _seamInfo = getChronoSeamForCell(cellIdx, tick, {
+        frameCount,
+        cellCount: totalCells,
+        cellOrderIdx,
+        shuffle,
+        dir,
+        mode: state.viewMode,
+        skipEnsureShuffle: true
+      });
+      updateSeamBlendForItem(item, _seamInfo);
       updateFrameDiffForItem(item);
       updateColoramaForItem(item, cellIdx);
 
@@ -8984,7 +9212,7 @@ async function exportResampledVideo(forceMode = null) {
       if (mode === 'grid') renderMp4GridFrame(ectx, canvasW, canvasH, frameImages, tick, cellOrder, rows, frameAspect, r, g, b, layout, drawingsOnly);
       else {
         const frameIdx = sequence[tick] ?? 0;
-        renderMp4SingleFrame(ectx, canvasW, canvasH, frameImages, frameIdx, r, g, b, layout, drawingsOnly);
+        renderMp4SingleFrame(ectx, canvasW, canvasH, frameImages, frameIdx, r, g, b, layout, drawingsOnly, tick);
       }
 
       requestAnimationFrame(drawFrame);
@@ -9261,7 +9489,7 @@ Alternatively, use PNG sequence export.`);
       } else {
         ensureAnimDirShuffle(frameCount);
         const singleFrameIdx = resolveDirectionFrame(tick, 0, frameCount, state.animDirection, state.animDirShuffle);
-        renderMp4SingleFrame(ctx, canvasW, canvasH, frameImages, singleFrameIdx, r, g, b, layout, drawingsOnly);
+        renderMp4SingleFrame(ctx, canvasW, canvasH, frameImages, singleFrameIdx, r, g, b, layout, drawingsOnly, tick);
       }
       const videoFrame = new VideoFrame(canvas, { timestamp: tick * frameDuration, duration: frameDuration });
       encoder.encode(videoFrame, { keyFrame: tick % 30 === 0 });
@@ -9357,6 +9585,16 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
         drawChronophotoStack(ctx, _gIdx, x, y, cellDrawW, cellDrawH);
         drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, frameImages);
         applyColoramaToCanvas(ctx, x, y, cellDrawW, cellDrawH, img, coloramaFilterId(c));
+        const _seamInfo = getChronoSeamForCell(c, tick, {
+          frameCount,
+          cellCount,
+          cellOrderIdx: cellOrderMap.get(c),
+          shuffle: window._fgState.animDirShuffle,
+          dir: _st.animDirection,
+          mode: 'grid',
+          skipEnsureShuffle: true
+        });
+        drawChronoSeamBlend(ctx, _seamInfo, x, y, cellDrawW, cellDrawH, frameImages, coloramaFilterId(c));
       }
       _cells.push({ c, uiC, x, y, frameW: cellDrawW, frameH: cellDrawH, animFrameIdx, frame });
     }
@@ -9854,13 +10092,17 @@ function buildChronoGhostIndicesRaw(tick, baseOffset, frameCount, dir, shuffle, 
 }
 
 
-function drawChronophotoStack(ctx, ghostIndices, x, y, w, h) {
+function drawChronophotoStack(ctx, ghostIndices, x, y, w, h, opts = {}) {
   if (!window._fgState.chronoEnabled || !window._fgState.frames.length) return;
   if (!ghostIndices || !ghostIndices.length) return;
 
   const blendMode = window._fgState.chronoBlend  || 'screen';
   const alphaBase = (window._fgState.chronoOpacity !== undefined) ? window._fgState.chronoOpacity : 1.0;
+  const opacityScale = Number.isFinite(Number(opts.opacityScale)) ? Math.max(0, Math.min(1, Number(opts.opacityScale))) : 1;
+  if (opacityScale <= 0) return;
   const depth     = ghostIndices.length;
+  const frameImages = opts.frameImages || null;
+  const filterId = opts.filterId || 'fgColorama';
 
   ctx.save();
   ctx.globalCompositeOperation = blendMode;
@@ -9872,18 +10114,20 @@ function drawChronophotoStack(ctx, ghostIndices, x, y, w, h) {
     const frame = window._fgState.frames[ghostFrameIdx];
     if (!frame) continue;
 
-    const src = getFrameDataUrl(frame);
-    if (!src) continue;
-
-    const img = frame.img || (frame.img = new Image());
-    if (img.src !== src) img.src = src;
-    if (!img.naturalWidth) continue;
+    let img = frameImages && frameImages[ghostFrameIdx] ? frameImages[ghostFrameIdx] : null;
+    if (!img) {
+      const src = getFrameDataUrl(frame);
+      if (!src) continue;
+      img = frame.img || (frame.img = new Image());
+      if (img.src !== src) img.src = src;
+    }
+    if (!img.naturalWidth && !img.videoWidth && !img.width) continue;
 
     let finalOpacity = alphaBase;
     if (window._fgState.chronoCascade) {
       finalOpacity = computeCascadeOpacity(step, depth, alphaBase);
     }
-    ctx.globalAlpha = finalOpacity;
+    ctx.globalAlpha = finalOpacity * opacityScale;
 
     const _st = window._fgState;
     const sx = _st.frameImgScaleX !== undefined ? Number(_st.frameImgScaleX) : (Number(_st.frameImgScale) || 1);
@@ -9906,7 +10150,7 @@ function drawChronophotoStack(ctx, ghostIndices, x, y, w, h) {
     ctx.rotate((Number(_st.frameImgRot) || 0) * Math.PI / 180);
 
     const _ccf3 = (_st.cc && _st.cc.enabled) ? buildCCFilter() : 'none';
-    const _caf3 = (_st.colorama && _st.colorama.enabled) ? ' url(#fgColorama)' : '';
+    const _caf3 = (_st.colorama && _st.colorama.enabled) ? ' url(#' + filterId + ')' : '';
     ctx.filter = (_ccf3 === 'none' && !_caf3) ? 'none' : (_ccf3 === 'none' ? _caf3.trim() : _ccf3 + _caf3);
     ctx.drawImage(img, -dw/2, -dh/2, dw, dh);
     ctx.filter = 'none';
@@ -10029,6 +10273,94 @@ function drawFrameCell(ctx, img, x, y, w, h) {
     ctx.restore();
   }
 
+function getFrameImageForCanvas(frameIdx, frameImages) {
+    const n = window._fgState.frames.length;
+    if (!n) return null;
+    const idx = normalizeFrameIndex(frameIdx, n);
+    if (frameImages && frameImages[idx]) return frameImages[idx];
+    const frame = window._fgState.frames[idx];
+    if (!frame) return null;
+    const src = getFrameDataUrl(frame);
+    if (!src) return null;
+    const img = frame.img || (frame.img = new Image());
+    if (img.src !== src) img.src = src;
+    return img;
+  }
+
+function drawFrameImageOverlay(ctx, img, x, y, w, h, alpha = 1, filterId = 'fgColorama') {
+    if (!img || alpha <= 0) return;
+
+    let srcW = 0;
+    let srcH = 0;
+    if (img.videoWidth && img.videoHeight) {
+      srcW = img.videoWidth;
+      srcH = img.videoHeight;
+    } else if (img.naturalWidth && img.naturalHeight) {
+      srcW = img.naturalWidth;
+      srcH = img.naturalHeight;
+    } else if (img.width && img.height) {
+      srcW = img.width;
+      srcH = img.height;
+    } else {
+      srcW = Number(window._fgState.videoWidth) || 1;
+      srcH = Number(window._fgState.videoHeight) || 1;
+    }
+
+    srcW = Math.max(1, Number(srcW) || 1);
+    srcH = Math.max(1, Number(srcH) || 1);
+
+    const sx = window._fgState.frameImgScaleX !== undefined ? Number(window._fgState.frameImgScaleX) : (Number(window._fgState.frameImgScale) || 1);
+    const sy = window._fgState.frameImgScaleY !== undefined ? Number(window._fgState.frameImgScaleY) : (Number(window._fgState.frameImgScale) || 1);
+    const ox = (Number(window._fgState.frameImgOffX) || 0) * 0.01 * w;
+    const oy = (Number(window._fgState.frameImgOffY) || 0) * 0.01 * h;
+
+    const contain = Math.min(w / srcW, h / srcH);
+    const dw = srcW * contain * sx;
+    const dh = srcH * contain * sy;
+    const dx = x + (w - dw) / 2 + ox;
+    const dy = y + (h - dh) / 2 + oy;
+
+    const frameOpacity = window._fgState.frameImgOpacity !== undefined ? Number(window._fgState.frameImgOpacity) : 1;
+    const drawAlpha = Math.max(0, Math.min(1, alpha * Math.max(0, Math.min(1, frameOpacity))));
+    if (drawAlpha <= 0) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = drawAlpha;
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.translate(dx + dw / 2, dy + dh / 2);
+    ctx.rotate((Number(window._fgState.frameImgRot) || 0) * Math.PI / 180);
+
+    const st = window._fgState;
+    const ccf = buildCCFilter();
+    const caf = (st.colorama && st.colorama.enabled) ? ' url(#' + (filterId || 'fgColorama') + ')' : '';
+    ctx.filter = (ccf === 'none' && !caf) ? 'none' : (ccf === 'none' ? caf.trim() : ccf + caf);
+    ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    ctx.filter = 'none';
+    ctx.restore();
+  }
+
+function drawChronoSeamBlend(ctx, seamInfo, x, y, w, h, frameImages = null, filterId = 'fgColorama') {
+    if (!window._fgState.chronoSeamBlend || !seamInfo) return;
+    const alpha = Number.isFinite(Number(seamInfo.alpha)) ? Math.max(0, Math.min(1, Number(seamInfo.alpha))) : 0;
+    if (alpha <= 0) return;
+
+    const baseImg = getFrameImageForCanvas(seamInfo.targetFrameIdx, frameImages);
+    if (baseImg && (baseImg.naturalWidth || baseImg.videoWidth || baseImg.width)) {
+      drawFrameImageOverlay(ctx, baseImg, x, y, w, h, alpha, filterId);
+    }
+
+    if (window._fgState.chronoEnabled && seamInfo.targetGhostIndices && seamInfo.targetGhostIndices.length) {
+      drawChronophotoStack(ctx, seamInfo.targetGhostIndices, x, y, w, h, {
+        opacityScale: alpha,
+        frameImages,
+        filterId
+      });
+    }
+  }
+
   function drawExportRefFrame(ctx, x, y, w, h) {
     if (!state.refFrameSource) return;
     if (!state.refFrameVisible) return;
@@ -10114,6 +10446,17 @@ function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout,
       drawChronophotoStack(ctx, _gIdx2, innerX, innerY, innerW, innerH);
       drawFrameDiffStack(ctx, innerX, innerY, innerW, innerH, frameImages);
       applyColoramaToCanvas(ctx, innerX, innerY, innerW, innerH, img, coloramaFilterId(0));
+      const _singleTick = animTick !== null ? animTick : frameIdx;
+      const _seamInfoSingle = getChronoSeamForCell(0, _singleTick, {
+        frameCount,
+        cellCount: 1,
+        cellOrderIdx: 0,
+        shuffle: window._fgState.animDirShuffle,
+        dir: window._fgState.animDirection,
+        mode: 'single',
+        skipEnsureShuffle: true
+      });
+      drawChronoSeamBlend(ctx, _seamInfoSingle, innerX, innerY, innerW, innerH, frameImages, coloramaFilterId(0));
     }
 
     if (window._fgState.refFrameAboveDrawings) {
@@ -10437,6 +10780,7 @@ async function exportPngSeqDrawings() {
         }
       }
     }
+    ensureAnimDirShuffle(frameCount);
 
     for (let i = 0; i < frameCount; i++) {
       tmpCtx.clearRect(0, 0, outW, outH);
@@ -10462,6 +10806,18 @@ async function exportPngSeqDrawings() {
           // If drawImage fails (rare on iOS), leave frame blank.
         }
       }
+
+      const _seamInfoPng = getChronoSeamForCell(0, i, {
+        frameCount,
+        cellCount: 1,
+        cellOrderIdx: 0,
+        shuffle: state.animDirShuffle,
+        dir: state.animDirection,
+        mode: 'single',
+        skipEnsureShuffle: true
+      });
+      await ensureChronoSeamBlendImagesReady(_seamInfoPng);
+      drawChronoSeamBlend(tmpCtx, _seamInfoPng, 0, 0, outW, outH, null, coloramaFilterId(0));
 
       // Optional drawings overlay (composited)
       if (state.exportDrawings && !splitAlpha) {
@@ -11121,6 +11477,10 @@ const canvas = document.createElement('canvas');
   const offset = 0;
   const __exportCells = [];
   const previewItems = framesGrid ? framesGrid.querySelectorAll('.frame-item') : null;
+  const stillCellOrder = generateCellOrder(cellCount, state.gridCols);
+  const stillCellOrderMap = new Map();
+  stillCellOrder.forEach((cell, idx) => stillCellOrderMap.set(cell, idx));
+  ensureAnimDirShuffle(state.frames.length);
 
   // Pre-load Frame Diff plate image
   if (state.frameDiffEnabled && state.frames.length) {
@@ -11159,6 +11519,14 @@ const canvas = document.createElement('canvas');
     }
 
     const cellIdx = i - offset;
+    const cellOrderIdx = stillCellOrderMap.get(cellIdx);
+    const stillCellInfo = getFrameCellInfo(cellIdx, state.currentTick, {
+      frameCount: state.frames.length,
+      cellCount,
+      cellOrderIdx,
+      shuffle: state.animDirShuffle,
+      skipEnsureShuffle: true
+    });
 
     // WYSIWYG export: take the currently displayed frame per cell when possible
     let frameIdx = NaN;
@@ -11170,7 +11538,7 @@ const canvas = document.createElement('canvas');
 
     // Fallback: exact match to UI preview distribution
     if (!Number.isFinite(frameIdx)) {
-      frameIdx = getFrameCellInfo(cellIdx, state.currentTick, { cellCount }).frameIdx;
+      frameIdx = stillCellInfo.frameIdx;
     }
 
     frameIdx = normalizeFrameIndex(frameIdx, state.frames.length);
@@ -11188,9 +11556,22 @@ const canvas = document.createElement('canvas');
       }
       if (img.naturalWidth) {
         drawFrameCell(ctx, img, x, y, cellDrawW, cellDrawH);
-        const _gIdx2 = buildChronoGhostIndicesStill(frameIdx, window._fgState.frames.length);
+        const _gIdx2 = state.chronoEnabled
+          ? buildChronoGhostIndices(state.currentTick, stillCellInfo.baseOffset, state.frames.length, state.animDirection, state.animDirShuffle)
+          : [];
         drawChronophotoStack(ctx, _gIdx2, x, y, cellDrawW, cellDrawH);
         drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, null);
+        const _seamInfoStill = getChronoSeamForCell(cellIdx, state.currentTick, {
+          frameCount: state.frames.length,
+          cellCount,
+          cellOrderIdx,
+          shuffle: state.animDirShuffle,
+          dir: state.animDirection,
+          mode: 'grid',
+          skipEnsureShuffle: true
+        });
+        await ensureChronoSeamBlendImagesReady(_seamInfoStill);
+        drawChronoSeamBlend(ctx, _seamInfoStill, x, y, cellDrawW, cellDrawH, null, coloramaFilterId(cellIdx));
       } else {
         // Best-effort: draw placeholder
         ctx.fillStyle = '#111';
@@ -11354,6 +11735,30 @@ const canvas = document.createElement('canvas');
     });
   }
 
+  async function ensureChronoSeamBlendImagesReady(seamInfo) {
+    if (!seamInfo || !seamInfo.alpha || seamInfo.alpha <= 0 || !state.frames.length) return;
+    const ids = [seamInfo.targetFrameIdx];
+    if (state.chronoEnabled && Array.isArray(seamInfo.targetGhostIndices)) {
+      seamInfo.targetGhostIndices.forEach(idx => {
+        if (idx !== null && Number.isFinite(Number(idx))) ids.push(idx);
+      });
+    }
+
+    const seen = new Set();
+    for (const rawIdx of ids) {
+      const idx = normalizeFrameIndex(rawIdx, state.frames.length);
+      if (seen.has(idx)) continue;
+      seen.add(idx);
+      const frame = state.frames[idx];
+      if (!frame) continue;
+      const src = getFrameDataUrl(frame);
+      if (!src) continue;
+      const img = frame.img || (frame.img = new Image());
+      if (img.src !== src) img.src = src;
+      await ensureImageReady(img);
+    }
+  }
+
   function formatTime(s) { return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
 
   // Export current frame (Single) as still image (PNG/JPEG)
@@ -11473,9 +11878,30 @@ const canvas = document.createElement('canvas');
       }
       if (img.naturalWidth) {
         drawFrameCell(ctx, img, dx, dy, frameW, frameH);
-        const _gIdx2 = buildChronoGhostIndicesStill(frameIdx, window._fgState.frames.length);
+        ensureAnimDirShuffle(state.frames.length);
+        const _singleStillInfo = getFrameCellInfo(0, state.currentTick, {
+          frameCount: state.frames.length,
+          cellCount: 1,
+          cellOrderIdx: 0,
+          shuffle: state.animDirShuffle,
+          skipEnsureShuffle: true
+        });
+        const _gIdx2 = state.chronoEnabled
+          ? buildChronoGhostIndices(state.currentTick, _singleStillInfo.baseOffset, state.frames.length, state.animDirection, state.animDirShuffle)
+          : [];
         drawChronophotoStack(ctx, _gIdx2, dx, dy, frameW, frameH);
         drawFrameDiffStack(ctx, dx, dy, frameW, frameH, null);
+        const _seamInfoSingleStill = getChronoSeamForCell(0, state.currentTick, {
+          frameCount: state.frames.length,
+          cellCount: 1,
+          cellOrderIdx: 0,
+          shuffle: state.animDirShuffle,
+          dir: state.animDirection,
+          mode: 'single',
+          skipEnsureShuffle: true
+        });
+        await ensureChronoSeamBlendImagesReady(_seamInfoSingleStill);
+        drawChronoSeamBlend(ctx, _seamInfoSingleStill, dx, dy, frameW, frameH, null, coloramaFilterId(0));
       } else {
         ctx.fillStyle = '#111';
         ctx.fillRect(dx, dy, frameW, frameH);
@@ -11849,25 +12275,14 @@ window.addEventListener('keydown', (e) => {
       }
       if (code === 'ArrowUp') {
          e.preventDefault();
-         // Ctrl/Cmd + Up = Cycle Pattern Prev (up = go back in list)
-         const sel = document.getElementById('animPattern');
-         if (sel && sel.options.length > 0) {
-            let idx = sel.selectedIndex - 1;
-            if (idx < 0) idx = sel.options.length - 1;
-            sel.selectedIndex = idx;
-            sel.onchange();
-         }
+         // Ctrl/Cmd + Up = Cycle Direction Prev
+         cycleSelectOption('animDirection', -1);
          return;
       }
       if (code === 'ArrowDown') {
          e.preventDefault();
-         // Ctrl/Cmd + Down = Cycle Pattern Next (down = forward in list)
-         const sel = document.getElementById('animPattern');
-         if (sel && sel.options.length > 0) {
-            let idx = (sel.selectedIndex + 1) % sel.options.length;
-            sel.selectedIndex = idx;
-            sel.onchange();
-         }
+         // Ctrl/Cmd + Down = Cycle Direction Next
+         cycleSelectOption('animDirection', 1);
          return;
       }
       if (code === 'ArrowLeft') {
@@ -12026,14 +12441,8 @@ window.addEventListener('keydown', (e) => {
         // Shift+ArrowUp: Plus columns
         const btn = document.getElementById('colsPlus'); if (btn) btn.click();
       } else {
-        // ArrowUp: Cycle Direction Prev
-        const sel = document.getElementById('animDirection');
-        if (sel && sel.options.length > 0) {
-           let idx = sel.selectedIndex - 1;
-           if (idx < 0) idx = sel.options.length - 1;
-           sel.selectedIndex = idx;
-           sel.onchange();
-        }
+        // ArrowUp: Cycle Pattern Prev
+        cycleSelectOption('animPattern', -1);
       }
     }
     else if (code === 'ArrowDown') {
@@ -12042,13 +12451,8 @@ window.addEventListener('keydown', (e) => {
         // Shift+ArrowDown: Minus columns
         const btn = document.getElementById('colsMinus'); if (btn) btn.click();
       } else {
-        // ArrowDown: Cycle Direction Next
-        const sel = document.getElementById('animDirection');
-        if (sel && sel.options.length > 0) {
-           let idx = (sel.selectedIndex + 1) % sel.options.length;
-           sel.selectedIndex = idx;
-           sel.onchange();
-        }
+        // ArrowDown: Cycle Pattern Next
+        cycleSelectOption('animPattern', 1);
       }
     }
     else if (code === 'ArrowLeft') { 
