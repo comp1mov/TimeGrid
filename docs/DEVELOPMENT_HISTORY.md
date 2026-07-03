@@ -198,3 +198,23 @@ Changed the timecode overlay from one long inline label into a vertical stack.
 - `Top` stacks downward, `Center` centers the full stack, and `Bottom` keeps the stack bottom-anchored.
 - Preview updates use DOM line spans, while export draws the same lines manually on canvas.
 - Caption labels now use italic `JetBrains Mono` with heavier weight for a more styled look.
+
+## 2026-07-04 Custom frame selection and slice layout v28.19
+
+Added a manual `Custom Frames` mode to Frame Selection.
+
+- Switching into `Custom Frames` seeds a textarea from the currently generated/selected frame numbers.
+- Custom frame numbers are entered as 1-based UI values and converted to internal 0-based indices only for capture.
+- The parser accepts comma, space, and newline separated values, then clamps them to the active Start/End frame range.
+- Custom mode uses the normal generated `state.frames` pipeline, so preview and export keep the same downstream model.
+- Image `Slice` now defaults preview columns to `cutCols`, preserving the sliced source layout instead of auto-fitting to another column count.
+- Added `docs/BACKLOG.md` as the working inbox for future feature ideas before they move into implementation or history.
+
+## 2026-07-04 Timecode font panel v28.19
+
+Added a compact font settings panel to the Timecode menu.
+
+- A `T` button now sits next to `Text` and `BG`.
+- The panel offers mono italic, mono, sans, and serif italic presets.
+- Regular/italic and weight controls update the live preview.
+- Canvas export uses the same resolved font config as preview.

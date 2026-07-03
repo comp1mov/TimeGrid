@@ -7,10 +7,17 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.18';
+  const APP_VERSION = 'v28.19';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+  const SERIF_FONT_FAMILY = '"Instrument Serif", Georgia, "Times New Roman", serif';
+  const TIMECODE_FONT_PRESETS = {
+    monoItalic: { family: TIMECODE_FONT_FAMILY, style: 'italic', weight: 600 },
+    mono: { family: TIMECODE_FONT_FAMILY, style: 'normal', weight: 600 },
+    sans: { family: UI_FONT_FAMILY, style: 'normal', weight: 600 },
+    serifItalic: { family: SERIF_FONT_FAMILY, style: 'italic', weight: 500 }
+  };
 
   const EXPORT_CONF = {
     RES: { low: 540, medium: 720, hd: 1080, high: 2160, max: Infinity },
@@ -64,6 +71,7 @@ inject();
     imageFiles: [],
     videoWidth: 0, videoHeight: 0, videoFps: 30, videoDate: null,
     frames: [], frameCount: 24,
+    customFrameList: '',
     sceneCount: 5,
     sceneDepth: 8,
     sceneDistance: 1, gridCols: 6,
@@ -84,6 +92,7 @@ inject();
 
     fontSize: 10, spacing: 0, sequenceMode: false,
     tcTextColor: '#ffffff', tcBgColor: '#000000', tcOpacity: 0.7,
+    tcFontPreset: 'monoItalic', tcFontStyle: 'italic', tcFontWeight: 600,
     tcAlign: 'center', tcPosition: 'center', tcPadding: 0, tcMargin: 0,
     // Frame image transform inside each cell (preview + export)
     frameImgScale: 1.02, frameImgScaleX: 1.02, frameImgScaleY: 1.02, frameImgScaleLink: true,
@@ -260,6 +269,7 @@ function getTargetFrameOutputDims() {
 
   const gridColsInput = $('gridCols'), canvasAspectSelect = $('canvasAspect');
   const selectionModeSelect = $('selectionMode'), frameCountInput = $('frameCount');
+  const customFramesInput = $('customFramesInput'), customFramesCount = $('customFramesCount');
   const countMinus = $('countMinus'), countPlus = $('countPlus');
   const intervalValueInput = $('intervalValue'), qualitySelect = $('qualitySelect');
   const sceneCountInput = $('sceneCountInput'), sceneDepthInput = $('sceneDepthInput'), sceneDistanceInput = $('sceneDistanceInput');
@@ -549,6 +559,8 @@ function getTargetFrameOutputDims() {
   const tcTextColorInput = $('tcTextColor'), tcBgColorInput = $('tcBgColor');
   const tcOpacitySlider = $('tcOpacitySlider'), tcOpacityValue = $('tcOpacityValue');
   const tcAlignSelect = $('tcAlign'), tcPositionSelect = $('tcPosition');
+  const tcFontBtn = $('tcFontBtn'), tcFontPanel = $('tcFontPanel');
+  const tcFontPresetGroup = $('tcFontPresetGroup'), tcFontStyleGroup = $('tcFontStyleGroup'), tcFontWeightGroup = $('tcFontWeightGroup');
 
   // Draw (spray) tuning inside Display & Style
   const sprayScatterSlider = $('sprayScatterSlider'), sprayScatterValue = $('sprayScatterValue');
@@ -949,6 +961,54 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
     if (endFrameInput) endFrameInput.value = String(Math.max(1, (Number(state.endFrame) || 0) + 1));
   }
 
+  function parseCustomFrameNumbers(raw = state.customFrameList) {
+    const maxFrame = getMaxFrameIndex();
+    const start = Math.max(0, Math.floor(Number(state.startFrame) || 0));
+    const end = Math.max(start, Math.min(maxFrame, Math.floor(Number(state.endFrame) || maxFrame)));
+    return String(raw || '')
+      .split(/[^0-9]+/g)
+      .map(part => parseInt(part, 10))
+      .filter(Number.isFinite)
+      .map(n => Math.max(start, Math.min(end, n - 1)));
+  }
+
+  function updateCustomFrameCount() {
+    if (!customFramesCount) return;
+    const n = parseCustomFrameNumbers().length;
+    customFramesCount.textContent = `${n} frame${n === 1 ? '' : 's'}`;
+  }
+
+  function makeCurrentFrameNumberList(modeForSnapshot = state.selectionMode) {
+    if (state.frames && state.frames.length) {
+      return state.frames
+        .map(frame => Math.max(1, Math.floor(Number(frame && frame.frameNumber) || 0) + 1))
+        .join('\n');
+    }
+    if (state.videoDuration > 0) {
+      const curMode = state.selectionMode;
+      state.selectionMode = modeForSnapshot || 'count';
+      const out = calculateFrameTimes().map(time => Math.max(1, Math.floor(time * Math.max(1, state.videoFps || 1)) + 1));
+      state.selectionMode = curMode;
+      if (out.length) return out.join('\n');
+    }
+    const n = Math.max(1, Math.min(Math.floor(Number(state.frameCount) || 24), 3000));
+    const start = Math.max(0, Math.floor(Number(state.startFrame) || 0));
+    const end = Math.max(start, Math.floor(Number(state.endFrame) || start));
+    const out = [];
+    if (n <= 1) out.push(start + 1);
+    else for (let i = 0; i < n; i++) out.push(Math.round(start + ((end - start) / (n - 1)) * i) + 1);
+    return out.join('\n');
+  }
+
+  function seedCustomFrameListFromCurrentSelection(modeForSnapshot) {
+    const list = makeCurrentFrameNumberList(modeForSnapshot);
+    state.customFrameList = list;
+    if (customFramesInput) customFramesInput.value = list;
+    state.frameCount = parseCustomFrameNumbers(list).length || state.frameCount;
+    if (frameCountInput) frameCountInput.value = state.frameCount;
+    updateCustomFrameCount();
+  }
+
   function isFullVideoRange() {
     if (state.isSingleImage) return false;
     const maxFrame = getMaxFrameIndex();
@@ -1169,7 +1229,7 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
 
       if (state.autoFit) {
         const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-        state.gridCols = calculateOptimalColumns(cellCount);
+        state.gridCols = state.imageImportMode === 'cut' ? cols : calculateOptimalColumns(cellCount);
         gridColsInput.value = state.gridCols;
       }
 
@@ -1283,6 +1343,12 @@ for (let i = 0; i < times.length; i++) {
       const ct = clamp(t);
       if (!times.length || Math.abs(times[times.length - 1] - ct) > (0.25 / fps)) times.push(ct);
     };
+
+    if (state.selectionMode === 'custom') {
+      const customFrames = parseCustomFrameNumbers().slice(0, max);
+      customFrames.forEach(frameIdx => times.push(clamp(frameIdx / fps)));
+      return times;
+    }
 
     if (!includeEdges) {
       if (state.selectionMode === 'count') {
@@ -1398,6 +1464,10 @@ for (let i = 0; i < times.length; i++) {
     let _estFrameCount = state.frameCount || 1;
     if (state.selectionMode === 'scene') {
       _estFrameCount = Math.max(1, (state.sceneCount || 5) * (state.sceneDepth || 8));
+    } else if (state.selectionMode === 'custom') {
+      _estFrameCount = Math.max(1, parseCustomFrameNumbers().length || 1);
+    } else if (state.selectionMode === 'slice') {
+      _estFrameCount = Math.max(1, getCutTotal());
     }
     const sourceFrames = Math.max(1, state.frames.length || _estFrameCount);
     const visibleCells = getVisibleGridCellCount();
@@ -1673,6 +1743,18 @@ function updateInfoPanel() {
     });
   }
 
+  function getTimecodeFontConfig() {
+    const preset = TIMECODE_FONT_PRESETS[state.tcFontPreset] || TIMECODE_FONT_PRESETS.monoItalic;
+    const style = (state.tcFontStyle === 'normal' || state.tcFontStyle === 'italic') ? state.tcFontStyle : preset.style;
+    const weight = Math.max(400, Math.min(700, Math.round(Number(state.tcFontWeight) || preset.weight || 600)));
+    return { family: preset.family, style, weight };
+  }
+
+  function getTimecodeCanvasFont(fontSize) {
+    const cfg = getTimecodeFontConfig();
+    return `${cfg.style} ${cfg.weight} ${fontSize}px ${cfg.family}`;
+  }
+
   // Draw a timecode overlay on a canvas export (PNG/JPEG/MP4) using the same visual logic as the UI.
   function drawTimecodeOverlay(ctx, x, y, w, h, frame, derivedIndex, totalFrames, frameIdx, opts = {}) {
     try {
@@ -1692,7 +1774,7 @@ function updateInfoPanel() {
       const margin = Math.max(0, Math.round((Number(state.tcMargin) || 0) * scale));
 
       ctx.save();
-      ctx.font = `italic 600 ${fontSize}px ${TIMECODE_FONT_FAMILY}`;
+      ctx.font = getTimecodeCanvasFont(fontSize);
       ctx.textBaseline = 'top';
 
       const maxBoxW = Math.max(1, w - margin * 2);
@@ -1765,6 +1847,13 @@ function updateInfoPanel() {
     const b = parseInt(state.tcBgColor.slice(5,7), 16);
     framesGrid.style.setProperty('--tc-bg-color', `rgba(${r},${g},${b},${state.tcOpacity})`);
     framesGrid.style.setProperty('--tc-text-color', state.tcTextColor);
+    const font = getTimecodeFontConfig();
+    document.documentElement.style.setProperty('--tc-font-family', font.family);
+    document.documentElement.style.setProperty('--tc-font-style', font.style);
+    document.documentElement.style.setProperty('--tc-font-weight', String(font.weight));
+    framesGrid.style.setProperty('--tc-font-family', font.family);
+    framesGrid.style.setProperty('--tc-font-style', font.style);
+    framesGrid.style.setProperty('--tc-font-weight', String(font.weight));
     const p = state.tcPadding || 0;
     const m = state.tcMargin || 0;
     framesGrid.style.setProperty('--tc-padding', `${p}px ${Math.round(p * 1.5)}px`);
@@ -2993,6 +3082,10 @@ function fitToSingleFrame() {
     const prev = state.selectionMode;
     state.selectionMode = selectionModeSelect.value;
 
+    if (state.selectionMode === 'custom' && prev !== 'custom') {
+      seedCustomFrameListFromCurrentSelection(prev);
+    }
+
     // Smart conversion when switching to/from scene mode
     if (state.selectionMode === 'scene' && prev === 'count') {
       // frames → scene: find optimal sceneCount + sceneDepth
@@ -3015,6 +3108,17 @@ function fitToSingleFrame() {
 
     updateIntervalUI(); markRegenPending();
   };
+
+  if (customFramesInput) {
+    customFramesInput.oninput = () => {
+      state.customFrameList = customFramesInput.value;
+      state.frameCount = parseCustomFrameNumbers().length || state.frameCount;
+      if (frameCountInput) frameCountInput.value = state.frameCount;
+      updateCustomFrameCount();
+      updateGridHint();
+      markRegenPending();
+    };
+  }
 
   if (sceneCountInput) {
     const syncScene = () => {
@@ -3058,18 +3162,19 @@ function fitToSingleFrame() {
   const frameStep = 10;
   if (startFrameInput) startFrameInput.min = '1';
   if (endFrameInput) endFrameInput.min = '1';
-  startMinus.onclick = () => { state.startFrame = Math.max(0, state.startFrame - frameStep); syncFrameRangeInputs();   markRegenPending();
+  startMinus.onclick = () => { state.startFrame = Math.max(0, state.startFrame - frameStep); syncFrameRangeInputs(); if (state.selectionMode === 'custom') updateCustomFrameCount();   markRegenPending();
   };
-  startPlus.onclick = () => { state.startFrame = Math.min(state.endFrame - 1, state.startFrame + frameStep); syncFrameRangeInputs();   markRegenPending();
+  startPlus.onclick = () => { state.startFrame = Math.min(state.endFrame - 1, state.startFrame + frameStep); syncFrameRangeInputs(); if (state.selectionMode === 'custom') updateCustomFrameCount();   markRegenPending();
   };
-  endMinus.onclick = () => { state.endFrame = Math.max(state.startFrame + 1, state.endFrame - frameStep); syncFrameRangeInputs();   markRegenPending();
+  endMinus.onclick = () => { state.endFrame = Math.max(state.startFrame + 1, state.endFrame - frameStep); syncFrameRangeInputs(); if (state.selectionMode === 'custom') updateCustomFrameCount();   markRegenPending();
   };
-  endPlus.onclick = () => { const maxFrame = getMaxFrameIndex(); state.endFrame = Math.min(maxFrame, state.endFrame + frameStep); syncFrameRangeInputs();   markRegenPending();
+  endPlus.onclick = () => { const maxFrame = getMaxFrameIndex(); state.endFrame = Math.min(maxFrame, state.endFrame + frameStep); syncFrameRangeInputs(); if (state.selectionMode === 'custom') updateCustomFrameCount();   markRegenPending();
   };
   startFrameInput.onchange = () => {
     const startUser = resolveIntMenuValue(startFrameInput, (state.startFrame || 0) + 1, 1, Math.max(1, state.endFrame || 1));
     state.startFrame = Math.max(0, Math.min(state.endFrame - 1, startUser - 1));
     syncFrameRangeInputs();
+    if (state.selectionMode === 'custom') updateCustomFrameCount();
     markRegenPending();
   };
   endFrameInput.onchange = () => {
@@ -3077,6 +3182,7 @@ function fitToSingleFrame() {
     const endUser = resolveIntMenuValue(endFrameInput, (state.endFrame || 0) + 1, 1, maxFrame + 1);
     state.endFrame = Math.max(state.startFrame + 1, Math.min(maxFrame, endUser - 1));
     syncFrameRangeInputs();
+    if (state.selectionMode === 'custom') updateCustomFrameCount();
     markRegenPending();
   };
 
@@ -3140,14 +3246,20 @@ function fitToSingleFrame() {
     const isScene = state.selectionMode === 'scene';
     const isCount = state.selectionMode === 'count';
     const isSlice = state.selectionMode === 'slice';
+    const isCustom = state.selectionMode === 'custom';
     countRow.style.display = isCount ? 'flex' : 'none';
-    intervalRow.style.display = (!isCount && !isScene && !isSlice) ? 'flex' : 'none';
-    if (!isCount && !isScene && !isSlice) intervalLabel.textContent = state.selectionMode === 'seconds' ? 'Seconds' : 'Frames';
+    intervalRow.style.display = (!isCount && !isScene && !isSlice && !isCustom) ? 'flex' : 'none';
+    if (!isCount && !isScene && !isSlice && !isCustom) intervalLabel.textContent = state.selectionMode === 'seconds' ? 'Seconds' : 'Frames';
     const sceneDisplay = isScene ? 'flex' : 'none';
     if ($('sceneCountRow')) {
       $('sceneCountRow').style.display = sceneDisplay;
       $('sceneDepthRow').style.display = sceneDisplay;
       $('sceneDistanceRow').style.display = sceneDisplay;
+    }
+    if ($('customFramesRow')) {
+      $('customFramesRow').style.display = isCustom ? 'block' : 'none';
+      if (customFramesInput && customFramesInput.value !== state.customFrameList) customFramesInput.value = state.customFrameList || '';
+      updateCustomFrameCount();
     }
     const sliceDisplay = isSlice ? 'flex' : 'none';
     if ($('sliceColsRow')) {
@@ -4053,15 +4165,78 @@ function fitToSingleFrame() {
   }
 
   // Timecode style controls
+  function setTimecodeFontPanelOpen(open) {
+    if (tcFontPanel) tcFontPanel.style.display = open ? 'block' : 'none';
+    if (tcFontBtn) tcFontBtn.classList.toggle('active-toggle', !!open);
+  }
+
+  function syncTimecodeFontUI() {
+    const preset = state.tcFontPreset || 'monoItalic';
+    const style = (state.tcFontStyle === 'normal' || state.tcFontStyle === 'italic') ? state.tcFontStyle : 'italic';
+    const weight = String(Math.max(400, Math.min(700, Math.round(Number(state.tcFontWeight) || 600))));
+    if (tcFontPresetGroup) {
+      tcFontPresetGroup.querySelectorAll('[data-preset]').forEach(btn => {
+        btn.classList.toggle('active-toggle', btn.dataset.preset === preset);
+      });
+    }
+    if (tcFontStyleGroup) {
+      tcFontStyleGroup.querySelectorAll('[data-style]').forEach(btn => {
+        btn.classList.toggle('active-toggle', btn.dataset.style === style);
+      });
+    }
+    if (tcFontWeightGroup) {
+      tcFontWeightGroup.querySelectorAll('[data-weight]').forEach(btn => {
+        btn.classList.toggle('active-toggle', btn.dataset.weight === weight);
+      });
+    }
+  }
+
+  function applyTimecodeFontPreset(presetKey) {
+    const preset = TIMECODE_FONT_PRESETS[presetKey] || TIMECODE_FONT_PRESETS.monoItalic;
+    state.tcFontPreset = TIMECODE_FONT_PRESETS[presetKey] ? presetKey : 'monoItalic';
+    state.tcFontStyle = preset.style;
+    state.tcFontWeight = preset.weight;
+    updateTimecodeStyles();
+    syncTimecodeFontUI();
+  }
+
   tcTextColorInput.oninput = () => { state.tcTextColor = tcTextColorInput.value; updateTimecodeStyles(); };
   tcBgColorInput.oninput = () => { state.tcBgColor = tcBgColorInput.value; updateTimecodeStyles(); };
   tcOpacitySlider.oninput = () => { state.tcOpacity = parseInt(tcOpacitySlider.value) / 100; tcOpacityValue.textContent = `${tcOpacitySlider.value}%`; updateTimecodeStyles(); };
+  if (tcFontBtn) tcFontBtn.onclick = () => setTimecodeFontPanelOpen(!(tcFontPanel && tcFontPanel.style.display !== 'none'));
+  if (tcFontPresetGroup) {
+    tcFontPresetGroup.onclick = (e) => {
+      const btn = e.target.closest('[data-preset]');
+      if (!btn) return;
+      applyTimecodeFontPreset(btn.dataset.preset);
+    };
+  }
+  if (tcFontStyleGroup) {
+    tcFontStyleGroup.onclick = (e) => {
+      const btn = e.target.closest('[data-style]');
+      if (!btn) return;
+      state.tcFontStyle = btn.dataset.style === 'normal' ? 'normal' : 'italic';
+      updateTimecodeStyles();
+      syncTimecodeFontUI();
+    };
+  }
+  if (tcFontWeightGroup) {
+    tcFontWeightGroup.onclick = (e) => {
+      const btn = e.target.closest('[data-weight]');
+      if (!btn) return;
+      state.tcFontWeight = Math.max(400, Math.min(700, Math.round(Number(btn.dataset.weight) || 600)));
+      updateTimecodeStyles();
+      syncTimecodeFontUI();
+    };
+  }
   tcAlignSelect.onchange = () => { state.tcAlign = tcAlignSelect.value; renderGrid(); if (state.autoFit) { requestFitToActiveView(); } };
   tcPositionSelect.onchange = () => { state.tcPosition = tcPositionSelect.value; renderGrid(); if (state.autoFit) { requestFitToActiveView(); } };
   const tcPaddingSlider = $('tcPaddingSlider'), tcPaddingValue = $('tcPaddingValue');
   if (tcPaddingSlider) tcPaddingSlider.oninput = () => { state.tcPadding = parseInt(tcPaddingSlider.value); tcPaddingValue.textContent = `${state.tcPadding}px`; updateTimecodeStyles(); };
   const tcMarginSlider = $('tcMarginSlider'), tcMarginValue = $('tcMarginValue');
   if (tcMarginSlider) tcMarginSlider.oninput = () => { state.tcMargin = parseInt(tcMarginSlider.value); tcMarginValue.textContent = `${state.tcMargin}px`; updateTimecodeStyles(); };
+  syncTimecodeFontUI();
+  updateTimecodeStyles();
 
   // Frame image transform UI
   function applyFrameImgTransform() {
@@ -5140,6 +5315,7 @@ function updateAllCells() {
     if (mode === 'seconds') return Math.max(1, Math.floor(range / fps / (state.intervalValue || 3)) + 1);
     if (mode === 'frames')  return Math.max(1, Math.floor(range / (state.intervalValue || 1)) + 1);
     if (mode === 'scene')   return (state.sceneCount || 5) * (state.sceneDepth || 8);
+    if (mode === 'custom')  return parseCustomFrameNumbers().length || 0;
     if (mode === 'slice')   return (state.cutCols || 3) * (state.cutRows || 3);
     return null;
   }

@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.18`
+Текущая версия приложения в коде: `TimeGrid v28.19`
 
 ## 1. Короткое описание
 
@@ -632,3 +632,12 @@ Timecode fields now stack vertically inside one overlay box instead of forming o
 - `Top` position grows downward from the top margin; `Bottom` remains bottom-anchored, so the stack grows upward.
 - Preview and canvas export share the same line splitting and per-line ellipsis behavior.
 - Frame labels use italic `JetBrains Mono` to give the overlay a more editorial caption feel while keeping digits readable.
+
+### 2026-07-04 Timecode font panel v28.19
+
+Timecode styling now has a compact font panel next to the `Text` and `BG` color controls:
+
+- `T` opens the font settings panel inside the Timecode menu.
+- Font presets include mono italic, mono, sans, and serif italic.
+- Style and weight controls update preview immediately.
+- Canvas export reads the same font family, style, and weight as the DOM preview.

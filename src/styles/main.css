@@ -211,9 +211,9 @@
       position: absolute; z-index: 2;
       background: var(--tc-bg-color, rgba(0,0,0,0.7));
       padding: var(--tc-padding, 0);
-      font-family: var(--fg-font-mono);
-      font-style: italic;
-      font-weight: 600;
+      font-family: var(--tc-font-family, var(--fg-font-mono));
+      font-style: var(--tc-font-style, italic);
+      font-weight: var(--tc-font-weight, 600);
       font-size: var(--meta-font-size, 10px);
       color: var(--tc-text-color, #fff); font-variant-numeric: tabular-nums slashed-zero;
       width: fit-content; max-width: calc(100% - var(--tc-margin, 0px) - var(--tc-margin, 0px));
@@ -347,6 +347,7 @@
     .menu-section.menu-subsection .menu-section-content { padding: 0; }
     .menu-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
     .menu-row:last-child { margin-bottom: 0; }
+    .menu-column { margin-bottom: 10px; }
     .menu-label { font-size: 11px; color: rgba(255,255,255,0.75); }
     .menu-hint {
       font-size: 10px; color: color-mix(in srgb, var(--fg-accent, #35f2a3) 90%, transparent); margin-top: 8px;
@@ -376,6 +377,19 @@
       color: #fff; font-size: 11px; text-align: center;
     }
     .menu-input:focus { outline: none; border-color: var(--fg-accent, #35f2a3); }
+    .menu-textarea {
+      width: 100%;
+      min-height: 118px;
+      resize: vertical;
+      padding: 8px;
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 2px;
+      color: #fff;
+      font: 11px/1.45 "JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-align: left;
+    }
+    .menu-textarea:focus { outline: none; border-color: var(--fg-accent, #35f2a3); }
     .menu-input-group { display: flex; align-items: center; gap: 2px; }
     .menu-input-narrow { width: 80px; }
     .menu-input-btn {
@@ -1161,7 +1175,7 @@
   /* TC Color buttons */
   .tc-color-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 44px;
     gap: 6px;
     margin-bottom: 6px;
   }
@@ -1200,6 +1214,32 @@
     z-index: 1;
     text-align: center;
     width: 100%;
+  }
+  .tc-font-btn {
+    background: #111;
+    color: rgba(255,255,255,0.92);
+    font-family: var(--tc-font-family, var(--fg-font-mono));
+    font-style: var(--tc-font-style, italic);
+    font-weight: var(--tc-font-weight, 600);
+  }
+  .tc-font-btn.active-toggle {
+    border-color: var(--fg-accent, #35f2a3);
+    background: color-mix(in srgb, var(--fg-accent, #35f2a3) 18%, #111);
+  }
+  .tc-font-glyph {
+    position: relative;
+    z-index: 1;
+    font-size: 18px;
+    line-height: 1;
+    pointer-events: none;
+  }
+  .tc-font-panel {
+    margin: -2px 0 10px;
+    padding: 8px 0 2px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .tc-font-preset-grid .menu-btn {
+    font-size: 9px;
   }
 
   

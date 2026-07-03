@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 ╔════════════════════════════════════════════════════════════════╗
-║      TimeGrid v28.18                                         ║
+║      TimeGrid v28.19                                         ║
 ╚════════════════════════════════════════════════════════════════╝
 -->
 
@@ -20,10 +20,10 @@
     gtag('js', new Date());
     gtag('config', 'G-JG9JL2MG9E');
   </script>
-  <title>TimeGrid v28.18</title>
+  <title>TimeGrid v28.19</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/styles/main.css">
 </head>
 <body>
@@ -36,7 +36,7 @@
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell"></span>
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell active2"></span>
           </span>
-          <span class="metadata-logo-text" id="fgLogoText">TimeGrid v28.18</span>
+          <span class="metadata-logo-text" id="fgLogoText">TimeGrid v28.19</span>
         </div>
         <div class="metadata-gap"></div>
         <div class="metadata-group">
@@ -274,6 +274,7 @@
               <option value="seconds">Every N Sec</option>
               <option value="frames">Every N Frames</option>
               <option value="scene">Scene</option>
+              <option value="custom">Custom Frames</option>
               <option value="slice">Slice</option>
             </select>
           </div>
@@ -312,6 +313,14 @@
               <input type="text" inputmode="decimal" class="menu-input menu-input-narrow" id="sceneDistanceInput" value="1" min="1" max="500">
               <button class="menu-input-btn" id="sceneDistancePlus">+</button>
             </div>
+          </div>
+
+          <div class="menu-column" id="customFramesRow" style="display:none;">
+            <div class="menu-row" style="margin-bottom:6px;">
+              <span class="menu-label">Frame Numbers</span>
+              <span class="menu-label" id="customFramesCount">0 frames</span>
+            </div>
+            <textarea class="menu-textarea" id="customFramesInput" rows="8" spellcheck="false" placeholder="1, 12, 24&#10;48&#10;96"></textarea>
           </div>
 
           <div class="menu-row" id="sliceColsRow" style="display:none;">
@@ -689,6 +698,31 @@
             <div class="tc-color-btn" id="tcBgColorBtn" style="background:#000000;">
               <input type="color" id="tcBgColor" value="#000000">
               <span class="tc-color-label">BG</span>
+            </div>
+            <button class="tc-color-btn tc-font-btn" id="tcFontBtn" type="button" title="Font settings" aria-label="Font settings">
+              <span class="tc-font-glyph">T</span>
+            </button>
+          </div>
+
+          <div class="tc-font-panel" id="tcFontPanel" style="display:none;">
+            <div class="menu-subtitle">Font</div>
+            <div class="tc-btn-group tc-font-preset-grid" id="tcFontPresetGroup">
+              <button class="menu-btn active-toggle" data-preset="monoItalic">Mono I</button>
+              <button class="menu-btn" data-preset="mono">Mono</button>
+              <button class="menu-btn" data-preset="sans">Sans</button>
+              <button class="menu-btn" data-preset="serifItalic">Serif I</button>
+            </div>
+            <div class="menu-subtitle">Style</div>
+            <div class="tc-btn-group" id="tcFontStyleGroup">
+              <button class="menu-btn" data-style="normal">Regular</button>
+              <button class="menu-btn active-toggle" data-style="italic">Italic</button>
+            </div>
+            <div class="menu-subtitle">Weight</div>
+            <div class="tc-btn-group" id="tcFontWeightGroup">
+              <button class="menu-btn" data-weight="400">400</button>
+              <button class="menu-btn" data-weight="500">500</button>
+              <button class="menu-btn active-toggle" data-weight="600">600</button>
+              <button class="menu-btn" data-weight="700">700</button>
             </div>
           </div>
 
@@ -1553,7 +1587,7 @@
           <div class="about-toggle"></div>
         </div>
         <div class="about-content">
-          <div class="about-version">Version v28.18</div>
+          <div class="about-version">Version v28.19</div>
           <div class="about-description">Video frame extraction tool for contact sheets, storyboards, and AI analysis.</div>
           
                     <div class="menu-row" style="margin-bottom: 12px; justify-content: space-between; padding-right: 4px;">
