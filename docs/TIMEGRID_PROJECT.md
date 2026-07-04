@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.24`
+Текущая версия приложения в коде: `TimeGrid v28.25`
 
 ## 1. Короткое описание
 
@@ -685,3 +685,12 @@ The first-frame protection is now limited to the video priming path instead of s
 - `Seam Frames = 1` overlays the first frame of the next cycle on the last frame.
 - Higher values cascade the beginning frames backward across the ending frames: first over last, second over previous, and so on.
 - Opacity is automatic and ramps stronger toward the loop seam.
+
+### 2026-07-04 Static Seam Preview v28.25
+
+`Seam Blend` now keys off the frame actually visible in each cell, not only the global animation tick.
+
+- Static grid preview shows the seam immediately when an ending frame is visible.
+- `Seam Frames = 1` is debuggable without pressing play: the last frame receives frame `0`.
+- Live preview, still export, MP4 export, and PNG sequence export pass the displayed `frameIdx` into the same seam helper.
+- Grid rebuilds run one post-build visual sync so DOM seam overlays are present before playback starts.

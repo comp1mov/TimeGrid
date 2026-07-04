@@ -200,3 +200,13 @@ Current model:
 - Opacity is automatic and cascades toward the loop seam.
 
 This keeps the feature testable: turn it on, set `Seam Frames = 1`, and the last frame should visibly receive the first frame.
+
+## 2026-07-04 Static Seam Preview v28.25
+
+Seam Blend is now frame-based instead of only tick-based.
+
+- The seam helper receives the displayed `frameIdx` from preview/export paths.
+- A static grid cell that already shows an ending frame can show the seam without playback.
+- `Seam Frames = 1` maps the visible last frame to frame `0`.
+- Larger values map ending frames backward to the corresponding beginning frames with the same automatic cascade.
+- Grid rebuilds run a post-build visual sync so DOM seam overlays are created before the animation starts.

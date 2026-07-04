@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.24';
+  const APP_VERSION = 'v28.25';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -2594,6 +2594,23 @@ function schedulePostGridSync() {
     };
   }
 
+  function shouldSyncGridVisualLayersAfterBuild() {
+    return !!(
+      state.chronoEnabled ||
+      state.chronoSeamBlend ||
+      state.frameDiffEnabled ||
+      (state.cc && state.cc.enabled) ||
+      (state.colorama && state.colorama.enabled) ||
+      (state.drawOnion && state.drawMode && state.drawTarget === 'frame')
+    );
+  }
+
+  function syncGridVisualLayersAfterBuild() {
+    if (!state.frames.length || !framesGrid || !framesGrid._cellCount) return;
+    if (!shouldSyncGridVisualLayersAfterBuild()) return;
+    try { updateAllCells(); } catch (e) {}
+  }
+
   function smoothstep01(v) {
     const t = Math.max(0, Math.min(1, Number(v) || 0));
     return t * t * (3 - 2 * t);
@@ -2613,14 +2630,6 @@ function schedulePostGridSync() {
     return 1;
   }
 
-  function getChronoSeamCycleLength(frameCount, dir, mode) {
-    const n = Math.max(1, Math.floor(Number(frameCount) || 1));
-    const viewMode = mode || state.viewMode || 'grid';
-    const loopN = Math.max(0, Math.floor(Number(state.loopAfterN) || 0));
-    if (viewMode !== 'single' && loopN > 0 && loopN < n) return Math.max(1, loopN);
-    return Math.max(1, getAnimDirectionCycleLength(n, dir || state.animDirection));
-  }
-
   function getChronoSeamLengthForCycle(cycleLength) {
     const cycle = Math.max(1, Math.floor(Number(cycleLength) || 1));
     const len = Math.max(1, Math.round(Number(state.chronoSeamLength) || 4));
@@ -2628,56 +2637,68 @@ function schedulePostGridSync() {
     return Math.max(1, Math.min(cycle - 1, len));
   }
 
-  function getChronoSeamBlendInfo(tick, frameCount, opts = {}) {
+  function getChronoSeamBlendInfoForFrame(frameIdx, frameCount, opts = {}) {
     if (!state.chronoSeamBlend || frameCount <= 1) return { alpha: 0 };
 
-    const dir = opts.dir || state.animDirection;
-    const cycleLength = getChronoSeamCycleLength(frameCount, dir, opts.mode);
+    const n = Math.max(1, Math.floor(Number(frameCount) || 1));
+    const viewMode = opts.mode || state.viewMode || 'grid';
+    const loopN = Math.max(0, Math.floor(Number(state.loopAfterN) || 0));
+    const useLoopWindow = viewMode !== 'single' && loopN > 0 && loopN < n;
+    const cycleLength = useLoopWindow ? loopN : n;
     const seamLength = getChronoSeamLengthForCycle(cycleLength);
     if (seamLength <= 0) return { alpha: 0, cycleLength, seamLength };
 
-    const rawTick = Number.isFinite(Number(tick)) ? Math.floor(Number(tick)) : 0;
-    const phase = ((rawTick % cycleLength) + cycleLength) % cycleLength;
+    const baseOffset = Number.isFinite(Number(opts.baseOffset)) ? Math.floor(Number(opts.baseOffset)) : 0;
+    const cycleStart = useLoopWindow ? normalizeFrameIndex(baseOffset + (state.loopOffset || 0), n) : 0;
+    const currentFrameIdx = normalizeFrameIndex(frameIdx, n);
+    const phase = ((currentFrameIdx - cycleStart) % cycleLength + cycleLength) % cycleLength;
     const start = Math.max(0, cycleLength - seamLength);
-    if (phase < start) return { alpha: 0, cycleLength, seamLength, phase };
+    if (phase < start) return { alpha: 0, cycleLength, seamLength, phase, cycleStart };
 
     const seamIndex = phase - start;
     const progress = seamLength <= 1 ? 1 : (seamIndex + 1) / seamLength;
-    const nextCycleTick = rawTick + (cycleLength - phase);
-    const targetTick = nextCycleTick + Math.max(0, seamLength - 1 - seamIndex);
+    const targetPhase = Math.max(0, seamLength - 1 - seamIndex);
+    const targetFrameIdx = normalizeFrameIndex(cycleStart + targetPhase, n);
+
     return {
       alpha: smoothstep01(progress),
       cycleLength,
       seamLength,
       phase,
       seamIndex,
-      targetTick,
+      targetTick: targetFrameIdx,
+      targetFrameIdx,
+      cycleStart,
+      currentFrameIdx,
       progress: Math.max(0, Math.min(1, progress))
     };
   }
 
   function getChronoSeamForCell(cellIdx, tick, opts = {}) {
     const frameCount = Math.max(0, Math.floor(Number(opts.frameCount ?? state.frames.length) || 0));
-    const seam = getChronoSeamBlendInfo(tick, frameCount, opts);
-    if (!seam || seam.alpha <= 0) return seam || { alpha: 0 };
-
-    const targetTick = Number.isFinite(Number(seam.targetTick)) ? Math.floor(Number(seam.targetTick)) : 0;
-    const dir = opts.dir || state.animDirection;
-    const targetInfo = getFrameCellInfo(cellIdx, targetTick, {
+    const currentInfo = opts.cellInfo || getFrameCellInfo(cellIdx, tick, {
       frameCount,
       cellCount: opts.cellCount,
       cellOrderIdx: opts.cellOrderIdx,
       cellOrderMap: opts.cellOrderMap,
       cellOrder: opts.cellOrder,
       shuffle: opts.shuffle || state.animDirShuffle,
-      dir,
+      dir: opts.dir || state.animDirection,
       skipEnsureShuffle: true
     });
+    const currentFrameIdx = Number.isFinite(Number(opts.frameIdx))
+      ? normalizeFrameIndex(opts.frameIdx, frameCount)
+      : normalizeFrameIndex(currentInfo.frameIdx, frameCount);
+    const seam = getChronoSeamBlendInfoForFrame(currentFrameIdx, frameCount, {
+      ...opts,
+      baseOffset: currentInfo.baseOffset
+    });
+    if (!seam || seam.alpha <= 0) return seam || { alpha: 0 };
 
     return {
       ...seam,
-      targetFrameIdx: targetInfo.frameIdx,
-      targetBaseOffset: targetInfo.baseOffset,
+      targetFrameIdx: seam.targetFrameIdx,
+      targetBaseOffset: seam.cycleStart,
       targetGhostIndices: []
     };
   }
@@ -2764,6 +2785,7 @@ function renderGrid() {
       framesGrid._cellCount = framesGrid.querySelectorAll('.frame-item').length;
       applyNoPinAttributes(framesGrid);
       setViewMode(state.viewMode);
+      syncGridVisualLayersAfterBuild();
       schedulePostGridSync();
     }
 
@@ -5298,6 +5320,8 @@ function updateAllCells() {
         frameCount,
         cellCount: totalCells,
         cellOrderIdx,
+        cellInfo,
+        frameIdx,
         shuffle,
         dir,
         mode: state.viewMode,
@@ -10197,6 +10221,8 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
           frameCount,
           cellCount,
           cellOrderIdx: cellOrderMap.get(c),
+          cellInfo,
+          frameIdx: animFrameIdx,
           shuffle: window._fgState.animDirShuffle,
           dir: _st.animDirection,
           mode: 'grid',
@@ -11065,6 +11091,7 @@ function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout,
         frameCount,
         cellCount: 1,
         cellOrderIdx: 0,
+        frameIdx,
         shuffle: window._fgState.animDirShuffle,
         dir: window._fgState.animDirection,
         mode: 'single',
@@ -11407,6 +11434,7 @@ async function exportPngSeqDrawings() {
         frameCount,
         cellCount: 1,
         cellOrderIdx: 0,
+        frameIdx: i,
         shuffle: state.animDirShuffle,
         dir: state.animDirection,
         mode: 'single',
@@ -12190,6 +12218,8 @@ const canvas = document.createElement('canvas');
           frameCount: state.frames.length,
           cellCount,
           cellOrderIdx,
+          cellInfo: stillCellInfo,
+          frameIdx,
           shuffle: state.animDirShuffle,
           dir: state.animDirection,
           mode: 'grid',
@@ -12525,6 +12555,8 @@ const canvas = document.createElement('canvas');
           frameCount: state.frames.length,
           cellCount: 1,
           cellOrderIdx: 0,
+          cellInfo: _singleStillInfo,
+          frameIdx,
           shuffle: state.animDirShuffle,
           dir: state.animDirection,
           mode: 'single',

@@ -265,3 +265,12 @@ Reduced Chronophoto seam controls to a single understandable value.
 - `Seam Frames` now directly means how many ending frames receive beginning-frame overlays.
 - The mapping is reverse-to-seam: frame 1 of the next cycle lands on the last frame, frame 2 on the previous frame, and so on.
 - Seam opacity is automatic and cascades stronger as playback approaches the loop seam.
+
+## 2026-07-04 Static Seam Preview v28.25
+
+Fixed a confusing Seam Blend debugging gap where the blend was visible during playback but not reliably visible in static preview.
+
+- Seam detection now uses the displayed `frameIdx` for each cell.
+- Static grid cells that show ending frames receive the same beginning-frame overlays as playback/export.
+- Grid rebuilds now run one post-build visual sync for Chronophoto, Seam Blend, Frame Diff, color correction, Colorama, and onion overlays.
+- MP4, still, and PNG sequence export paths pass their displayed frame index into the seam helper to keep preview/export aligned.
