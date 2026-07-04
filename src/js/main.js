@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.21';
+  const APP_VERSION = 'v28.22';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -650,6 +650,7 @@ function getTargetFrameOutputDims() {
     state.videoDate = new Date(file.lastModified);
     if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
     state.videoUrl = URL.createObjectURL(file);
+    state._capturePrimedUrl = null;
     videoElement.src = state.videoUrl;
     videoElement.load();
     // iOS/Safari reliability: ensure inline playback and prime the decoder
@@ -1258,6 +1259,13 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
     loadingOverlay.classList.add('visible');
     captureCanvas.width = Math.round(state.videoWidth * state.quality);
     captureCanvas.height = Math.round(state.videoHeight * state.quality);
+    loadingProgress.textContent = 'Preparing video frames...';
+
+    const sourceUrl = state.videoUrl;
+    if (times.length) {
+      await primeVideoForCapture(times[0]);
+      if (sourceUrl !== state.videoUrl || state.isSingleImage) return;
+    }
 
     
 
@@ -1266,10 +1274,15 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
     state._frameTileDims = null;
 for (let i = 0; i < times.length; i++) {
       const time = times[i];
-      let dataUrl = await captureFrame(time);
+      const shouldRetryBlank = i === 0;
+      let dataUrl = await captureFrame(time, { rejectLikelyBlank: shouldRetryBlank });
+      if (!dataUrl && shouldRetryBlank) {
+        await waitMs(90);
+        dataUrl = await captureFrame(time, { rejectLikelyBlank: true });
+      }
       if (!dataUrl) {
         // iOS/Safari occasional blank frame: retry once after a tiny delay.
-        await new Promise(r => queueMicrotask(r));
+        await waitMs(50);
         dataUrl = await captureFrame(time);
       }
       if (!dataUrl) dataUrl = '';
@@ -1671,56 +1684,178 @@ function updateInfoPanel() {
     if (icomp) icomp.textContent = (typeof state._compAvgMs === 'number' && state._compAvgMs > 0) ? `${state._compAvgMs.toFixed(1)} ms` : '—';
 }
 
-    function captureFrame(time) {
+  function waitMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+  }
+
+  function clampVideoCaptureTime(time, opts = {}) {
+    const v = videoElement;
+    const raw = Number(time);
+    if (!Number.isFinite(raw)) return 0;
+    const safeStart = opts.avoidStart ? 0.001 : 0;
+    if (v && v.duration && Number.isFinite(v.duration)) {
+      // Keep a tiny epsilon away from the end to avoid iOS black frames.
+      const maxT = Math.max(0, v.duration - 0.001);
+      return Math.min(Math.max(raw, Math.min(safeStart, maxT)), maxT);
+    }
+    return Math.max(raw, safeStart);
+  }
+
+  function waitForVideoReadySignal(v, timeoutMs = 1200) {
     return new Promise(resolve => {
-      const v = videoElement;
-
-      const clampTime = (t) => {
-        if (!isFinite(t)) return 0;
-        if (v.duration && isFinite(v.duration)) {
-          // Keep a tiny epsilon away from the end to avoid iOS black frames.
-          return Math.min(Math.max(t, 0), Math.max(0, v.duration - 0.001));
-        }
-        return Math.max(t, 0);
-      };
-
-      const target = clampTime(time);
+      if (!v) return resolve(false);
+      if (v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0) return resolve(true);
 
       let done = false;
-      const finish = (dataUrl) => {
+      const finish = (ok) => {
         if (done) return;
         done = true;
-        resolve(dataUrl);
+        clearTimeout(timer);
+        ['loadeddata', 'canplay', 'canplaythrough'].forEach(evt => v.removeEventListener(evt, onReady));
+        resolve(!!ok);
+      };
+      const onReady = () => finish(v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0);
+      const timer = setTimeout(() => finish(v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0), timeoutMs);
+
+      ['loadeddata', 'canplay', 'canplaythrough'].forEach(evt => v.addEventListener(evt, onReady, { once: true }));
+    });
+  }
+
+  function waitForDecodedVideoFrame(v, opts = {}) {
+    const timeoutMs = Math.max(80, Number(opts.timeoutMs) || 450);
+    const preferRaf = !!opts.preferRaf;
+    return new Promise(resolve => {
+      if (!v) return resolve(false);
+      let done = false;
+      let callbackId = null;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (callbackId != null && typeof v.cancelVideoFrameCallback === 'function') {
+          try { v.cancelVideoFrameCallback(callbackId); } catch (e) {}
+        }
+        resolve(!!ok);
+      };
+      const timer = setTimeout(() => {
+        finish(v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0);
+      }, timeoutMs);
+
+      try {
+        if (!preferRaf && typeof v.requestVideoFrameCallback === 'function') {
+          callbackId = v.requestVideoFrameCallback(() => finish(true));
+        } else {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => finish(v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0));
+          });
+        }
+      } catch (e) {
+        finish(false);
+      }
+    });
+  }
+
+  function seekVideoForCapture(time, opts = {}) {
+    const v = videoElement;
+    const target = clampVideoCaptureTime(time, opts);
+    const timeoutMs = Math.max(120, Number(opts.timeoutMs) || 900);
+
+    return new Promise(resolve => {
+      if (!v) return resolve(false);
+
+      let done = false;
+      let didSeek = false;
+      const closeEnough = () => Math.abs((Number(v.currentTime) || 0) - target) < 1e-4;
+
+      const finish = async (ok) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        v.removeEventListener('seeked', onSeeked);
+        if (!ok) return resolve(false);
+        const frameReady = await waitForDecodedVideoFrame(v, {
+          timeoutMs: Math.max(220, Math.round(timeoutMs * 0.5)),
+          preferRaf: !didSeek
+        });
+        resolve(!!frameReady);
       };
 
       const onSeeked = () => {
-        // iOS/Safari can fire 'seeked' before the frame is actually ready for drawImage.
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            try {
-              drawImageHQ(captureCtx, v, 0, 0, v.videoWidth || captureCanvas.width, v.videoHeight || captureCanvas.height, 0, 0, captureCanvas.width, captureCanvas.height);
-              finish(captureCanvas.toDataURL('image/jpeg', 0.9));
-            } catch (e) {
-              // If drawImage fails (rare on iOS), resolve with null so caller can skip/retry.
-              finish(null);
-            }
-          });
-        });
+        didSeek = true;
+        finish(true);
       };
 
-      v.addEventListener('seeked', onSeeked, { once: true });
+      const timer = setTimeout(() => {
+        // Fallback only accepts a frame if the browser has actually reached the target
+        // and reports current frame data. It no longer draws blindly on timeout.
+        finish(closeEnough() && v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0);
+      }, timeoutMs);
 
-      // Fallback in case 'seeked' never fires (iOS edge cases).
-      setTimeout(() => {
-        if (!done) onSeeked();
-      }, 250);
-
-      if (Math.abs(v.currentTime - target) < 1e-4) {
-        onSeeked();
-      } else {
-        v.currentTime = target;
+      try {
+        v.pause();
+        v.addEventListener('seeked', onSeeked, { once: true });
+        if (closeEnough()) finish(true);
+        else v.currentTime = target;
+      } catch (e) {
+        finish(false);
       }
     });
+  }
+
+  async function primeVideoForCapture(firstTime = 0) {
+    const v = videoElement;
+    const sourceUrl = state.videoUrl;
+    if (!v || !sourceUrl || state._capturePrimedUrl === sourceUrl) return true;
+
+    await waitForVideoReadySignal(v, 1400);
+    if (sourceUrl !== state.videoUrl || state.isSingleImage) return false;
+
+    const warmTime = clampVideoCaptureTime(firstTime, { avoidStart: true });
+    const ok = await seekVideoForCapture(warmTime, { timeoutMs: 1200, avoidStart: true });
+    if (sourceUrl === state.videoUrl && ok) state._capturePrimedUrl = sourceUrl;
+    return ok;
+  }
+
+  function isCanvasLikelyBlank(canvas) {
+    try {
+      if (!canvas || !canvas.width || !canvas.height) return true;
+      const sample = state._blankCheckCanvas || (state._blankCheckCanvas = document.createElement('canvas'));
+      sample.width = 16;
+      sample.height = 16;
+      const sctx = sample.getContext('2d', { willReadFrequently: true });
+      sctx.clearRect(0, 0, sample.width, sample.height);
+      sctx.drawImage(canvas, 0, 0, sample.width, sample.height);
+      const data = sctx.getImageData(0, 0, sample.width, sample.height).data;
+      let lit = 0;
+      let maxLum = 0;
+      let sumLum = 0;
+      const count = data.length / 4;
+      for (let i = 0; i < data.length; i += 4) {
+        const lum = data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722;
+        sumLum += lum;
+        if (lum > maxLum) maxLum = lum;
+        if (lum > 10) lit++;
+      }
+      return lit <= 1 && maxLum < 18 && (sumLum / Math.max(1, count)) < 5;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function captureFrame(time, opts = {}) {
+    const v = videoElement;
+    const ready = await seekVideoForCapture(time, { timeoutMs: opts.timeoutMs || 900 });
+    if (!ready) return null;
+
+    try {
+      captureCtx.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
+      drawImageHQ(captureCtx, v, 0, 0, v.videoWidth || captureCanvas.width, v.videoHeight || captureCanvas.height, 0, 0, captureCanvas.width, captureCanvas.height);
+      if (opts.rejectLikelyBlank && isCanvasLikelyBlank(captureCanvas)) return null;
+      return captureCanvas.toDataURL('image/jpeg', 0.9);
+    } catch (e) {
+      // If drawImage fails (rare on iOS), resolve with null so caller can skip/retry.
+      return null;
+    }
   }
 
   function computeShowTimecode() {

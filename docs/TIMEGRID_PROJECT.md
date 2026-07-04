@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.21`
+Текущая версия приложения в коде: `TimeGrid v28.22`
 
 ## 1. Короткое описание
 
@@ -659,3 +659,12 @@ Long text-like Timecode fields now wrap instead of hard-clipping immediately.
 - Default Timecode font size is now `15px`.
 - Custom `TEXT`, display `NAME`, and source `FILE` labels are marked as wrappable in preview.
 - Canvas export wraps the same text-like labels with measured line breaks.
+
+### 2026-07-04 First-frame capture priming v28.22
+
+Fresh video imports now wait for stronger decoded-frame readiness before the first generated grid capture.
+
+- `generateFrames()` primes the current video source before the first capture pass.
+- Capture seeking waits for `loadeddata`/`canplay`, `seeked`, and decoded frame readiness where available.
+- The seek timeout fallback no longer draws blindly if the browser has not reached the target frame.
+- The first captured frame can retry a likely blank/black canvas a limited number of times, then accepts the result so intentionally black starts still work.

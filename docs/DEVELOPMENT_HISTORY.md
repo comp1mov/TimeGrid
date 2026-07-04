@@ -238,3 +238,12 @@ Adjusted the default Timecode look and made long text labels more resilient.
 - Default Timecode font size is now `15px`.
 - Custom `TEXT`, display `NAME`, and source `FILE` lines are marked as wrappable in the DOM preview.
 - Canvas export wraps those text-like labels using measured line breaks before drawing backgrounds and text.
+
+## 2026-07-04 First-frame capture priming v28.22
+
+Fixed the recent fresh-import issue where the first generated video frame could be black before the decoder was warm.
+
+- Added `primeVideoForCapture()` before the first video capture pass in `generateFrames()`.
+- Added shared capture readiness helpers for video ready state, decoded frame readiness, and safer seek completion.
+- Removed the blind draw-on-timeout behavior from `captureFrame()`.
+- Added limited blank-canvas retries for only the first generated frame, with a final acceptance path for videos that genuinely begin black.
