@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.23`
+Текущая версия приложения в коде: `TimeGrid v28.24`
 
 ## 1. Короткое описание
 
@@ -676,3 +676,12 @@ The first-frame protection is now limited to the video priming path instead of s
 - Normal frame capture uses the fast `seeked` + double-rAF path again.
 - Decoded-frame waiting remains available for the one-time priming step after fresh import.
 - `Seam Blend` target frames now resolve from the next cycle start, not global tick `0`, so frame modes can visibly blend toward the upcoming first frame.
+
+### 2026-07-04 Simplified Seam Blend v28.24
+
+`Seam Blend` now has one visible control: `Seam Frames`.
+
+- Removed `Seam Mode` and `Seam Strength` from the Chronophoto panel.
+- `Seam Frames = 1` overlays the first frame of the next cycle on the last frame.
+- Higher values cascade the beginning frames backward across the ending frames: first over last, second over previous, and so on.
+- Opacity is automatic and ramps stronger toward the loop seam.

@@ -256,3 +256,12 @@ Fixed two regressions found while testing v28.22.
 - The stricter decoded-frame wait remains only in the one-time `primeVideoForCapture()` step.
 - `Seam Blend` now resolves its target from the next cycle start for the current tick, so `Frame Soft` and `Frame Full` visibly blend toward the upcoming first frame.
 - Chronophoto seam ghost indices now respect the frame count passed into the seam helper.
+
+## 2026-07-04 Simplified Seam Blend v28.24
+
+Reduced Chronophoto seam controls to a single understandable value.
+
+- Removed `Seam Mode` and `Seam Strength` from the UI and active seam math.
+- `Seam Frames` now directly means how many ending frames receive beginning-frame overlays.
+- The mapping is reverse-to-seam: frame 1 of the next cycle lands on the last frame, frame 2 on the previous frame, and so on.
+- Seam opacity is automatic and cascades stronger as playback approaches the loop seam.

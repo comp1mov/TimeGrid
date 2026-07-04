@@ -186,3 +186,17 @@ v28.14 keeps that behavior available as `Frame Full`, but adds safer test modes:
 - `Frame Full`: the original full-strength base-frame seam for A/B comparison.
 
 `Chrono Only` is the default. It will not hide a huge `last -> first` base-frame jump by itself, but it should keep Chronophoto continuity without the static-frame freeze artifact.
+
+## 2026-07-04 Simplified Seam Blend v28.24
+
+The mode/strength experiment was removed from the active UI.
+
+Current model:
+
+- `Seam Blend` toggles the feature.
+- `Seam Frames` is the only control.
+- `1` means: overlay the first frame of the next cycle on the last frame of the current cycle.
+- `N` means: overlay the first `N` beginning frames backward across the last `N` ending frames.
+- Opacity is automatic and cascades toward the loop seam.
+
+This keeps the feature testable: turn it on, set `Seam Frames = 1`, and the last frame should visibly receive the first frame.

@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.23';
+  const APP_VERSION = 'v28.24';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -103,7 +103,7 @@ inject();
     // Color Correction
     cc: { enabled: false, brightness: 1.0, contrast: 1.0, saturation: 1.0, hue: 0, invert: false, allLayers: true },
     colorama: { enabled: false, allLayers: true, colorA: '#0a0a2e', colorB: '#ff4400', colorC: '#ffee00', offset: 0, blend: 'normal', opacity: 1.0, speed: 0, cascade: false, cascadeAmt: 1.0 },
-    chronoEnabled: false, chronoBlend: 'darken', chronoDepth: 5, chronoOpacity: 1.0, chronoCascade: false, chronoCascadeMirror: false, chronoCascadeConst: 1, chronoStride: 1, chronoCleanLoop: false, chronoSeamBlend: false, chronoSeamLength: 0, chronoSeamMode: 'chrono', chronoSeamStrength: 0.55,
+    chronoEnabled: false, chronoBlend: 'darken', chronoDepth: 5, chronoOpacity: 1.0, chronoCascade: false, chronoCascadeMirror: false, chronoCascadeConst: 1, chronoStride: 1, chronoCleanLoop: false, chronoSeamBlend: false, chronoSeamLength: 4,
     frameDiffEnabled: false, frameDiffPlateIdx: 0, frameDiffPlateMode: 'static', frameDiffPlateStep: 1, frameDiffPlateLoopN: 8, frameDiffPlateOffset: 0, frameDiffBlend: 'difference', frameDiffOpacity: 1.0,
     frameImgFill: 'empty', // 'empty' or 'edge'
 
@@ -2599,51 +2599,18 @@ function schedulePostGridSync() {
     return t * t * (3 - 2 * t);
   }
 
-  function normalizeChronoSeamMode(value) {
-    if (value === 'frame-soft' || value === 'frame-full') return value;
-    return 'chrono';
-  }
-
-  function getChronoSeamMode() {
-    return normalizeChronoSeamMode(state.chronoSeamMode);
-  }
-
-  function getChronoSeamStrength() {
-    const v = Number(state.chronoSeamStrength);
-    if (!Number.isFinite(v)) return 0.55;
-    return Math.max(0.05, Math.min(1, v));
-  }
-
   function getChronoSeamBaseOpacity(seamInfo) {
     if (!seamInfo) return 0;
     const alpha = Number.isFinite(Number(seamInfo.alpha)) ? Math.max(0, Math.min(1, Number(seamInfo.alpha))) : 0;
-    if (alpha <= 0) return 0;
-    const mode = normalizeChronoSeamMode(seamInfo.mode || state.chronoSeamMode);
-    if (mode === 'frame-full') return alpha;
-    if (mode === 'frame-soft') return alpha * getChronoSeamStrength();
-    return 0;
+    return alpha;
   }
 
   function getChronoSeamGhostOpacityScale(seamInfo) {
-    if (!seamInfo) return 0;
-    const alpha = Number.isFinite(Number(seamInfo.alpha)) ? Math.max(0, Math.min(1, Number(seamInfo.alpha))) : 0;
-    if (alpha <= 0) return 0;
-    const mode = normalizeChronoSeamMode(seamInfo.mode || state.chronoSeamMode);
-    if (mode === 'frame-full') return alpha;
-    return alpha * getChronoSeamStrength();
+    return 0;
   }
 
   function getChronoCurrentOpacityScale(seamInfo) {
-    if (!seamInfo || !state.chronoSeamBlend) return 1;
-    const mode = normalizeChronoSeamMode(seamInfo.mode || state.chronoSeamMode);
-    if (mode !== 'chrono') return 1;
-    return 1 - getChronoSeamGhostOpacityScale(seamInfo);
-  }
-
-  function getChronoSeamAutoLength() {
-    const depth = Math.max(1, Math.round(Number(state.chronoDepth) || 3));
-    const stride = Math.max(1, Math.round(Number(state.chronoStride) || 1));
-    return Math.max(1, depth * stride);
+    return 1;
   }
 
   function getChronoSeamCycleLength(frameCount, dir, mode) {
@@ -2656,8 +2623,7 @@ function schedulePostGridSync() {
 
   function getChronoSeamLengthForCycle(cycleLength) {
     const cycle = Math.max(1, Math.floor(Number(cycleLength) || 1));
-    const manual = Math.max(0, Math.round(Number(state.chronoSeamLength) || 0));
-    let len = manual > 0 ? manual : getChronoSeamAutoLength();
+    const len = Math.max(1, Math.round(Number(state.chronoSeamLength) || 4));
     if (cycle <= 1) return 0;
     return Math.max(1, Math.min(cycle - 1, len));
   }
@@ -2675,14 +2641,17 @@ function schedulePostGridSync() {
     const start = Math.max(0, cycleLength - seamLength);
     if (phase < start) return { alpha: 0, cycleLength, seamLength, phase };
 
-    const progress = seamLength <= 1 ? 1 : (phase - start) / Math.max(1, seamLength - 1);
+    const seamIndex = phase - start;
+    const progress = seamLength <= 1 ? 1 : (seamIndex + 1) / seamLength;
     const nextCycleTick = rawTick + (cycleLength - phase);
+    const targetTick = nextCycleTick + Math.max(0, seamLength - 1 - seamIndex);
     return {
       alpha: smoothstep01(progress),
       cycleLength,
       seamLength,
       phase,
-      targetTick: nextCycleTick,
+      seamIndex,
+      targetTick,
       progress: Math.max(0, Math.min(1, progress))
     };
   }
@@ -2707,13 +2676,9 @@ function schedulePostGridSync() {
 
     return {
       ...seam,
-      mode: getChronoSeamMode(),
-      strength: getChronoSeamStrength(),
       targetFrameIdx: targetInfo.frameIdx,
       targetBaseOffset: targetInfo.baseOffset,
-      targetGhostIndices: state.chronoEnabled
-        ? buildChronoGhostIndices(targetTick, targetInfo.baseOffset, frameCount, dir, opts.shuffle || state.animDirShuffle)
-        : []
+      targetGhostIndices: []
     };
   }
 
@@ -3575,11 +3540,6 @@ function fitToSingleFrame() {
   const chronoOpacityNum = $('chronoOpacityNum');
   const toggleChronoCascade = $('toggleChronoCascade');
   const toggleChronoSeamBlend = $('toggleChronoSeamBlend');
-  const chronoSeamModeSelect = $('chronoSeamMode');
-  const chronoSeamModeRow = $('chronoSeamModeRow');
-  const chronoSeamStrengthInput = $('chronoSeamStrength');
-  const chronoSeamStrengthNum = $('chronoSeamStrengthNum');
-  const chronoSeamStrengthRow = $('chronoSeamStrengthRow');
   const chronoSeamLengthInput = $('chronoSeamLength');
   const chronoSeamLengthMinus = $('chronoSeamLengthMinus');
   const chronoSeamLengthPlus = $('chronoSeamLengthPlus');
@@ -3591,9 +3551,7 @@ function fitToSingleFrame() {
   if (state.chronoStride === undefined) state.chronoStride = 1;
   if (state.chronoCleanLoop === undefined) state.chronoCleanLoop = false;
   if (state.chronoSeamBlend === undefined) state.chronoSeamBlend = false;
-  if (state.chronoSeamLength === undefined) state.chronoSeamLength = 0;
-  state.chronoSeamMode = normalizeChronoSeamMode(state.chronoSeamMode);
-  if (state.chronoSeamStrength === undefined) state.chronoSeamStrength = 0.55;
+  if (state.chronoSeamLength === undefined || Number(state.chronoSeamLength) < 1) state.chronoSeamLength = 4;
   if (state.frameDiffEnabled === undefined)  state.frameDiffEnabled  = false;
   if (state.frameDiffPlateIdx === undefined) state.frameDiffPlateIdx = 0;
   if (state.frameDiffBlend === undefined)    state.frameDiffBlend    = 'difference';
@@ -3784,15 +3742,9 @@ function fitToSingleFrame() {
 
   function syncChronoSeamUI() {
     const seamEnabled = !!state.chronoSeamBlend;
-    const seamMode = getChronoSeamMode();
-    const seamStrength = getChronoSeamStrength();
+    state.chronoSeamLength = Math.max(1, Math.min(300, Math.round(Number(state.chronoSeamLength) || 4)));
     if (toggleChronoSeamBlend) toggleChronoSeamBlend.classList.toggle('active', !!state.chronoSeamBlend);
-    if (chronoSeamModeSelect) chronoSeamModeSelect.value = seamMode;
-    if (chronoSeamModeRow) chronoSeamModeRow.style.display = seamEnabled ? '' : 'none';
-    if (chronoSeamStrengthInput) chronoSeamStrengthInput.value = seamStrength.toFixed(2);
-    if (chronoSeamStrengthNum) chronoSeamStrengthNum.value = seamStrength.toFixed(2);
-    if (chronoSeamStrengthRow) chronoSeamStrengthRow.style.display = seamEnabled && seamMode !== 'frame-full' ? '' : 'none';
-    if (chronoSeamLengthInput) chronoSeamLengthInput.value = Math.max(0, Math.round(Number(state.chronoSeamLength) || 0));
+    if (chronoSeamLengthInput) chronoSeamLengthInput.value = state.chronoSeamLength;
     if (chronoSeamLengthRow) chronoSeamLengthRow.style.display = seamEnabled ? '' : 'none';
   }
 
@@ -3882,34 +3834,8 @@ function fitToSingleFrame() {
     };
   }
 
-  if (chronoSeamModeSelect) {
-    chronoSeamModeSelect.onchange = () => {
-      state.chronoSeamMode = normalizeChronoSeamMode(chronoSeamModeSelect.value);
-      syncChronoSeamUI();
-      updateChronoUI();
-    };
-  }
-
-  function applyChronoSeamStrength(value) {
-    const v = Math.max(0.05, Math.min(1, Number(value) || 0.55));
-    state.chronoSeamStrength = v;
-    if (chronoSeamStrengthInput) chronoSeamStrengthInput.value = v.toFixed(2);
-    if (chronoSeamStrengthNum) chronoSeamStrengthNum.value = v.toFixed(2);
-    updateChronoUI();
-  }
-
-  if (chronoSeamStrengthInput) {
-    chronoSeamStrengthInput.oninput = () => applyChronoSeamStrength(chronoSeamStrengthInput.value);
-  }
-  if (chronoSeamStrengthNum) {
-    chronoSeamStrengthNum.oninput = () => applyChronoSeamStrength(chronoSeamStrengthNum.value);
-    chronoSeamStrengthNum.onchange = () => {
-      chronoSeamStrengthNum.value = getChronoSeamStrength().toFixed(2);
-    };
-  }
-
   function applyChronoSeamLength(value) {
-    const v = Math.max(0, Math.min(300, Math.round(Number(value) || 0)));
+    const v = Math.max(1, Math.min(300, Math.round(Number(value) || 4)));
     state.chronoSeamLength = v;
     if (chronoSeamLengthInput) chronoSeamLengthInput.value = v;
     updateChronoUI();
@@ -3919,10 +3845,10 @@ function fitToSingleFrame() {
     chronoSeamLengthInput.onchange = () => applyChronoSeamLength(chronoSeamLengthInput.value);
   }
   if (chronoSeamLengthMinus) {
-    chronoSeamLengthMinus.onclick = () => applyChronoSeamLength((Number(state.chronoSeamLength) || 0) - 1);
+    chronoSeamLengthMinus.onclick = () => applyChronoSeamLength((Number(state.chronoSeamLength) || 4) - 1);
   }
   if (chronoSeamLengthPlus) {
-    chronoSeamLengthPlus.onclick = () => applyChronoSeamLength((Number(state.chronoSeamLength) || 0) + 1);
+    chronoSeamLengthPlus.onclick = () => applyChronoSeamLength((Number(state.chronoSeamLength) || 4) + 1);
   }
   syncChronoSeamUI();
 
