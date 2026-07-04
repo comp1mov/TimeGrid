@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
 Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.22`
+Текущая версия приложения в коде: `TimeGrid v28.23`
 
 ## 1. Короткое описание
 
@@ -668,3 +668,11 @@ Fresh video imports now wait for stronger decoded-frame readiness before the fir
 - Capture seeking waits for `loadeddata`/`canplay`, `seeked`, and decoded frame readiness where available.
 - The seek timeout fallback no longer draws blindly if the browser has not reached the target frame.
 - The first captured frame can retry a likely blank/black canvas a limited number of times, then accepts the result so intentionally black starts still work.
+
+### 2026-07-04 Capture speed and seam target hotfix v28.23
+
+The first-frame protection is now limited to the video priming path instead of slowing every captured frame.
+
+- Normal frame capture uses the fast `seeked` + double-rAF path again.
+- Decoded-frame waiting remains available for the one-time priming step after fresh import.
+- `Seam Blend` target frames now resolve from the next cycle start, not global tick `0`, so frame modes can visibly blend toward the upcoming first frame.

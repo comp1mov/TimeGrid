@@ -247,3 +247,12 @@ Fixed the recent fresh-import issue where the first generated video frame could 
 - Added shared capture readiness helpers for video ready state, decoded frame readiness, and safer seek completion.
 - Removed the blind draw-on-timeout behavior from `captureFrame()`.
 - Added limited blank-canvas retries for only the first generated frame, with a final acceptance path for videos that genuinely begin black.
+
+## 2026-07-04 Capture speed and seam target hotfix v28.23
+
+Fixed two regressions found while testing v28.22.
+
+- Normal capture no longer waits for a slow decoded-frame callback on every frame; it uses the fast `seeked` + double-rAF path again.
+- The stricter decoded-frame wait remains only in the one-time `primeVideoForCapture()` step.
+- `Seam Blend` now resolves its target from the next cycle start for the current tick, so `Frame Soft` and `Frame Full` visibly blend toward the upcoming first frame.
+- Chronophoto seam ghost indices now respect the frame count passed into the seam helper.

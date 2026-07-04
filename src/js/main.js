@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.22';
+  const APP_VERSION = 'v28.23';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -1774,8 +1774,8 @@ function updateInfoPanel() {
         v.removeEventListener('seeked', onSeeked);
         if (!ok) return resolve(false);
         const frameReady = await waitForDecodedVideoFrame(v, {
-          timeoutMs: Math.max(220, Math.round(timeoutMs * 0.5)),
-          preferRaf: !didSeek
+          timeoutMs: Math.max(60, Number(opts.frameReadyTimeout) || (opts.preferDecodedFrame ? 320 : 80)),
+          preferRaf: !opts.preferDecodedFrame
         });
         resolve(!!frameReady);
       };
@@ -1811,7 +1811,12 @@ function updateInfoPanel() {
     if (sourceUrl !== state.videoUrl || state.isSingleImage) return false;
 
     const warmTime = clampVideoCaptureTime(firstTime, { avoidStart: true });
-    const ok = await seekVideoForCapture(warmTime, { timeoutMs: 1200, avoidStart: true });
+    const ok = await seekVideoForCapture(warmTime, {
+      timeoutMs: 1200,
+      frameReadyTimeout: 360,
+      avoidStart: true,
+      preferDecodedFrame: true
+    });
     if (sourceUrl === state.videoUrl && ok) state._capturePrimedUrl = sourceUrl;
     return ok;
   }
@@ -2571,11 +2576,12 @@ function schedulePostGridSync() {
       : getCellBaseFrameOffset(cellOrderIdx, cellCount, frameCount);
 
     if (!opts.skipEnsureShuffle) ensureAnimDirShuffle(frameCount);
+    const dir = opts.dir || state.animDirection;
     const frameIdx = applyLoopAfterN(
       Number.isFinite(Number(tick)) ? Math.floor(Number(tick)) : 0,
       baseOffset,
       frameCount,
-      state.animDirection,
+      dir,
       opts.shuffle || state.animDirShuffle
     );
 
@@ -2670,11 +2676,13 @@ function schedulePostGridSync() {
     if (phase < start) return { alpha: 0, cycleLength, seamLength, phase };
 
     const progress = seamLength <= 1 ? 1 : (phase - start) / Math.max(1, seamLength - 1);
+    const nextCycleTick = rawTick + (cycleLength - phase);
     return {
       alpha: smoothstep01(progress),
       cycleLength,
       seamLength,
       phase,
+      targetTick: nextCycleTick,
       progress: Math.max(0, Math.min(1, progress))
     };
   }
@@ -2684,13 +2692,16 @@ function schedulePostGridSync() {
     const seam = getChronoSeamBlendInfo(tick, frameCount, opts);
     if (!seam || seam.alpha <= 0) return seam || { alpha: 0 };
 
-    const targetInfo = getFrameCellInfo(cellIdx, 0, {
+    const targetTick = Number.isFinite(Number(seam.targetTick)) ? Math.floor(Number(seam.targetTick)) : 0;
+    const dir = opts.dir || state.animDirection;
+    const targetInfo = getFrameCellInfo(cellIdx, targetTick, {
       frameCount,
       cellCount: opts.cellCount,
       cellOrderIdx: opts.cellOrderIdx,
       cellOrderMap: opts.cellOrderMap,
       cellOrder: opts.cellOrder,
       shuffle: opts.shuffle || state.animDirShuffle,
+      dir,
       skipEnsureShuffle: true
     });
 
@@ -2701,7 +2712,7 @@ function schedulePostGridSync() {
       targetFrameIdx: targetInfo.frameIdx,
       targetBaseOffset: targetInfo.baseOffset,
       targetGhostIndices: state.chronoEnabled
-        ? buildChronoGhostIndices(0, targetInfo.baseOffset, frameCount, opts.dir || state.animDirection, opts.shuffle || state.animDirShuffle)
+        ? buildChronoGhostIndices(targetTick, targetInfo.baseOffset, frameCount, dir, opts.shuffle || state.animDirShuffle)
         : []
     };
   }
@@ -4864,7 +4875,6 @@ function fitToSingleFrame() {
     const depth     = state.chronoDepth  || 3;
     const stride    = Math.max(1, state.chronoStride || 1);
     const cleanLoop = !!state.chronoCleanLoop;
-    const n         = state.frames.length;
     const indices   = [];
 
     for (let step = 1; step <= depth; step++) {
