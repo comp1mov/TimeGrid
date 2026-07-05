@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.25';
+  const APP_VERSION = 'v28.26';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -111,6 +111,7 @@ inject();
     frameTargetAspect: 'auto', // 'auto' (source) or aspect string like '16:9'
     scale: 1, panX: 0, panY: 0, isPanning: false,
     startPanX: 0, startPanY: 0, startMouseX: 0, startMouseY: 0,
+    viewPresets: [null, null, null, null],
     menuOpen: false,
     // Animation
     animFps: 14, animDirection: 'forward', animPattern: 'sequential', flipPatternX: false, flipPatternY: false,
@@ -3054,57 +3055,79 @@ canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale
     return Math.max(20, base);
   }
 
-  function fitToScreen() {
-    
+  function getFitViewportRect(opts = {}) {
+    const areaRect = canvasArea.getBoundingClientRect();
+    const rect = { left: 0, top: 0, width: areaRect.width, height: areaRect.height };
+
+    if (!opts.ignoreMenu && sideMenu && sideMenu.classList.contains('open')) {
+      const menuRect = sideMenu.getBoundingClientRect();
+      const menuLeft = Math.max(0, Math.min(areaRect.width, menuRect.left - areaRect.left));
+      const menuOverlapW = Math.max(0, Math.min(areaRect.right, menuRect.right) - Math.max(areaRect.left, menuRect.left));
+      // Desktop menu overlays the right side; on mobile it can cover the full area, so keep full rect there.
+      if (menuOverlapW > 0 && menuLeft >= 180) rect.width = menuLeft;
+    }
+
+    return rect;
+  }
+
+  function syncViewportDependentLayers() {
+    requestAnimationFrame(() => {
+      try { updateExportGuidesOverlay(); } catch (e) {}
+      if (state.drawMode) {
+        try { resizeDrawCanvas(); } catch (e) {}
+        try { compositeAllLayers(); } catch (e) {}
+      } else {
+        try { requestComposite(); } catch (e) {}
+      }
+    });
+  }
+
+  function applyViewportToElement(el, opts = {}) {
+    if (!el) return false;
+
+    const viewport = getFitViewportRect(opts);
+    const mode = opts.mode === 'cover' ? 'cover' : 'contain';
+    const pad = mode === 'cover' ? 0 : getFitPad(viewport);
+    const availW = viewport.width - pad * 2;
+    const availH = viewport.height - pad * 2;
+    const elW = el.offsetWidth;
+    const elH = el.offsetHeight;
+
+    const dimsOk =
+      viewport.width > 120 && viewport.height > 120 &&
+      availW > 0 && availH > 0 &&
+      elW > 10 && elH > 10;
+
+    if (!dimsOk) return false;
+
+    const containScale = Math.min(availW / Math.max(1, elW), availH / Math.max(1, elH));
+    const coverScale = Math.max(availW / Math.max(1, elW), availH / Math.max(1, elH));
+    const rawScale = mode === 'cover' ? coverScale : containScale;
+    const maxScale = Number.isFinite(Number(opts.maxScale)) ? Number(opts.maxScale) : VIEW_SCALE_MAX;
+    const minScale = Number.isFinite(Number(opts.minScale)) ? Number(opts.minScale) : VIEW_SCALE_MIN;
+    const scale = Math.max(minScale, Math.min(maxScale, rawScale * (Number(opts.scaleMul) || 1)));
+    const off = getOffsetWithin(el, canvasInner);
+
+    state.scale = scale;
+    state.panX = viewport.left + (viewport.width - elW * state.scale) / 2 - off.x * state.scale;
+    state.panY = viewport.top + (viewport.height - elH * state.scale) / 2 - off.y * state.scale;
+
+    updateTransform();
+    syncViewportDependentLayers();
+    return true;
+  }
+
+  function fitToScreen(opts = {}) {
     if (!state.frames.length) return;
 
-    const MIN_VIEW_SCALE = VIEW_SCALE_MIN;
-    const MAX_VIEW_SCALE = VIEW_SCALE_MAX;
     const MAX_TRIES = 10;
 
     let tries = 0;
 
     const attempt = () => {
       tries++;
-
-      const rect = canvasArea.getBoundingClientRect();
-      const pad = getFitPad(rect);
-      const availW = rect.width - pad * 2;
-      const availH = rect.height - pad * 2;
-
-      // Use layout metrics unaffected by the current CSS transform.
-      const gridW = framesGrid.offsetWidth;
-      const gridH = framesGrid.offsetHeight;
-
-      const dimsOk =
-        rect.width > 200 && rect.height > 200 &&
-        availW > 0 && availH > 0 &&
-        gridW > 40 && gridH > 40;
-
-      const scaleCandidate = dimsOk
-        ? Math.min(availW / Math.max(1, gridW), availH / Math.max(1, gridH))
-        : NaN;
-
-      if (!Number.isFinite(scaleCandidate)) {
-        if (typeof dbg === 'function') {
-        }
+      if (!applyViewportToElement(framesGrid, opts)) {
         if (tries < MAX_TRIES) return queueMicrotask(attempt);
-        return;
-      }
-
-      const off = getOffsetWithin(framesGrid, canvasInner);
-
-      state.scale = Math.max(MIN_VIEW_SCALE, Math.min(MAX_VIEW_SCALE, scaleCandidate));
-      state.panX = (rect.width - gridW * state.scale) / 2 - off.x * state.scale;
-      state.panY = (rect.height - gridH * state.scale) / 2 - off.y * state.scale;
-
-      
-
-      updateTransform();
-
-      if (state.drawMode) {
-        resizeDrawCanvas();
-        compositeAllLayers();
       }
     };
 
@@ -3120,7 +3143,7 @@ canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale
     updateTransform();
 
     requestAnimationFrame(() => {
-      const areaRect = canvasArea.getBoundingClientRect();
+      const areaRect = getFitViewportRect();
 
       if (state.viewMode === 'single') {
         const items = framesGrid.querySelectorAll('.frame-item');
@@ -3132,12 +3155,13 @@ canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale
         const frameH = firstFrame.offsetHeight;
         const off = getOffsetWithin(firstFrame, canvasInner);
 
-        state.panX = (areaRect.width - frameW) / 2 - off.x;
-        state.panY = (areaRect.height - frameH) / 2 - off.y;
+        state.panX = areaRect.left + (areaRect.width - frameW) / 2 - off.x;
+        state.panY = areaRect.top + (areaRect.height - frameH) / 2 - off.y;
       } else {
         const gridRect = framesGrid.getBoundingClientRect();
-        const areaCx = areaRect.left + areaRect.width * 0.5;
-        const areaCy = areaRect.top + areaRect.height * 0.5;
+        const canvasRect = canvasArea.getBoundingClientRect();
+        const areaCx = canvasRect.left + areaRect.left + areaRect.width * 0.5;
+        const areaCy = canvasRect.top + areaRect.top + areaRect.height * 0.5;
         const gridCx = gridRect.left + gridRect.width * 0.5;
         const gridCy = gridRect.top + gridRect.height * 0.5;
 
@@ -3153,11 +3177,8 @@ canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale
     });
   }
 
-function fitToSingleFrame() {
+function fitToSingleFrame(opts = {}) {
     if (!state.frames.length) return;
-
-    const rect = canvasArea.getBoundingClientRect();
-    const pad = getFitPad(rect);
 
     // Find first frame item (skip info card if present)
     const items = framesGrid.querySelectorAll('.frame-item');
@@ -3165,40 +3186,112 @@ function fitToSingleFrame() {
     const firstFrame = items[offset];
     if (!firstFrame) return;
 
-    // Use layout metrics (unaffected by current CSS transform)
-    const frameW = firstFrame.offsetWidth;
-    const frameH = firstFrame.offsetHeight;
-    const off = getOffsetWithin(firstFrame, canvasInner);
-
-    const availW = rect.width - pad * 2;
-    const availH = rect.height - pad * 2;
-
-    const dimsOk =
-      rect.width > 200 && rect.height > 200 &&
-      availW > 0 && availH > 0 &&
-      frameW > 10 && frameH > 10;
-
-    const scaleCandidate = dimsOk
-      ? Math.min(availW / Math.max(1, frameW), availH / Math.max(1, frameH), 3)
-      : NaN;
-
-    if (!Number.isFinite(scaleCandidate)) return;
-
-    state.scale = scaleCandidate;
-    // Center the frame in viewport
-    state.panX = (rect.width - frameW * state.scale) / 2 - off.x * state.scale;
-    state.panY = (rect.height - frameH * state.scale) / 2 - off.y * state.scale;
-
-    updateTransform();
+    applyViewportToElement(firstFrame, { ...opts, maxScale: Number.isFinite(Number(opts.maxScale)) ? opts.maxScale : 3 });
   }
 
-  function fitActiveView() {
-    if (state.viewMode === 'single') fitToSingleFrame();
-    else fitToScreen();
+  function fitActiveView(opts = {}) {
+    if (state.viewMode === 'single') fitToSingleFrame(opts);
+    else fitToScreen(opts);
   }
 
   function requestFitToActiveView() {
     requestAnimationFrame(() => requestAnimationFrame(() => fitActiveView()));
+  }
+
+  function getViewPresetSlotFromCode(code) {
+    const m = String(code || '').match(/^(?:Digit|Numpad)([1-4])$/);
+    return m ? Number(m[1]) - 1 : -1;
+  }
+
+  function flashViewPresetFeedback(slot, type) {
+    try {
+      if (!qFit) return;
+      const prev = qFit.title;
+      qFit.title = `${type === 'save' ? 'Saved' : 'View'} ${slot + 1}`;
+      qFit.classList.add('active');
+      setTimeout(() => {
+        qFit.classList.remove('active');
+        qFit.title = prev || 'Fit visible workspace (F)';
+      }, 420);
+    } catch (e) {}
+  }
+
+  function saveViewPreset(slot) {
+    if (slot < 0 || slot > 3) return;
+    state.viewPresets[slot] = {
+      scale: Number.isFinite(state.scale) ? state.scale : 1,
+      panX: Number.isFinite(state.panX) ? state.panX : 0,
+      panY: Number.isFinite(state.panY) ? state.panY : 0,
+      viewMode: state.viewMode === 'single' ? 'single' : 'grid',
+      currentTick: Number.isFinite(Number(state.currentTick)) ? Math.max(0, Math.floor(Number(state.currentTick))) : 0
+    };
+    flashViewPresetFeedback(slot, 'save');
+  }
+
+  function applySavedViewPreset(preset) {
+    if (!preset) return false;
+    if (preset.viewMode && preset.viewMode !== state.viewMode) setViewMode(preset.viewMode, { fit: false });
+    if (!state.isPlaying && Number.isFinite(Number(preset.currentTick))) {
+      state.currentTick = Math.max(0, Math.floor(Number(preset.currentTick)));
+      updateLogoFromTick();
+      updateAllCells();
+    }
+
+    state.scale = clampViewScale(Number(preset.scale) || 1);
+    state.panX = Number.isFinite(Number(preset.panX)) ? Number(preset.panX) : 0;
+    state.panY = Number.isFinite(Number(preset.panY)) ? Number(preset.panY) : 0;
+    updateTransform();
+    syncViewportDependentLayers();
+    return true;
+  }
+
+  function applyGridZoomPreset(cols, rows) {
+    if (!state.frames.length) return;
+    const targetEl = state.viewMode === 'single'
+      ? framesGrid.querySelector('.frame-item')
+      : framesGrid;
+    if (!targetEl) return;
+
+    if (state.viewMode === 'single') {
+      const scaleMul = cols <= 3 ? 1.85 : 1.35;
+      applyViewportToElement(targetEl, { scaleMul, maxScale: VIEW_SCALE_MAX });
+      return;
+    }
+
+    const viewport = getFitViewportRect();
+    const pad = getFitPad(viewport);
+    const availW = viewport.width - pad * 2;
+    const availH = viewport.height - pad * 2;
+    const firstCell = framesGrid.querySelector('.frame-item');
+    if (!firstCell || availW <= 0 || availH <= 0) return;
+
+    const styles = getComputedStyle(framesGrid);
+    const gapX = Number.parseFloat(styles.columnGap || styles.gap) || Number(state.spacing) || 0;
+    const gapY = Number.parseFloat(styles.rowGap || styles.gap) || Number(state.spacing) || 0;
+    const cellW = Math.max(1, firstCell.offsetWidth);
+    const cellH = Math.max(1, firstCell.offsetHeight);
+    const targetW = cellW * cols + gapX * Math.max(0, cols - 1);
+    const targetH = cellH * rows + gapY * Math.max(0, rows - 1);
+    const visibleScale = Math.min(availW / targetW, availH / targetH);
+    const containScale = Math.min(availW / Math.max(1, framesGrid.offsetWidth), availH / Math.max(1, framesGrid.offsetHeight));
+    const scale = Math.max(containScale, visibleScale);
+
+    applyViewportToElement(framesGrid, { scaleMul: scale / Math.max(0.0001, containScale), maxScale: VIEW_SCALE_MAX });
+  }
+
+  function applyDefaultViewPreset(slot) {
+    if (slot === 0) fitActiveView({ mode: 'contain' });
+    else if (slot === 1) fitActiveView({ mode: 'cover' });
+    else if (slot === 2) applyGridZoomPreset(3, 2);
+    else if (slot === 3) applyGridZoomPreset(5, 3);
+  }
+
+  function recallViewPreset(slot) {
+    if (slot < 0 || slot > 3) return;
+    const saved = state.viewPresets[slot];
+    if (saved) applySavedViewPreset(saved);
+    else applyDefaultViewPreset(slot);
+    flashViewPresetFeedback(slot, 'recall');
   }
 
   function refreshActiveViewLayout() {
@@ -3211,7 +3304,7 @@ function fitToSingleFrame() {
     });
   }
 
-  function setViewMode(mode) {
+  function setViewMode(mode, opts = {}) {
     state.viewMode = mode;
     qMode.textContent = mode === 'grid' ? 'GRID' : '1';
     qMode.classList.toggle('active', mode === 'single');
@@ -3226,7 +3319,8 @@ function fitToSingleFrame() {
       }
       item.classList.remove('dimmed');
     });
-    refreshActiveViewLayout();
+    if (opts.fit !== false) refreshActiveViewLayout();
+    else syncViewportDependentLayers();
   }
 
   function cycleSelectOption(selectId, delta) {
@@ -13025,6 +13119,12 @@ window.addEventListener('keydown', (e) => {
       }
       return;
     }
+    const altViewSlot = getViewPresetSlotFromCode(code);
+    if (e.altKey && !e.ctrlKey && !e.metaKey && altViewSlot >= 0) {
+      e.preventDefault();
+      saveViewPreset(altViewSlot);
+      return;
+    }
     if (e.altKey) return;
 
 // Escape should always work
@@ -13104,30 +13204,19 @@ window.addEventListener('keydown', (e) => {
     }
     else if (code === 'Digit1' || code === 'Numpad1') {
       e.preventDefault();
-      if (!state.drawMode) setDrawMode(true);
-      if (state.drawEraser) drawEraserBtn.click();
-      const b1 = document.querySelector('.draw-brush-btn[data-brush="round"]');
-      if (b1) b1.click();
+      recallViewPreset(0);
     }
     else if (code === 'Digit2' || code === 'Numpad2') {
       e.preventDefault();
-      if (!state.drawMode) setDrawMode(true);
-      if (state.drawEraser) drawEraserBtn.click();
-      const b2 = document.querySelector('.draw-brush-btn[data-brush="spray"]');
-      if (b2) b2.click();
+      recallViewPreset(1);
     }
     else if (code === 'Digit3' || code === 'Numpad3') {
       e.preventDefault();
-      if (!state.drawMode) setDrawMode(true);
-      if (!state.drawEraser) drawEraserBtn.click();
+      recallViewPreset(2);
     }
     else if (code === 'Digit4' || code === 'Numpad4') {
       e.preventDefault();
-      if (!state.drawMode) setDrawMode(true);
-      // Activate eyedropper directly — avoid toggle via btn.click() which can deactivate it
-      eyedropperActive = true;
-      if (drawEyedropperBtn) drawEyedropperBtn.classList.add('active');
-      drawCanvas.style.cursor = 'crosshair';
+      recallViewPreset(3);
     }
     else if (code === 'KeyX') {
       e.preventDefault();
