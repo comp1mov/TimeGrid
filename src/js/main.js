@@ -3103,9 +3103,12 @@ canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale
     const containScale = Math.min(availW / Math.max(1, elW), availH / Math.max(1, elH));
     const coverScale = Math.max(availW / Math.max(1, elW), availH / Math.max(1, elH));
     const rawScale = mode === 'cover' ? coverScale : containScale;
+    const coverOverscan = mode === 'cover'
+      ? (Number.isFinite(Number(opts.coverOverscan)) ? Math.max(0, Number(opts.coverOverscan)) : 0.0075)
+      : 0;
     const maxScale = Number.isFinite(Number(opts.maxScale)) ? Number(opts.maxScale) : VIEW_SCALE_MAX;
     const minScale = Number.isFinite(Number(opts.minScale)) ? Number(opts.minScale) : VIEW_SCALE_MIN;
-    const scale = Math.max(minScale, Math.min(maxScale, rawScale * (Number(opts.scaleMul) || 1)));
+    const scale = Math.max(minScale, Math.min(maxScale, rawScale * (Number(opts.scaleMul) || 1) * (1 + coverOverscan)));
     const off = getOffsetWithin(el, canvasInner);
 
     state.scale = scale;
