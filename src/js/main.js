@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.26';
+  const APP_VERSION = 'v28.27';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -139,7 +139,9 @@ exportQuality: 'hd', // low, medium, high, max
     _exportBgCropGrid: null,
     _exportBgCropSingle: null,
     exportLoops: 1, // 1-10 loops for MP4
+    fgAccentColor: '#35f2a3',
     accent2Color: '#f28c35',  // second accent color (logo last-frame dot)
+    panelOpacity: 0.88,
     currentFrame: 0, // current frame index for manual scrubbing
     // Drawing state - Layer architecture:
     // 1. bgDrawing - background around frames
@@ -261,12 +263,56 @@ function getTargetFrameOutputDims() {
   const app = $('app'), metadataBar = $('metadataBar'), canvasArea = $('canvasArea');
   const canvasInner = $('canvasInner'), framesGrid = $('framesGrid'), dropZone = $('dropZone'), bgGridLayer = $('bgGridLayer');
   const sideMenu = $('sideMenu'), menuToggleBtn = $('menuToggleBtn'), menuCloseBtn = $('menuCloseBtn');
+  const panelOpacitySlider = $('panelOpacitySlider'), panelOpacityValue = $('panelOpacityValue');
   const progressBar = $('progressBar'), progressFill = $('progressFill');
   const loadingOverlay = $('loadingOverlay'), loadingProgress = $('loadingProgress');
   const videoElement = $('videoElement'), videoInput = $('videoInput'), imageInput = $('imageInput');
   const refFrameInput = $('refFrameInput');
   const captureCanvas = $('captureCanvas'), captureCtx = captureCanvas.getContext('2d');
   const gridHint = $('gridHint');
+
+  function getViewportMetrics() {
+    const vv = window.visualViewport;
+    return {
+      width: Math.max(1, vv ? vv.width : (window.innerWidth || document.documentElement.clientWidth || 1)),
+      height: Math.max(1, vv ? vv.height : (window.innerHeight || document.documentElement.clientHeight || 1)),
+      offsetTop: vv ? (vv.offsetTop || 0) : 0
+    };
+  }
+
+  function isCompactMobileLayout() {
+    const { width, height } = getViewportMetrics();
+    const coarse = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0;
+    return width <= 820 || (coarse && height >= width);
+  }
+
+  function getMobileRailWidth() {
+    if (!isCompactMobileLayout()) return 0;
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--mobile-rail-w').trim();
+    const parsed = Number.parseFloat(raw);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 52;
+  }
+
+  function syncMobileViewportVars() {
+    const metrics = getViewportMetrics();
+    const compact = isCompactMobileLayout();
+    document.documentElement.style.setProperty('--app-vh', `${metrics.height * 0.01}px`);
+    if (app) {
+      app.classList.toggle('mobile-ui', compact);
+      const scrollY = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
+      const collapsed = compact && (scrollY > 18 || metrics.offsetTop > 18);
+      app.classList.toggle('mobile-header-collapsed', collapsed);
+    }
+    return compact;
+  }
+
+  function applyPanelOpacity() {
+    const alpha = Math.max(0.35, Math.min(1, Number(state.panelOpacity) || 0.88));
+    state.panelOpacity = alpha;
+    document.documentElement.style.setProperty('--fg-panel-opacity', alpha.toFixed(2));
+    if (panelOpacitySlider) panelOpacitySlider.value = String(Math.round(alpha * 100));
+    if (panelOpacityValue) panelOpacityValue.textContent = `${Math.round(alpha * 100)}%`;
+  }
 
   const gridColsInput = $('gridCols'), canvasAspectSelect = $('canvasAspect');
   const selectionModeSelect = $('selectionMode'), frameCountInput = $('frameCount');
@@ -577,6 +623,8 @@ function getTargetFrameOutputDims() {
     sideMenu.classList.add('open');
     menuToggleBtn.classList.add('active');
     canvasArea.classList.add('has-menu');
+    syncMobileViewportVars();
+    requestAnimationFrame(() => { if (state.autoFit && state.frames.length) fitActiveView(); });
   }
   function closeMenu() {
     
@@ -584,6 +632,8 @@ function getTargetFrameOutputDims() {
     sideMenu.classList.remove('open');
     menuToggleBtn.classList.remove('active');
     canvasArea.classList.remove('has-menu');
+    syncMobileViewportVars();
+    requestAnimationFrame(() => { if (state.autoFit && state.frames.length) fitActiveView(); });
   }
   function toggleMenu() { state.menuOpen ? closeMenu() : openMenu(); }
 
@@ -2911,6 +2961,7 @@ function renderGrid() {
   let navStartPanY = 0;
   let threeFingersStartY = null;
   let threeFingersStartSize = null;
+  let mobileNavPending = null;
 
   function navStart(touches) {
     if (!touches || !touches.length) return;
@@ -2958,6 +3009,7 @@ function renderGrid() {
   function navEnd() {
     navTouchMode = null;
     navTouchActive = false;
+    mobileNavPending = null;
     navStartDist = 0;
     navLastCenter = null;
     threeFingersStartY = null;
@@ -2973,10 +3025,16 @@ function renderGrid() {
     if (e.target.closest('.side-menu,.draw-palette,.drop-zone')) return;
     if (e.touches.length >= 2) {
       e.preventDefault();
+      mobileNavPending = null;
       navStart(e.touches);
       return;
     }
     if (!state.drawMode && e.touches.length === 1) {
+      if (isCompactMobileLayout()) {
+        const t = e.touches[0];
+        mobileNavPending = { x: t.clientX, y: t.clientY, panX: state.panX, panY: state.panY };
+        return;
+      }
       e.preventDefault();
       navStart(e.touches);
       return;
@@ -2990,6 +3048,38 @@ function renderGrid() {
   canvasArea.addEventListener('touchmove', e => {
     if (isQuickUI(e.target)) return;
     if (e.target.closest('.side-menu,.draw-palette,.drop-zone')) return;
+    if (mobileNavPending) {
+      if (e.touches.length >= 2) {
+        e.preventDefault();
+        mobileNavPending = null;
+        navStart(e.touches);
+        return;
+      }
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const dx = t.clientX - mobileNavPending.x;
+        const dy = t.clientY - mobileNavPending.y;
+        const ax = Math.abs(dx);
+        const ay = Math.abs(dy);
+        if (ay > 12 && ay > ax * 1.15) {
+          mobileNavPending = null;
+          return;
+        }
+        if (Math.max(ax, ay) > 8) {
+          e.preventDefault();
+          const pending = mobileNavPending;
+          mobileNavPending = null;
+          navStart(e.touches);
+          navStartX = pending.x;
+          navStartY = pending.y;
+          navStartPanX = pending.panX;
+          navStartPanY = pending.panY;
+          navMove(e.touches);
+          return;
+        }
+      }
+      return;
+    }
     if (navTouchActive) {
       e.preventDefault();
       navMove(e.touches);
@@ -3058,6 +3148,11 @@ canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale
   function getFitViewportRect(opts = {}) {
     const areaRect = canvasArea.getBoundingClientRect();
     const rect = { left: 0, top: 0, width: areaRect.width, height: areaRect.height };
+    const railW = getMobileRailWidth();
+    if (railW > 0 && rect.width > railW + 120) {
+      rect.left += railW;
+      rect.width -= railW;
+    }
 
     if (!opts.ignoreMenu && sideMenu && sideMenu.classList.contains('open')) {
       const menuRect = sideMenu.getBoundingClientRect();
@@ -4379,6 +4474,14 @@ function fitToSingleFrame(opts = {}) {
       state.accent2Color = accent2ColorInput.value;
       document.documentElement.style.setProperty('--fg-accent2', state.accent2Color);
       updateLogoFromTick();
+    };
+  }
+
+  if (panelOpacitySlider) {
+    panelOpacitySlider.value = String(Math.round((Number(state.panelOpacity) || 0.88) * 100));
+    panelOpacitySlider.oninput = () => {
+      state.panelOpacity = (parseInt(panelOpacitySlider.value, 10) || 88) / 100;
+      applyPanelOpacity();
     };
   }
 
@@ -12866,6 +12969,12 @@ const canvas = document.createElement('canvas');
     $('fgAccentColor').value = state.fgAccentColor || '#35f2a3';
     document.documentElement.style.setProperty('--fg-accent', state.fgAccentColor || '#35f2a3');
   }
+  if ($('fgAccent2Color')) {
+    $('fgAccent2Color').value = state.accent2Color || '#f28c35';
+    document.documentElement.style.setProperty('--fg-accent2', state.accent2Color || '#f28c35');
+  }
+  applyPanelOpacity();
+  syncMobileViewportVars();
   if (toggleBgGrid) toggleBgGrid.classList.toggle('active', !!state.bgGridShow);
   if (bgGridTypeSelect) bgGridTypeSelect.value = state.bgGridType || 'lines';
   if (bgGridColorInput) bgGridColorInput.value = state.bgGridColor || '#ffffff';
@@ -13300,6 +13409,7 @@ window.addEventListener('keydown', (e) => {
   // Viewport changes (resize/orientation) - stabilize layout on iPad/Safari/Chrome
   let viewportTimeout;
   function onViewportChanged() {
+    syncMobileViewportVars();
     clearTimeout(viewportTimeout);
     viewportTimeout = setTimeout(() => {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -13336,6 +13446,7 @@ window.addEventListener('keydown', (e) => {
   }
 
   window.addEventListener('resize', onViewportChanged, { passive: true });
+  window.addEventListener('scroll', onViewportChanged, { passive: true });
   window.addEventListener('orientationchange', onViewportChanged, { passive: true });
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', onViewportChanged, { passive: true });
