@@ -291,7 +291,7 @@
     .dz-title { font-size: 28px; font-weight: 700; letter-spacing: 0.5px; color: rgba(255,255,255,0.86); margin-bottom: 10px; }
     .dz-subtitle { font-size: 12px; line-height: 1.55; color: rgba(255,255,255,0.54); max-width: 520px; }
     .dz-subtitle div{ margin: 0; }
-    .drop-zone-formats { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 12px; }
+    .drop-zone-formats { font-size: 10px; color: rgba(255,255,255,0.36); margin-top: 12px; letter-spacing: 0.04em; }
     .drop-zone-hint { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 6px; }
     .drop-zone-btn {
       padding: 10px 24px; background: var(--fg-accent, #35f2a3); color: #000; border: none;
@@ -304,7 +304,7 @@
     /* START SCREEN LINKS */
     .drop-zone-support{
       width: min(520px, calc(100% - 64px));
-      margin-top: 28px;
+      margin-top: 24px;
       display: block;
     }
     .drop-zone-support-text{
@@ -318,7 +318,17 @@
       text-wrap: pretty;
       hyphens: auto;
     }
-    .drop-zone-support-text p{ margin: 0; }
+    .drop-zone-support-text p{
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .drop-zone-credit{
+      display: block;
+      margin-top: 6px;
+      color: rgba(255,255,255,0.38);
+    }
     .drop-zone-support-link{
       color: inherit;
       text-decoration: underline;
