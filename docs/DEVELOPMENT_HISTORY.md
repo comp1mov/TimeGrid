@@ -321,3 +321,14 @@ Released after v28.28.
 - The button calls the existing `toggleAllSections()` command, giving phone users access to collapse/expand even when the menu header is clipped.
 - Quick Fit now supports a repeated-click gesture: first click/tap performs contain fit, second fast click/tap performs cover/fill fit.
 - The implementation reuses existing `fitActiveView({ mode: 'cover' })` instead of adding a separate fit algorithm.
+
+## 2026-07-07 Mobile fit and panel controls v28.29 follow-up
+
+Polished the same mobile control pass without bumping the visible app version.
+
+- Panel opacity now defaults to `50%`.
+- The same panel opacity value drives the side menu, quick buttons, sticky mobile menu header, and draw palette.
+- On mobile, the second quick Fit tap uses cover/fill and allows the image to scale underneath the left quick rail; the first tap still fits to the visible area beside the rail.
+- The phone draw palette now has a compact responsive layout so it does not spill across the viewport.
+- The mobile landing screen is left-aligned inside the usable area beside the quick rail.
+- The side-menu header collapse button now shows `N`, matching the mobile quick collapse button and the existing keyboard shortcut.

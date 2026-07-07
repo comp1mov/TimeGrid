@@ -713,3 +713,7 @@ Released after v28.28:
 
 - Added a mobile-only `N` quick button above the menu button to collapse/expand menu sections when the menu header is clipped or hard to reach.
 - Quick Fit now cycles by repeated tap: first tap is contain fit, second fast tap is cover/fill fit.
+- Follow-up mobile polish keeps the same visible version but sets panel opacity to `50%` by default.
+- The panel opacity setting now applies consistently to the side menu, quick buttons, sticky mobile menu header, and draw palette.
+- Mobile cover/fill Fit can scale the image under the left quick rail on the second tap, while the first tap still fits beside the rail.
+- The phone draw palette is more compact, the mobile landing screen is left-aligned beside the quick rail, and the side-menu collapse control now also displays `N`.
