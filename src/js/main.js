@@ -625,7 +625,6 @@ function getTargetFrameOutputDims() {
     menuToggleBtn.classList.add('active');
     canvasArea.classList.add('has-menu');
     syncMobileViewportVars();
-    requestAnimationFrame(() => { if (state.autoFit && state.frames.length) fitActiveView(); });
   }
   function closeMenu() {
     
@@ -634,7 +633,6 @@ function getTargetFrameOutputDims() {
     menuToggleBtn.classList.remove('active');
     canvasArea.classList.remove('has-menu');
     syncMobileViewportVars();
-    requestAnimationFrame(() => { if (state.autoFit && state.frames.length) fitActiveView(); });
   }
   function toggleMenu() { state.menuOpen ? closeMenu() : openMenu(); }
 
