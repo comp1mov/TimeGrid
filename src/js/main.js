@@ -111,6 +111,7 @@ inject();
     frameTargetAspect: 'auto', // 'auto' (source) or aspect string like '16:9'
     scale: 1, panX: 0, panY: 0, isPanning: false,
     startPanX: 0, startPanY: 0, startMouseX: 0, startMouseY: 0,
+    fitMode: 'contain', fitIncludeMobileRail: false,
     viewPresets: [null, null, null, null],
     menuOpen: false,
     // Animation
@@ -3286,9 +3287,30 @@ function fitToSingleFrame(opts = {}) {
     applyViewportToElement(firstFrame, { ...opts, maxScale: Number.isFinite(Number(opts.maxScale)) ? opts.maxScale : 3 });
   }
 
+  function resolveFitOpts(opts = {}) {
+    const hasMode = opts.mode === 'contain' || opts.mode === 'cover';
+    const prevMode = state.fitMode === 'cover' ? 'cover' : 'contain';
+    const mode = hasMode ? opts.mode : prevMode;
+    const hasRail = Object.prototype.hasOwnProperty.call(opts, 'includeMobileRail');
+    const includeMobileRail = hasRail
+      ? !!opts.includeMobileRail
+      : (hasMode && mode !== prevMode ? false : !!state.fitIncludeMobileRail);
+    return { ...opts, mode, includeMobileRail };
+  }
+
+  function rememberFitOpts(opts = {}) {
+    state.fitMode = opts.mode === 'cover' ? 'cover' : 'contain';
+    state.fitIncludeMobileRail = !!opts.includeMobileRail;
+  }
+
   function fitActiveView(opts = {}) {
-    if (state.viewMode === 'single') fitToSingleFrame(opts);
-    else fitToScreen(opts);
+    const fitOpts = resolveFitOpts(opts);
+    const shouldRemember = opts.remember !== false &&
+      (Object.prototype.hasOwnProperty.call(opts, 'mode') ||
+       Object.prototype.hasOwnProperty.call(opts, 'includeMobileRail'));
+    if (shouldRemember) rememberFitOpts(fitOpts);
+    if (state.viewMode === 'single') fitToSingleFrame(fitOpts);
+    else fitToScreen(fitOpts);
   }
 
   function requestFitToActiveView() {

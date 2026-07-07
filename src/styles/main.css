@@ -293,6 +293,7 @@
     }
     .drop-zone-text { text-align: center; line-height: 1.2; margin-top: 10px; margin-bottom: 20px; }
     .dz-title { font-size: 28px; font-weight: 700; letter-spacing: 0.5px; color: rgba(255,255,255,0.86); margin-bottom: 10px; }
+    .dz-version { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: rgba(255,255,255,0.42); margin: -4px 0 10px; text-transform: uppercase; }
     .dz-subtitle { font-size: 12px; line-height: 1.55; color: rgba(255,255,255,0.54); max-width: 520px; }
     .dz-subtitle div{ margin: 0; }
     .drop-zone-formats { font-size: 10px; color: rgba(255,255,255,0.36); margin-top: 12px; letter-spacing: 0.04em; }
@@ -636,33 +637,32 @@
     @media (max-width: 820px), (pointer: coarse) and (orientation: portrait) {
       :root {
         --mobile-rail-w: 52px;
-        --mobile-scroll-room: 128px;
+        --mobile-scroll-room: 0px;
       }
 
       html,
       body {
-        height: auto;
+        height: 100%;
         min-height: 100%;
         overflow-x: hidden;
-        overflow-y: auto;
-        overscroll-behavior-x: none;
-        overscroll-behavior-y: contain;
+        overflow-y: hidden;
+        overscroll-behavior: none;
         touch-action: pan-y;
       }
 
       body {
-        min-height: calc((var(--app-vh, 1vh) * 100) + var(--mobile-scroll-room, 128px));
+        min-height: calc(var(--app-vh, 1vh) * 100);
       }
 
       body::after {
-        content: "";
-        display: block;
-        height: var(--mobile-scroll-room, 128px);
+        content: none;
+        display: none;
+        height: 0;
         pointer-events: none;
       }
 
       .app {
-        position: sticky;
+        position: relative;
         top: 0;
         height: calc(var(--app-vh, 1vh) * 100);
         min-height: calc(var(--app-vh, 1vh) * 100);
@@ -670,10 +670,12 @@
       }
 
       .metadata-bar {
-        height: 44px;
-        min-height: 44px;
-        padding: 0 48px 0 8px;
-        transition: height 0.18s ease, min-height 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
+        display: none;
+        height: 0;
+        min-height: 0;
+        padding: 0;
+        border-bottom: 0;
+        transition: none;
       }
 
       .app.mobile-header-collapsed .metadata-bar {
@@ -745,7 +747,7 @@
       }
 
       .canvas-area {
-        touch-action: pan-y;
+        touch-action: none;
       }
 
       .quick-toolbar {
@@ -848,6 +850,12 @@
 
       .dz-title {
         font-size: 25px;
+        margin-bottom: 7px;
+      }
+
+      .dz-version {
+        font-size: 10px;
+        margin: -2px 0 9px;
       }
 
       .dz-subtitle {
@@ -1025,7 +1033,6 @@
       z-index: 200;
       cursor: move;
       user-select: none;
-      backdrop-filter: blur(10px);
       box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
     .draw-palette.visible { display: flex; }
