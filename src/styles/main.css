@@ -352,7 +352,6 @@
       transform: translateX(100%); transition: transform 0.52s cubic-bezier(0.77, 0, 0.175, 1);
       will-change: transform;
       z-index: 20; display: flex; flex-direction: column; overflow-y: auto;
-      backdrop-filter: blur(10px);
     }
 
     /* Side menu scrollbar: ultra-thin */
@@ -477,7 +476,6 @@
       display: flex; align-items: center; justify-content: center;
       touch-action: manipulation;
       pointer-events: auto;
-      backdrop-filter: blur(8px);
     }
     .quick-btn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); }
     .quick-btn:active, .quick-btn.active { background: color-mix(in srgb, var(--fg-accent, #35f2a3) 30%, transparent); border-color: var(--fg-accent, #35f2a3); color: var(--fg-accent, #35f2a3); }
@@ -803,7 +801,6 @@
         min-height: 48px;
         align-items: center;
         background: rgba(0,0,0,var(--fg-panel-opacity, 0.88));
-        backdrop-filter: blur(14px);
       }
 
       .menu-section,
