@@ -5,3 +5,10 @@ dist/
 split.js
 split_legacy.py
 legacy/
+
+# Local/private research and narrative notes
+docs/private/
+docs/PROJECT_NARRATIVE.md
+docs/Animation Grids.md
+docs/teory/
+FrameGrid 313a0c4a812c8080aea8cf392b536cc6.md
