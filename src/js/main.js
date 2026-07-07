@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.28';
+  const APP_VERSION = 'v28.29';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -600,7 +600,8 @@ function getTargetFrameOutputDims() {
   // Quick toolbar
   const qMode = $('qMode'), qReset = $('qReset'), qPrev = $('qPrev'), qPlay = $('qPlay'), qNext = $('qNext'), qDraw = $('qDraw'), qFit = $('qFit');
   const qOne = $('qOne');
-  const qMenu = $('qMenu');
+  const qMenu = $('qMenu'), qCollapse = $('qCollapse');
+  let qFitLastClickAt = 0;
   
   // Timecode style controls
   const tcTextColorInput = $('tcTextColor'), tcBgColorInput = $('tcBgColor');
@@ -4880,9 +4881,15 @@ function fitToSingleFrame(opts = {}) {
   qPrev.onclick = () => stepFrame(-1);
   qNext.onclick = () => stepFrame(1);
   qPlay.onclick = () => { state.isPlaying ? stopAnimation() : startAnimation(); };
-  qFit.onclick = () => { fitActiveView(); };
+  qFit.onclick = () => {
+    const now = Date.now();
+    const shouldFill = qFitLastClickAt && now - qFitLastClickAt <= 650;
+    qFitLastClickAt = shouldFill ? 0 : now;
+    fitActiveView({ mode: shouldFill ? 'cover' : 'contain' });
+  };
   qOne.onclick = () => { zoomTo100(); };
   // qRegen and qExport removed from toolbar
+  if (qCollapse) qCollapse.onclick = () => toggleAllSections();
   qMenu.onclick = toggleMenu;
   
   function updatePlayButton() {

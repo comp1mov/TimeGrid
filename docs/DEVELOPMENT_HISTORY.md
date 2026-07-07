@@ -1,6 +1,6 @@
 # Development History
 
-Обновлено: 2026-06-30
+Обновлено: 2026-07-07
 
 Этот файл фиксирует не весь chat log, а важные архитектурные решения, баги и смысловые повороты, чтобы не терять контекст проекта.
 
@@ -274,3 +274,50 @@ Fixed a confusing Seam Blend debugging gap where the blend was visible during pl
 - Static grid cells that show ending frames receive the same beginning-frame overlays as playback/export.
 - Grid rebuilds now run one post-build visual sync for Chronophoto, Seam Blend, Frame Diff, color correction, Colorama, and onion overlays.
 - MP4, still, and PNG sequence export paths pass their displayed frame index into the seam helper to keep preview/export aligned.
+
+## 2026-07-07 View presets v28.26
+
+Added fast viewport presets for recording and repeated inspection.
+
+- `1-4` recall view presets.
+- `Alt+1-4` saves the current view into a session-only preset slot.
+- Default preset 1 is normal contain fit.
+- Default preset 2 is cover/fill fit with a small overscan hotfix so edges leave the screen cleanly.
+- Default presets 3 and 4 zoom into the grid for close and medium inspection.
+- Brush hotkeys moved away from `1-4` so view presets can use the easier number keys.
+
+## 2026-07-07 Landing copy and footer polish
+
+Updated the public landing page copy and footer language.
+
+- Removed the old `vibecode` wording.
+- Kept the public page focused on TimeGrid as a free, independently developed tool.
+- Polished footer spacing so the support/development line reads more cleanly.
+
+## 2026-07-07 Mobile quick panel v28.27
+
+Made the phone portrait layout more usable without creating a separate mobile app shell.
+
+- The quick toolbar becomes a vertical rail on the left for mobile/coarse pointer portrait layouts.
+- The side menu opens beside that rail, keeping the quick controls reachable.
+- Top metadata is compressed on mobile and can collapse while scrolling to help iOS Safari hide its browser chrome.
+- `Fit` uses the shared visible-viewport helper and accounts for the mobile rail.
+- Added `Panel Opacity` in TimeGrid Info for tuning transparent menu overlays while seeing the image underneath.
+- Fixed the Vite build config by moving `inlineDynamicImports` under `rollupOptions.output`.
+
+## 2026-07-07 Mobile blur cleanup v28.28
+
+Removed an over-strong blur that had been introduced with the mobile menu pass.
+
+- Removed blur from the side menu, quick toolbar buttons, and mobile sticky menu header.
+- Left the draw palette and small busy overlay blur untouched because they are separate surfaces.
+- Production v28.28 was verified after deployment with no runtime errors reported by Vercel.
+
+## 2026-07-07 Mobile quick actions v28.29
+
+Released after v28.28.
+
+- Added a mobile-only `N` quick button above the menu button.
+- The button calls the existing `toggleAllSections()` command, giving phone users access to collapse/expand even when the menu header is clipped.
+- Quick Fit now supports a repeated-click gesture: first click/tap performs contain fit, second fast click/tap performs cover/fill fit.
+- The implementation reuses existing `fitActiveView({ mode: 'cover' })` instead of adding a separate fit algorithm.

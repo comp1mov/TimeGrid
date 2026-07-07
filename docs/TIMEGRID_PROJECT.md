@@ -1,7 +1,7 @@
 # TimeGrid — проектная документация
 
-Обновлено: 2026-06-30  
-Текущая версия приложения в коде: `TimeGrid v28.25`
+Обновлено: 2026-07-07
+Текущая версия приложения в коде: `TimeGrid v28.29`
 
 ## 1. Короткое описание
 
@@ -694,3 +694,23 @@ The first-frame protection is now limited to the video priming path instead of s
 - `Seam Frames = 1` is debuggable without pressing play: the last frame receives frame `0`.
 - Live preview, still export, MP4 export, and PNG sequence export pass the displayed `frameIdx` into the same seam helper.
 - Grid rebuilds run one post-build visual sync so DOM seam overlays are present before playback starts.
+
+### 2026-07-07 View presets and mobile quick controls v28.26-v28.29
+
+This cycle moved view control and mobile usability forward after the Chronophoto loop work.
+
+- `1-4` now recall view presets; `Alt+1-4` saves the current view for the session.
+- Default presets cover normal fit, cover/fill, close grid zoom, and medium grid zoom.
+- Quick Fit uses the shared viewport-fitting helper and respects the visible workspace.
+- Mobile portrait/coarse-pointer layout now turns the quick toolbar into a left-side vertical rail.
+- The side menu opens beside the mobile rail instead of covering it.
+- The mobile header can collapse while scrolling so iOS Safari has room to hide the browser chrome.
+- `Panel Opacity` was added under TimeGrid Info for testing transparent menu overlays.
+- Strong menu/quick-toolbar blur was removed in v28.28 after it made the phone UI feel too soft.
+
+### 2026-07-07 Mobile quick actions v28.29
+
+Released after v28.28:
+
+- Added a mobile-only `N` quick button above the menu button to collapse/expand menu sections when the menu header is clipped or hard to reach.
+- Quick Fit now cycles by repeated tap: first tap is contain fit, second fast tap is cover/fill fit.

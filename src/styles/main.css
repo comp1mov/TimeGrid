@@ -480,6 +480,7 @@
     .quick-btn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); }
     .quick-btn:active, .quick-btn.active { background: color-mix(in srgb, var(--fg-accent, #35f2a3) 30%, transparent); border-color: var(--fg-accent, #35f2a3); color: var(--fg-accent, #35f2a3); }
     .quick-btn svg { width: 18px; height: 18px; fill: currentColor; }
+    .quick-collapse-btn { display: none; font-size: 12px; font-weight: 700; }
     @media (max-width: 768px) {
       .quick-toolbar { top: 44px; }
     }
@@ -766,6 +767,10 @@
       .quick-btn svg {
         width: 16px;
         height: 16px;
+      }
+
+      .quick-collapse-btn {
+        display: flex;
       }
 
       #qMode {
