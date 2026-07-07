@@ -141,7 +141,7 @@ exportQuality: 'hd', // low, medium, high, max
     exportLoops: 1, // 1-10 loops for MP4
     fgAccentColor: '#35f2a3',
     accent2Color: '#f28c35',  // second accent color (logo last-frame dot)
-    panelOpacity: 0.88,
+    panelOpacity: 0.5,
     currentFrame: 0, // current frame index for manual scrubbing
     // Drawing state - Layer architecture:
     // 1. bgDrawing - background around frames
@@ -307,7 +307,7 @@ function getTargetFrameOutputDims() {
   }
 
   function applyPanelOpacity() {
-    const alpha = Math.max(0.35, Math.min(1, Number(state.panelOpacity) || 0.88));
+    const alpha = Math.max(0.35, Math.min(1, Number(state.panelOpacity) || 0.5));
     state.panelOpacity = alpha;
     document.documentElement.style.setProperty('--fg-panel-opacity', alpha.toFixed(2));
     if (panelOpacitySlider) panelOpacitySlider.value = String(Math.round(alpha * 100));
@@ -3147,7 +3147,7 @@ canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale
   function getFitViewportRect(opts = {}) {
     const areaRect = canvasArea.getBoundingClientRect();
     const rect = { left: 0, top: 0, width: areaRect.width, height: areaRect.height };
-    const railW = getMobileRailWidth();
+    const railW = opts.includeMobileRail ? 0 : getMobileRailWidth();
     if (railW > 0 && rect.width > railW + 120) {
       rect.left += railW;
       rect.width -= railW;
@@ -4477,9 +4477,9 @@ function fitToSingleFrame(opts = {}) {
   }
 
   if (panelOpacitySlider) {
-    panelOpacitySlider.value = String(Math.round((Number(state.panelOpacity) || 0.88) * 100));
+    panelOpacitySlider.value = String(Math.round((Number(state.panelOpacity) || 0.5) * 100));
     panelOpacitySlider.oninput = () => {
-      state.panelOpacity = (parseInt(panelOpacitySlider.value, 10) || 88) / 100;
+      state.panelOpacity = (parseInt(panelOpacitySlider.value, 10) || 50) / 100;
       applyPanelOpacity();
     };
   }
@@ -4883,7 +4883,7 @@ function fitToSingleFrame(opts = {}) {
     const now = Date.now();
     const shouldFill = qFitLastClickAt && now - qFitLastClickAt <= 650;
     qFitLastClickAt = shouldFill ? 0 : now;
-    fitActiveView({ mode: shouldFill ? 'cover' : 'contain' });
+    fitActiveView({ mode: shouldFill ? 'cover' : 'contain', includeMobileRail: shouldFill });
   };
   qOne.onclick = () => { zoomTo100(); };
   // qRegen and qExport removed from toolbar
