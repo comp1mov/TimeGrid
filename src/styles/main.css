@@ -3,7 +3,7 @@
       --fg-accent2: #f28c35;
       --fg-font-ui: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       --fg-font-mono: "JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      --fg-panel-opacity: 0.5;
+      --fg-panel-opacity: 0.95;
       --app-vh: 1vh;
       --mobile-rail-w: 0px;
       --mobile-scroll-room: 0px;
@@ -31,6 +31,7 @@
     @media (max-width: 640px), (pointer: coarse) {
       :root {
         --canvas-inner-pad: clamp(140px, 18vw, 520px);
+        --fg-panel-opacity: 0.5;
       }
     }
 
@@ -208,6 +209,29 @@
       z-index: 2;
     }
     .frames-grid.onion-off canvas.frame-onion { display: none; }
+
+    .frame-diff-plate,
+    .frame-diff-invert,
+    .frame-diff-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .frame-diff-plate {
+      object-fit: contain;
+      z-index: 3;
+    }
+    .frame-diff-invert {
+      background: #fff;
+      mix-blend-mode: difference;
+      z-index: 4;
+    }
+    .frame-diff-canvas {
+      object-fit: contain;
+      z-index: 3;
+    }
 
     .frame-timecode { z-index: 3; }
     
@@ -537,6 +561,32 @@
     .menu-btn.primary:hover { background: #4df7b5; }
 
     .menu-btn.active-toggle { background: color-mix(in srgb, var(--fg-accent, #35f2a3) 15%, transparent); border-color: var(--fg-accent, #35f2a3); color: #fff; }
+
+    .side-menu,
+    .draw-palette,
+    .quick-toolbar,
+    .menu-close-btn,
+    .menu-section-title,
+    .about-toggle,
+    .menu-btn,
+    .menu-chip-btn,
+    .menu-input-btn,
+    .menu-toggle-switch,
+    .menu-slider,
+    .menu-select,
+    .menu-input,
+    .menu-textarea {
+      touch-action: manipulation;
+    }
+
+    @media (pointer: coarse) {
+      .menu-input,
+      .menu-select,
+      .menu-textarea,
+      .menu-slider-input {
+        font-size: 16px;
+      }
+    }
 
     .menu-color-input {
       width: 36px; height: 28px; padding: 2px; background: #111;

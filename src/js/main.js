@@ -7,11 +7,12 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = 'v28.29';
+  const APP_VERSION = '28.30';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
   const SERIF_FONT_FAMILY = '"Instrument Serif", Georgia, "Times New Roman", serif';
+  const FRAME_DIFF_MOTION_MASK_SCALE = 0.5;
   const TIMECODE_FONT_PRESETS = {
     monoItalic: { family: TIMECODE_FONT_FAMILY, style: 'italic', weight: 600 },
     mono: { family: TIMECODE_FONT_FAMILY, style: 'normal', weight: 600 },
@@ -50,7 +51,7 @@ inject();
 
   // Sync document/UI labels
   document.title = APP_LABEL;
-  const logoTextEl = document.getElementById('fgLogoText') || document.querySelector('.metadata-logo-text'); if (logoTextEl) logoTextEl.textContent = APP_LABEL; const aboutVerEl = document.querySelector('.about-version'); if (aboutVerEl) aboutVerEl.textContent = `Version ${APP_VERSION}`;
+  const logoTextEl = document.getElementById('fgLogoText') || document.querySelector('.metadata-logo-text'); if (logoTextEl) logoTextEl.textContent = APP_LABEL; const aboutVerEl = document.querySelector('.about-version'); if (aboutVerEl) aboutVerEl.textContent = APP_VERSION;
 
   // Prevent browser zoom on the entire page (especially important for iOS)
   document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
@@ -104,7 +105,7 @@ inject();
     cc: { enabled: false, brightness: 1.0, contrast: 1.0, saturation: 1.0, hue: 0, invert: false, allLayers: true },
     colorama: { enabled: false, allLayers: true, colorA: '#0a0a2e', colorB: '#ff4400', colorC: '#ffee00', offset: 0, blend: 'normal', opacity: 1.0, speed: 0, cascade: false, cascadeAmt: 1.0 },
     chronoEnabled: false, chronoBlend: 'darken', chronoDepth: 5, chronoOpacity: 1.0, chronoCascade: false, chronoCascadeMirror: false, chronoCascadeConst: 1, chronoStride: 1, chronoCleanLoop: false, chronoSeamBlend: false, chronoSeamLength: 4,
-    frameDiffEnabled: false, frameDiffPlateIdx: 0, frameDiffPlateMode: 'static', frameDiffPlateStep: 1, frameDiffPlateLoopN: 8, frameDiffPlateOffset: 0, frameDiffBlend: 'difference', frameDiffOpacity: 1.0,
+    frameDiffEnabled: false, frameDiffPlateIdx: 0, frameDiffPlateMode: 'static', frameDiffPlateStep: 1, frameDiffPlateLoopN: 8, frameDiffPlateOffset: 0, frameDiffOutputMode: 'difference', frameDiffThreshold: 24, frameDiffBlend: 'difference', frameDiffOpacity: 1.0,
     frameImgFill: 'empty', // 'empty' or 'edge'
 
     frameBgColor: '#000000', frameBgOpacity: 1.0, // background behind scaled-down frame image
@@ -142,7 +143,9 @@ exportQuality: 'hd', // low, medium, high, max
     exportLoops: 1, // 1-10 loops for MP4
     fgAccentColor: '#35f2a3',
     accent2Color: '#f28c35',  // second accent color (logo last-frame dot)
-    panelOpacity: 0.5,
+    panelOpacity: 0.95,
+    panelOpacityMobile: 0.5,
+    frameDiffLastEngine: 'Idle',
     currentFrame: 0, // current frame index for manual scrubbing
     // Drawing state - Layer architecture:
     // 1. bgDrawing - background around frames
@@ -308,8 +311,11 @@ function getTargetFrameOutputDims() {
   }
 
   function applyPanelOpacity() {
-    const alpha = Math.max(0.35, Math.min(1, Number(state.panelOpacity) || 0.5));
-    state.panelOpacity = alpha;
+    const mobile = isCompactMobileLayout();
+    const key = mobile ? 'panelOpacityMobile' : 'panelOpacity';
+    const fallback = mobile ? 0.5 : 0.95;
+    const alpha = Math.max(0.35, Math.min(1, Number(state[key]) || fallback));
+    state[key] = alpha;
     document.documentElement.style.setProperty('--fg-panel-opacity', alpha.toFixed(2));
     if (panelOpacitySlider) panelOpacitySlider.value = String(Math.round(alpha * 100));
     if (panelOpacityValue) panelOpacityValue.textContent = `${Math.round(alpha * 100)}%`;
@@ -602,7 +608,7 @@ function getTargetFrameOutputDims() {
   const qMode = $('qMode'), qReset = $('qReset'), qPrev = $('qPrev'), qPlay = $('qPlay'), qNext = $('qNext'), qDraw = $('qDraw'), qFit = $('qFit');
   const qOne = $('qOne');
   const qMenu = $('qMenu'), qCollapse = $('qCollapse');
-  let qFitLastClickAt = 0;
+  let fitRepeatTriggerAt = 0;
   
   // Timecode style controls
   const tcTextColorInput = $('tcTextColor'), tcBgColorInput = $('tcBgColor');
@@ -1118,7 +1124,10 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
   dropZone.ondragover = e => { e.preventDefault(); dropZone.classList.add('drag-over'); };
   dropZone.ondragleave = () => dropZone.classList.remove('drag-over');
   dropZone.ondrop = e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFile(e.dataTransfer.files); };
-  dropZone.onclick = e => { if (!e.target.closest('.drop-zone-btn')) videoInput.click(); };
+  dropZone.onclick = e => {
+    if (e.target.closest('a,button,input,select,textarea,label')) return;
+    videoInput.click();
+  };
 
   browseVideoBtn.onclick = () => videoInput.click();
   browseImageBtn.onclick = () => requestImageImport('loop');
@@ -1667,6 +1676,7 @@ function updateInfoPanel() {
     const igpuv = document.getElementById('infoGpuVendor');
     const igpum = document.getElementById('infoGpuMode');
     const igpuh = document.getElementById('infoGpuHint');
+    const ifde = document.getElementById('infoFrameDiffEngine');
     const ifps = document.getElementById('infoUiFps');
     const icomp = document.getElementById('infoCompositeMs');
 
@@ -1730,6 +1740,10 @@ function updateInfoPanel() {
     if (igpuv) igpuv.textContent = gpu.vendor || '—';
     if (igpum) igpum.textContent = gpu.mode || '—';
     if (igpuh) igpuh.textContent = gpu.hint || '—';
+    if (ifde) {
+      const fdActive = !!(state.frameDiffEnabled && getFrameDiffOutputMode() === 'color-motion-white');
+      ifde.textContent = fdActive ? (state.frameDiffLastEngine || 'Pending') : 'Idle';
+    }
 
     if (ifps) ifps.textContent = (typeof state._uiFps === 'number' && state._uiFps > 0) ? String(state._uiFps) : '—';
     if (icomp) icomp.textContent = (typeof state._compAvgMs === 'number' && state._compAvgMs > 0) ? `${state._compAvgMs.toFixed(1)} ms` : '—';
@@ -3313,6 +3327,13 @@ function fitToSingleFrame(opts = {}) {
     else fitToScreen(fitOpts);
   }
 
+  function triggerRepeatFit() {
+    const now = Date.now();
+    const shouldFill = fitRepeatTriggerAt && now - fitRepeatTriggerAt <= 650;
+    fitRepeatTriggerAt = shouldFill ? 0 : now;
+    fitActiveView({ mode: shouldFill ? 'cover' : 'contain', includeMobileRail: shouldFill });
+  }
+
   function requestFitToActiveView() {
     requestAnimationFrame(() => requestAnimationFrame(() => fitActiveView()));
   }
@@ -3789,6 +3810,8 @@ function fitToSingleFrame(opts = {}) {
   if (state.chronoSeamLength === undefined || Number(state.chronoSeamLength) < 1) state.chronoSeamLength = 4;
   if (state.frameDiffEnabled === undefined)  state.frameDiffEnabled  = false;
   if (state.frameDiffPlateIdx === undefined) state.frameDiffPlateIdx = 0;
+  if (state.frameDiffOutputMode === undefined) state.frameDiffOutputMode = 'difference';
+  if (state.frameDiffThreshold === undefined) state.frameDiffThreshold = 24;
   if (state.frameDiffBlend === undefined)    state.frameDiffBlend    = 'difference';
   if (state.frameDiffOpacity === undefined)  state.frameDiffOpacity  = 1.0;
 
@@ -4093,6 +4116,9 @@ function fitToSingleFrame(opts = {}) {
   const frameDiffPlateInput  = $('frameDiffPlateInput');
   const frameDiffPlateMinus  = $('frameDiffPlateMinus');
   const frameDiffPlatePlus   = $('frameDiffPlatePlus');
+  const frameDiffThresholdRow = $('frameDiffThresholdRow');
+  const frameDiffThresholdEl = $('frameDiffThreshold');
+  const frameDiffThresholdNum = $('frameDiffThresholdNum');
   const frameDiffBlendSelect = $('frameDiffBlendSelect');
   const frameDiffOpacityEl   = $('frameDiffOpacity');
   const frameDiffOpacityNum  = $('frameDiffOpacityNum');
@@ -4114,7 +4140,11 @@ function fitToSingleFrame(opts = {}) {
     if (frameDiffStepInput) frameDiffStepInput.value = state.frameDiffPlateStep || 1;
     if (frameDiffLoopInput) frameDiffLoopInput.value = state.frameDiffPlateLoopN || 1;
     if (frameDiffOffsetInput) frameDiffOffsetInput.value = state.frameDiffPlateOffset || 0;
-    if (frameDiffBlendSelect) frameDiffBlendSelect.value = state.frameDiffBlend || 'difference';
+    const outputMode = getFrameDiffOutputMode();
+    if (frameDiffThresholdRow) frameDiffThresholdRow.style.display = outputMode === 'color-motion-white' ? '' : 'none';
+    if (frameDiffThresholdEl) frameDiffThresholdEl.value = Math.max(0, Math.min(255, Math.round(Number(state.frameDiffThreshold) || 0)));
+    if (frameDiffThresholdNum) frameDiffThresholdNum.value = Math.max(0, Math.min(255, Math.round(Number(state.frameDiffThreshold) || 0)));
+    if (frameDiffBlendSelect) frameDiffBlendSelect.value = getFrameDiffBlendControlValue();
     if (frameDiffOpacityEl)  frameDiffOpacityEl.value  = (state.frameDiffOpacity !== undefined) ? state.frameDiffOpacity : 1.0;
     if (frameDiffOpacityNum) frameDiffOpacityNum.value = (state.frameDiffOpacity !== undefined) ? state.frameDiffOpacity : 1.0;
   };
@@ -4225,10 +4255,22 @@ function fitToSingleFrame(opts = {}) {
   }
   if (frameDiffBlendSelect) {
     frameDiffBlendSelect.onchange = () => {
-      state.frameDiffBlend = frameDiffBlendSelect.value;
+      const value = frameDiffBlendSelect.value || 'difference';
+      state.frameDiffBlend = value;
+      state.frameDiffOutputMode = isFrameDiffSpecialBlend(value) ? value : 'difference';
+      syncFrameDiffUI();
       updateFrameDiffUI();
     };
   }
+  const applyFrameDiffThreshold = (value) => {
+    const v = Math.max(0, Math.min(255, Math.round(parseFloat(value) || 0)));
+    state.frameDiffThreshold = v;
+    if (frameDiffThresholdEl) frameDiffThresholdEl.value = v;
+    if (frameDiffThresholdNum) frameDiffThresholdNum.value = v;
+    updateFrameDiffUI();
+  };
+  if (frameDiffThresholdEl) frameDiffThresholdEl.oninput = () => applyFrameDiffThreshold(frameDiffThresholdEl.value);
+  if (frameDiffThresholdNum) frameDiffThresholdNum.oninput = () => applyFrameDiffThreshold(frameDiffThresholdNum.value);
   if (frameDiffOpacityEl) {
     frameDiffOpacityEl.oninput = () => {
       state.frameDiffOpacity = parseFloat(frameDiffOpacityEl.value);
@@ -4499,9 +4541,10 @@ function fitToSingleFrame(opts = {}) {
   }
 
   if (panelOpacitySlider) {
-    panelOpacitySlider.value = String(Math.round((Number(state.panelOpacity) || 0.5) * 100));
+    applyPanelOpacity();
     panelOpacitySlider.oninput = () => {
-      state.panelOpacity = (parseInt(panelOpacitySlider.value, 10) || 50) / 100;
+      const key = isCompactMobileLayout() ? 'panelOpacityMobile' : 'panelOpacity';
+      state[key] = (parseInt(panelOpacitySlider.value, 10) || (key === 'panelOpacityMobile' ? 50 : 95)) / 100;
       applyPanelOpacity();
     };
   }
@@ -4901,12 +4944,7 @@ function fitToSingleFrame(opts = {}) {
   qPrev.onclick = () => stepFrame(-1);
   qNext.onclick = () => stepFrame(1);
   qPlay.onclick = () => { state.isPlaying ? stopAnimation() : startAnimation(); };
-  qFit.onclick = () => {
-    const now = Date.now();
-    const shouldFill = qFitLastClickAt && now - qFitLastClickAt <= 650;
-    qFitLastClickAt = shouldFill ? 0 : now;
-    fitActiveView({ mode: shouldFill ? 'cover' : 'contain', includeMobileRail: shouldFill });
-  };
+  qFit.onclick = triggerRepeatFit;
   qOne.onclick = () => { zoomTo100(); };
   // qRegen and qExport removed from toolbar
   if (qCollapse) qCollapse.onclick = () => toggleAllSections();
@@ -5222,50 +5260,651 @@ function fitToSingleFrame(opts = {}) {
     for (let i = slot; i < ghostArr.length; i++) ghostArr[i].remove();
   }
 
-  function updateFrameDiffForItem(item) {
+  function isFrameDiffSpecialBlend(mode) {
+    return mode === 'inverted-difference' || mode === 'color-motion-white';
+  }
+
+  function getFrameDiffBlendControlValue() {
+    const blend = state.frameDiffBlend || 'difference';
+    if (isFrameDiffSpecialBlend(blend)) return blend;
+    const outputMode = state.frameDiffOutputMode || 'difference';
+    return isFrameDiffSpecialBlend(outputMode) ? outputMode : blend;
+  }
+
+  function getFrameDiffOutputMode() {
+    const mode = getFrameDiffBlendControlValue();
+    return isFrameDiffSpecialBlend(mode) ? mode : 'difference';
+  }
+
+  function getFrameDiffBlendMode() {
+    const mode = getFrameDiffBlendControlValue();
+    return isFrameDiffSpecialBlend(mode) ? 'difference' : mode;
+  }
+
+  function resolveFrameDiffPlateIdx({ tick = 0, frameCount = 0 } = {}) {
+    const n = Math.max(0, Math.floor(Number(frameCount) || 0));
+    if (!n) return -1;
+    const baseIdx = Math.max(0, Math.min(n - 1, Math.floor(Number(state.frameDiffPlateIdx) || 0)));
+    const step = Math.max(1, Math.floor(Number(state.frameDiffPlateStep) || 1));
+    const loopN = Math.max(1, Math.min(n, Math.floor(Number(state.frameDiffPlateLoopN) || 1)));
+    const offset = Math.max(0, Math.floor(Number(state.frameDiffPlateOffset) || 0)) % n;
+    const t = Math.max(0, Math.floor(Number(tick) || 0));
+
+    if (state.frameDiffPlateMode === 'tick') {
+      return (baseIdx + Math.floor(t / step)) % n;
+    }
+    if (state.frameDiffPlateMode === 'loop') {
+      return (offset + (Math.floor(t / step) % loopN)) % n;
+    }
+    return baseIdx;
+  }
+
+  function getFrameDiffImageForFrame(frame) {
+    if (!frame) return null;
+    const src = getFrameDataUrl(frame);
+    if (!src) return null;
+    const img = frame._diffImg || (frame._diffImg = new Image());
+    if (img.src !== src) img.src = src;
+    return img;
+  }
+
+  function removeFrameDiffLayers(xform) {
+    xform.querySelectorAll('.frame-diff-plate,.frame-diff-invert,.frame-diff-canvas').forEach(el => el.remove());
+  }
+
+  function ensureFrameDiffOverlayEl(xform, selector, tagName, className) {
+    let el = xform.querySelector(selector);
+    if (!el) {
+      el = document.createElement(tagName);
+      el.className = className;
+      xform.appendChild(el);
+    }
+    return el;
+  }
+
+  function drawFrameDiffSource(ctx, img, x, y, w, h, opts = {}) {
+    if (!img) return;
+    const st = window._fgState || state;
+    const srcW = img.videoWidth || img.naturalWidth || img.width || 1;
+    const srcH = img.videoHeight || img.naturalHeight || img.height || 1;
+    const applyTransform = opts.applyTransform !== false;
+    const sx = applyTransform
+      ? (st.frameImgScaleX !== undefined ? Number(st.frameImgScaleX) : (Number(st.frameImgScale) || 1))
+      : 1;
+    const sy = applyTransform
+      ? (st.frameImgScaleY !== undefined ? Number(st.frameImgScaleY) : (Number(st.frameImgScale) || 1))
+      : 1;
+    const ox = applyTransform ? (Number(st.frameImgOffX) || 0) * 0.01 * w : 0;
+    const oy = applyTransform ? (Number(st.frameImgOffY) || 0) * 0.01 * h : 0;
+    const contain = Math.min(w / Math.max(1, srcW), h / Math.max(1, srcH));
+    const dw = srcW * contain * sx;
+    const dh = srcH * contain * sy;
+    const dx = x + w / 2 - dw / 2 + ox;
+    const dy = y + h / 2 - dh / 2 + oy;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.translate(dx + dw / 2, dy + dh / 2);
+    if (applyTransform) ctx.rotate((Number(st.frameImgRot) || 0) * Math.PI / 180);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.filter = opts.filter || 'none';
+    if (opts.opacity !== undefined) ctx.globalAlpha *= Math.max(0, Math.min(1, Number(opts.opacity) || 0));
+    ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    ctx.filter = 'none';
+    ctx.restore();
+  }
+
+  function getFrameDiffScratchCanvas(name, w, h) {
+    const key = `_scratch_${name}`;
+    const canvas = renderFrameDiffMotionMask[key] || (renderFrameDiffMotionMask[key] = document.createElement('canvas'));
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.clearRect(0, 0, w, h);
+    return { canvas, ctx };
+  }
+
+  function isFrameDiffDrawable(img) {
+    return !!(img && (img.videoWidth || img.naturalWidth || img.width));
+  }
+
+  function getFrameDiffDrawableSize(img) {
+    if (!img) return null;
+    const w = img.videoWidth || img.naturalWidth || img.width || 0;
+    const h = img.videoHeight || img.naturalHeight || img.height || 0;
+    if (!w || !h) return null;
+    return { w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)) };
+  }
+
+  function getFrameDiffPreviewRasterSize(currentImg) {
+    return getFrameDiffDrawableSize(currentImg);
+  }
+
+  function getFrameDiffMotionMaskSize(w, h, scale = FRAME_DIFF_MOTION_MASK_SCALE) {
+    const srcW = Math.max(1, Math.round(Number(w) || 1));
+    const srcH = Math.max(1, Math.round(Number(h) || 1));
+    const s = Math.max(0.1, Math.min(1, Number(scale) || FRAME_DIFF_MOTION_MASK_SCALE));
+    const maskW = Math.max(1, Math.min(srcW, Math.round(srcW * s)));
+    const maskH = Math.max(1, Math.min(srcH, Math.round(srcH * s)));
+    return { w: maskW, h: maskH, scale: Math.min(maskW / srcW, maskH / srcH) };
+  }
+
+  function setFrameDiffEngineLabel(label) {
+    if (!label || state.frameDiffLastEngine === label) return;
+    state.frameDiffLastEngine = label;
+    try { scheduleInfoUpdate(); } catch (e) {}
+  }
+
+  function getFrameDiffImageForIndex(frameIdx, frameImages = null) {
+    const st = window._fgState || state;
+    const n = st.frames.length;
+    if (!n) return null;
+    const idx = normalizeFrameIndex(frameIdx, n);
+    if (frameImages && frameImages[idx]) return frameImages[idx];
+    return getFrameDiffImageForFrame(st.frames[idx]);
+  }
+
+  function watchFrameDiffImageLoad(img, onReady) {
+    if (!img || typeof onReady !== 'function' || isFrameDiffDrawable(img)) return;
+    const rerender = () => onReady();
+    img.addEventListener('load', rerender, { once: true });
+    img.addEventListener('error', rerender, { once: true });
+  }
+
+  function drawFrameDiffChronoStackSource(ctx, ghostIndices, x, y, w, h, opts = {}) {
+    const st = window._fgState || state;
+    if (!st.chronoEnabled || !st.frames.length || !ghostIndices || !ghostIndices.length) return true;
+
+    const blendMode = st.chronoBlend || 'screen';
+    const alphaBase = (st.chronoOpacity !== undefined) ? st.chronoOpacity : 1.0;
+    const opacityScale = Number.isFinite(Number(opts.opacityScale)) ? Math.max(0, Math.min(1, Number(opts.opacityScale))) : 1;
+    const depth = ghostIndices.length;
+    let ready = true;
+
+    ctx.save();
+    ctx.globalCompositeOperation = blendMode;
+    for (let step = 0; step < depth; step++) {
+      const ghostFrameIdx = ghostIndices[step];
+      if (ghostFrameIdx === null) continue;
+      const img = getFrameDiffImageForIndex(ghostFrameIdx, opts.frameImages);
+      if (!isFrameDiffDrawable(img)) {
+        ready = false;
+        watchFrameDiffImageLoad(img, opts.onPendingImage);
+        continue;
+      }
+
+      let finalOpacity = alphaBase;
+      if (st.chronoCascade) finalOpacity = computeCascadeOpacity(step, depth, alphaBase);
+      finalOpacity *= opacityScale;
+      if (finalOpacity <= 0) continue;
+
+      ctx.globalAlpha = Math.max(0, Math.min(1, finalOpacity));
+      drawFrameDiffSource(ctx, img, x, y, w, h, {
+        applyTransform: opts.applyTransform !== false,
+        filter: opts.filter || 'none'
+      });
+    }
+    ctx.restore();
+    return ready;
+  }
+
+  function buildFrameDiffVisualStackCanvas(opts = {}) {
+    const st = window._fgState || state;
+    const w = Math.max(1, Math.round(Number(opts.w) || 1));
+    const h = Math.max(1, Math.round(Number(opts.h) || 1));
+    const { canvas, ctx } = getFrameDiffScratchCanvas(opts.name || 'visual', w, h);
+    const frameCount = st.frames.length;
+    if (!frameCount) return null;
+
+    const tick = Number.isFinite(Number(opts.tick)) ? Math.floor(Number(opts.tick)) : (Number(st.currentTick) || 0);
+    const currentFrameIdx = Number.isFinite(Number(opts.currentFrameIdx))
+      ? normalizeFrameIndex(opts.currentFrameIdx, frameCount)
+      : normalizeFrameIndex(tick, frameCount);
+    const currentImg = opts.currentImg || getFrameDiffImageForIndex(currentFrameIdx, opts.frameImages);
+    if (!isFrameDiffDrawable(currentImg)) {
+      watchFrameDiffImageLoad(currentImg, opts.onPendingImage);
+      return null;
+    }
+
+    const filter = opts.filter || ((st.cc && st.cc.enabled) ? buildCCFilter() : 'none');
+    drawFrameDiffSource(ctx, currentImg, 0, 0, w, h, {
+      applyTransform: opts.applyTransform !== false,
+      filter
+    });
+
+    if (opts.includeChrono !== false && st.chronoEnabled) {
+      const cellIdx = Math.max(0, Math.floor(Number(opts.cellIdx) || 0));
+      const cellCount = Math.max(1, Math.floor(Number(opts.cellCount) || 1));
+      const cellOrderIdx = Number.isFinite(Number(opts.cellOrderIdx)) ? Math.floor(Number(opts.cellOrderIdx)) : cellIdx;
+      const cellInfo = opts.cellInfo || getFrameCellInfo(cellIdx, tick, {
+        frameCount,
+        cellCount,
+        cellOrderIdx,
+        shuffle: st.animDirShuffle,
+        dir: st.animDirection,
+        skipEnsureShuffle: true
+      });
+      const ghostIndices = opts.ghostIndices || buildChronoGhostIndices(tick, cellInfo.baseOffset, frameCount, st.animDirection, st.animDirShuffle);
+      const seamInfo = opts.seamInfo || getChronoSeamForCell(cellIdx, tick, {
+        frameCount,
+        cellCount,
+        cellOrderIdx,
+        cellInfo,
+        frameIdx: currentFrameIdx,
+        shuffle: st.animDirShuffle,
+        dir: st.animDirection,
+        mode: opts.mode || st.viewMode,
+        skipEnsureShuffle: true
+      });
+      drawFrameDiffChronoStackSource(ctx, ghostIndices, 0, 0, w, h, {
+        frameImages: opts.frameImages,
+        applyTransform: opts.applyTransform !== false,
+        opacityScale: getChronoCurrentOpacityScale(seamInfo),
+        filter,
+        onPendingImage: opts.onPendingImage
+      });
+    }
+
+    return canvas;
+  }
+
+  function createFrameDiffGlRenderer() {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl', {
+      alpha: true,
+      antialias: false,
+      depth: false,
+      stencil: false,
+      premultipliedAlpha: false,
+      preserveDrawingBuffer: false,
+      powerPreference: 'high-performance'
+    });
+    if (!gl) return null;
+
+    const vertexSrc = `
+      attribute vec2 aPosition;
+      varying vec2 vUv;
+      void main() {
+        vUv = vec2(aPosition.x * 0.5 + 0.5, 1.0 - (aPosition.y * 0.5 + 0.5));
+        gl_Position = vec4(aPosition, 0.0, 1.0);
+      }
+    `;
+    const fragmentSrc = `
+      precision mediump float;
+      varying vec2 vUv;
+      uniform sampler2D uCurrent;
+      uniform sampler2D uPlate;
+      uniform float uThreshold;
+      uniform float uOpacity;
+      uniform float uWhiteMatte;
+      void main() {
+        vec4 c = texture2D(uCurrent, vUv);
+        vec4 p = texture2D(uPlate, vUv);
+        float d = max(max(abs(c.r - p.r), abs(c.g - p.g)), abs(c.b - p.b));
+        float changed = d > uThreshold ? 1.0 : 0.0;
+        if (uWhiteMatte > 0.5) {
+          float matteAlpha = mix(1.0, 1.0 - uOpacity, changed);
+          gl_FragColor = vec4(1.0, 1.0, 1.0, matteAlpha);
+          return;
+        }
+        vec3 motion = mix(vec3(1.0), c.rgb, uOpacity);
+        vec3 rgb = mix(vec3(1.0), motion, changed);
+        gl_FragColor = vec4(rgb, 1.0);
+      }
+    `;
+
+    const compile = (type, src) => {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, src);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    };
+    const vert = compile(gl.VERTEX_SHADER, vertexSrc);
+    const frag = compile(gl.FRAGMENT_SHADER, fragmentSrc);
+    if (!vert || !frag) return null;
+
+    const program = gl.createProgram();
+    gl.attachShader(program, vert);
+    gl.attachShader(program, frag);
+    gl.linkProgram(program);
+    gl.deleteShader(vert);
+    gl.deleteShader(frag);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      gl.deleteProgram(program);
+      return null;
+    }
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,
+       1, -1,
+      -1,  1,
+      -1,  1,
+       1, -1,
+       1,  1
+    ]), gl.STATIC_DRAW);
+
+    const currentTex = gl.createTexture();
+    const plateTex = gl.createTexture();
+    const aPosition = gl.getAttribLocation(program, 'aPosition');
+    const uCurrent = gl.getUniformLocation(program, 'uCurrent');
+    const uPlate = gl.getUniformLocation(program, 'uPlate');
+    const uThreshold = gl.getUniformLocation(program, 'uThreshold');
+    const uOpacity = gl.getUniformLocation(program, 'uOpacity');
+    const uWhiteMatte = gl.getUniformLocation(program, 'uWhiteMatte');
+    const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
+
+    const configureTexture = (tex) => {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    };
+    configureTexture(currentTex);
+    configureTexture(plateTex);
+
+    let lost = false;
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      lost = true;
+    }, false);
+
+    const uploadTexture = (unit, tex, source) => {
+      if (!isFrameDiffDrawable(source)) return false;
+      const sw = source.videoWidth || source.naturalWidth || source.width || 0;
+      const sh = source.videoHeight || source.naturalHeight || source.height || 0;
+      if (sw > maxTextureSize || sh > maxTextureSize) return false;
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      try {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      } catch (e) {
+        return false;
+      }
+      return !gl.getError();
+    };
+
+    return {
+      canvas,
+      render(targetCtx, currentSource, plateSource, rect, opts = {}) {
+        if (lost || !targetCtx || !isFrameDiffDrawable(currentSource) || !isFrameDiffDrawable(plateSource)) return false;
+        const w = Math.max(1, Math.round(Number(rect.w) || 1));
+        const h = Math.max(1, Math.round(Number(rect.h) || 1));
+        if (w > maxTextureSize || h > maxTextureSize) return false;
+        if (canvas.width !== w) canvas.width = w;
+        if (canvas.height !== h) canvas.height = h;
+
+        gl.viewport(0, 0, w, h);
+        gl.useProgram(program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.enableVertexAttribArray(aPosition);
+        gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+        if (!uploadTexture(0, currentTex, currentSource)) return false;
+        if (!uploadTexture(1, plateTex, plateSource)) return false;
+        gl.uniform1i(uCurrent, 0);
+        gl.uniform1i(uPlate, 1);
+        gl.uniform1f(uThreshold, Math.max(0, Math.min(255, Number(opts.threshold) || 0)) / 255);
+        gl.uniform1f(uOpacity, Math.max(0, Math.min(1, Number(opts.opacity) || 1)));
+        gl.uniform1f(uWhiteMatte, opts.whiteMatte ? 1 : 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        if (gl.getError()) return false;
+
+        targetCtx.drawImage(canvas, Math.round(Number(rect.x) || 0), Math.round(Number(rect.y) || 0), w, h);
+        return true;
+      }
+    };
+  }
+
+  function getFrameDiffGlRenderer() {
+    if (renderFrameDiffMotionMask._glRenderer === undefined) {
+      renderFrameDiffMotionMask._glRenderer = createFrameDiffGlRenderer();
+    }
+    return renderFrameDiffMotionMask._glRenderer;
+  }
+
+  function renderFrameDiffMotionMask(ctx, currentImg, plateImg, rect, opts = {}) {
+    const w = Math.max(1, Math.round(Number(rect.w) || 1));
+    const h = Math.max(1, Math.round(Number(rect.h) || 1));
+    if (!currentImg || !plateImg || !w || !h) return false;
+    if (!(currentImg.videoWidth || currentImg.naturalWidth || currentImg.width)) return false;
+    if (!(plateImg.videoWidth || plateImg.naturalWidth || plateImg.width)) return false;
+
+    const glRenderer = opts.forceCpu ? null : getFrameDiffGlRenderer();
+    if (glRenderer && glRenderer.render(ctx, currentImg, plateImg, { x: rect.x, y: rect.y, w, h }, opts)) {
+      renderFrameDiffMotionMask._lastEngine = 'WebGL';
+      if (!opts.suppressEngineLabel) setFrameDiffEngineLabel('WebGL');
+      return true;
+    }
+    renderFrameDiffMotionMask._lastEngine = glRenderer ? 'CPU fallback' : 'CPU fallback (no WebGL)';
+    if (!opts.suppressEngineLabel) setFrameDiffEngineLabel(renderFrameDiffMotionMask._lastEngine);
+
+    const currentCanvas = renderFrameDiffMotionMask._currentCanvas || (renderFrameDiffMotionMask._currentCanvas = document.createElement('canvas'));
+    const plateCanvas = renderFrameDiffMotionMask._plateCanvas || (renderFrameDiffMotionMask._plateCanvas = document.createElement('canvas'));
+    currentCanvas.width = plateCanvas.width = w;
+    currentCanvas.height = plateCanvas.height = h;
+    const currentCtx = currentCanvas.getContext('2d', { willReadFrequently: true });
+    const plateCtx = plateCanvas.getContext('2d', { willReadFrequently: true });
+    currentCtx.clearRect(0, 0, w, h);
+    plateCtx.clearRect(0, 0, w, h);
+
+    const drawOpts = {
+      applyTransform: opts.applyTransform !== false,
+      filter: opts.filter || 'none'
+    };
+    drawFrameDiffSource(currentCtx, currentImg, 0, 0, w, h, drawOpts);
+    drawFrameDiffSource(plateCtx, plateImg, 0, 0, w, h, drawOpts);
+
+    const cur = currentCtx.getImageData(0, 0, w, h);
+    const plate = plateCtx.getImageData(0, 0, w, h);
+    const whiteMatte = !!opts.whiteMatte;
+    const outputTarget = whiteMatte ? getFrameDiffScratchCanvas('motionOutput', w, h) : null;
+    const outputCtx = outputTarget ? outputTarget.ctx : ctx;
+    const out = outputCtx.createImageData(w, h);
+    const threshold = Math.max(0, Math.min(255, Math.round(Number(opts.threshold) || 0)));
+    const opacity = Math.max(0, Math.min(1, Number(opts.opacity) || 1));
+
+    for (let i = 0; i < cur.data.length; i += 4) {
+      const dr = Math.abs(cur.data[i] - plate.data[i]);
+      const dg = Math.abs(cur.data[i + 1] - plate.data[i + 1]);
+      const db = Math.abs(cur.data[i + 2] - plate.data[i + 2]);
+      const changed = Math.max(dr, dg, db) > threshold;
+      if (whiteMatte) {
+        out.data[i] = 255;
+        out.data[i + 1] = 255;
+        out.data[i + 2] = 255;
+        out.data[i + 3] = changed ? Math.round(255 * (1 - opacity)) : 255;
+      } else if (changed) {
+        out.data[i] = Math.round(cur.data[i] * opacity + 255 * (1 - opacity));
+        out.data[i + 1] = Math.round(cur.data[i + 1] * opacity + 255 * (1 - opacity));
+        out.data[i + 2] = Math.round(cur.data[i + 2] * opacity + 255 * (1 - opacity));
+        out.data[i + 3] = 255;
+      } else {
+        out.data[i] = 255;
+        out.data[i + 1] = 255;
+        out.data[i + 2] = 255;
+        out.data[i + 3] = 255;
+      }
+    }
+
+    if (whiteMatte && outputTarget) {
+      outputCtx.putImageData(out, 0, 0);
+      ctx.drawImage(outputTarget.canvas, Math.round(Number(rect.x) || 0), Math.round(Number(rect.y) || 0), w, h);
+    } else {
+      ctx.putImageData(out, Math.round(Number(rect.x) || 0), Math.round(Number(rect.y) || 0));
+    }
+    return true;
+  }
+
+  function renderFrameDiffMotionMatte(ctx, currentStack, plateStack, rect, opts = {}) {
+    const maskSize = getFrameDiffDrawableSize(currentStack);
+    if (!maskSize || !getFrameDiffDrawableSize(plateStack)) return false;
+    const maskW = Math.max(1, Math.round(Number(opts.maskW) || maskSize.w));
+    const maskH = Math.max(1, Math.round(Number(opts.maskH) || maskSize.h));
+    const { canvas: matteCanvas, ctx: matteCtx } = getFrameDiffScratchCanvas(opts.name || 'motionMatte', maskW, maskH);
+    const ok = renderFrameDiffMotionMask(matteCtx, currentStack, plateStack, { x: 0, y: 0, w: maskW, h: maskH }, {
+      ...opts,
+      whiteMatte: true,
+      suppressEngineLabel: true,
+      applyTransform: false
+    });
+    if (!ok) return false;
+
+    const x = Math.round(Number(rect.x) || 0);
+    const y = Math.round(Number(rect.y) || 0);
+    const w = Math.max(1, Math.round(Number(rect.w) || 1));
+    const h = Math.max(1, Math.round(Number(rect.h) || 1));
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(matteCanvas, x, y, w, h);
+    ctx.restore();
+
+    const actualScale = Math.min(maskW / w, maskH / h);
+    const baseEngine = renderFrameDiffMotionMask._lastEngine || 'Pending';
+    setFrameDiffEngineLabel(`${baseEngine} mask ${actualScale.toFixed(2)}x`);
+    return true;
+  }
+
+  function ensureFrameDiffImageReady(img) {
+    if (!img) return Promise.resolve(false);
+    if ((img.complete && img.naturalWidth) || img.videoWidth || img.width) return Promise.resolve(true);
+    if (typeof img.decode === 'function') {
+      return img.decode().then(() => true).catch(() => false);
+    }
+    return new Promise(resolve => {
+      const done = ok => {
+        img.removeEventListener('load', onLoad);
+        img.removeEventListener('error', onError);
+        resolve(ok);
+      };
+      const onLoad = () => done(true);
+      const onError = () => done(false);
+      img.addEventListener('load', onLoad, { once: true });
+      img.addEventListener('error', onError, { once: true });
+    });
+  }
+
+  async function ensureFrameDiffPlateImageReady({ tick = 0, frameCount = 0, frameImages = null } = {}) {
+    if (!state.frameDiffEnabled || !state.frames.length) return false;
+    const pIdx = resolveFrameDiffPlateIdx({ tick, frameCount: frameCount || state.frames.length });
+    const img = getFrameImageForCanvas(pIdx, frameImages);
+    return ensureFrameDiffImageReady(img);
+  }
+
+  function updateFrameDiffMotionCanvas(canvas, item, plateImg, opacity, opts = {}) {
+    const currentImg = item.querySelector('.frame-main-img');
+    if (!currentImg || !plateImg) return false;
+    if (!currentImg.complete || !currentImg.naturalWidth || !plateImg.complete || !plateImg.naturalWidth) return false;
+    const xform = item.querySelector('.frame-media-xform');
+    const rasterSize = getFrameDiffPreviewRasterSize(currentImg);
+    if (!rasterSize) return false;
+    const w = rasterSize.w;
+    const h = rasterSize.h;
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    const maskSize = getFrameDiffMotionMaskSize(w, h);
+    const currentStack = buildFrameDiffVisualStackCanvas({
+      name: 'previewCurrent',
+      w: maskSize.w,
+      h: maskSize.h,
+      tick: state.currentTick,
+      currentFrameIdx: opts.currentFrameIdx,
+      currentImg,
+      cellIdx: opts.cellIdx,
+      cellCount: opts.cellCount,
+      cellOrderIdx: opts.cellOrderIdx,
+      cellInfo: opts.cellInfo,
+      ghostIndices: opts.ghostIndices,
+      seamInfo: opts.seamInfo,
+      applyTransform: false,
+      mode: state.viewMode,
+      onPendingImage: opts.onPendingImage
+    });
+    const plateStack = buildFrameDiffVisualStackCanvas({
+      name: 'previewPlate',
+      w: maskSize.w,
+      h: maskSize.h,
+      tick: state.currentTick,
+      currentFrameIdx: opts.plateFrameIdx,
+      currentImg: plateImg,
+      includeChrono: false,
+      applyTransform: false,
+      onPendingImage: opts.onPendingImage
+    });
+    if (!currentStack || !plateStack) return false;
+    return renderFrameDiffMotionMatte(ctx, currentStack, plateStack, { x: 0, y: 0, w, h }, {
+      name: 'previewMotionMatte',
+      maskW: maskSize.w,
+      maskH: maskSize.h,
+      threshold: state.frameDiffThreshold,
+      opacity,
+      applyTransform: false
+    });
+  }
+
+  function updateFrameDiffForItem(item, frameIdx, cellIdx, opts = {}) {
     const xform = item.querySelector('.frame-media-xform');
     if (!xform) return;
 
-    const existing = xform.querySelector('.frame-diff-plate');
     if (!state.frameDiffEnabled || !state.frames.length) {
-      if (existing) existing.remove();
+      removeFrameDiffLayers(xform);
       return;
     }
 
     const n       = state.frames.length;
-    const baseIdx = Math.max(0, Math.min(n - 1, state.frameDiffPlateIdx || 0));
-    const blend   = state.frameDiffBlend   || 'difference';
+    const outputMode = getFrameDiffOutputMode();
+    const pIdx = resolveFrameDiffPlateIdx({ tick: state.currentTick, frameCount: n });
+    const blend = getFrameDiffBlendMode();
     const opacity = (state.frameDiffOpacity !== undefined) ? state.frameDiffOpacity : 1.0;
-    const step = Math.max(1, state.frameDiffPlateStep || 1);
-    const loopN = Math.max(1, Math.min(n, state.frameDiffPlateLoopN || 1));
-    const offset = Math.max(0, state.frameDiffPlateOffset || 0) % n;
-    let pIdx = baseIdx;
-    if (state.frameDiffPlateMode === 'tick') {
-      pIdx = (baseIdx + Math.floor(Math.max(0, state.currentTick || 0) / step)) % n;
-    } else if (state.frameDiffPlateMode === 'loop') {
-      pIdx = (offset + (Math.floor(Math.max(0, state.currentTick || 0) / step) % loopN)) % n;
-    }
     const frame   = state.frames[pIdx];
-    if (!frame) { if (existing) existing.remove(); return; }
+    if (!frame) { removeFrameDiffLayers(xform); return; }
 
-    let img = existing;
-    if (!img) {
-      img = document.createElement('img');
-      img.className = 'frame-diff-plate';
-      img.style.position = 'absolute';
-      img.style.inset = '0';
-      img.style.width = '100%';
-      img.style.height = '100%';
-      img.style.objectFit = 'contain';
-      img.style.pointerEvents = 'none';
-      img.style.zIndex = '3';
-      xform.appendChild(img);
+    if (outputMode === 'color-motion-white') {
+      xform.querySelector('.frame-diff-plate')?.remove();
+      xform.querySelector('.frame-diff-invert')?.remove();
+      const canvas = ensureFrameDiffOverlayEl(xform, '.frame-diff-canvas', 'canvas', 'frame-diff-canvas');
+      canvas.style.display = '';
+      const plateImg = getFrameDiffImageForFrame(frame);
+      const rerender = () => requestAnimationFrame(() => updateFrameDiffForItem(item, frameIdx, cellIdx, opts));
+      if (plateImg && !plateImg.complete) plateImg.onload = rerender;
+      const mainImg = item.querySelector('.frame-main-img');
+      if (mainImg && !mainImg.complete) mainImg.onload = rerender;
+      if (!updateFrameDiffMotionCanvas(canvas, item, plateImg, opacity, {
+        ...opts,
+        currentFrameIdx: frameIdx,
+        plateFrameIdx: pIdx,
+        cellIdx,
+        onPendingImage: rerender
+      })) canvas.style.display = 'none';
+      return;
     }
+
+    xform.querySelector('.frame-diff-canvas')?.remove();
+    const img = ensureFrameDiffOverlayEl(xform, '.frame-diff-plate', 'img', 'frame-diff-plate');
     if (img.src !== frame.dataUrl) img.src = frame.dataUrl;
     img.style.display = '';
     img.style.mixBlendMode = blend;
     img.style.opacity = Math.max(0, Math.min(1, opacity)).toFixed(3);
     img.style.filter = (state.cc && state.cc.enabled) ? buildCCFilter() : '';
+
+    if (outputMode === 'inverted-difference') {
+      const invert = ensureFrameDiffOverlayEl(xform, '.frame-diff-invert', 'div', 'frame-diff-invert');
+      invert.style.display = '';
+    } else {
+      xform.querySelector('.frame-diff-invert')?.remove();
+    }
   }
 
 
@@ -5556,7 +6195,13 @@ function updateAllCells() {
       });
       updateChronoForItem(item, _ghostIndices, getChronoCurrentOpacityScale(_seamInfo));
       updateSeamBlendForItem(item, _seamInfo);
-      updateFrameDiffForItem(item);
+      updateFrameDiffForItem(item, frameIdx, cellIdx, {
+        cellCount: totalCells,
+        cellOrderIdx,
+        cellInfo,
+        ghostIndices: _ghostIndices,
+        seamInfo: _seamInfo
+      });
       updateColoramaForItem(item, cellIdx);
 
       if (showTC && timecodeEl) {
@@ -10458,7 +11103,18 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
         drawChronophotoStack(ctx, _gIdx, x, y, cellDrawW, cellDrawH, {
           opacityScale: getChronoCurrentOpacityScale(_seamInfo)
         });
-        drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, frameImages);
+        drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, frameImages, {
+          tick,
+          currentFrameIdx: animFrameIdx,
+          currentImg: img,
+          cellIdx: c,
+          cellCount,
+          cellOrderIdx: cellOrderMap.get(c),
+          cellInfo,
+          ghostIndices: _gIdx,
+          seamInfo: _seamInfo,
+          mode: 'grid'
+        });
         applyColoramaToCanvas(ctx, x, y, cellDrawW, cellDrawH, img, coloramaFilterId(c));
         drawChronoSeamBlend(ctx, _seamInfo, x, y, cellDrawW, cellDrawH, frameImages, coloramaFilterId(c));
       }
@@ -11026,26 +11682,68 @@ function drawChronophotoStack(ctx, ghostIndices, x, y, w, h, opts = {}) {
 }
 
 
-function drawFrameDiffStack(ctx, x, y, w, h, frameImages) {
+function drawFrameDiffStack(ctx, x, y, w, h, frameImages, opts = {}) {
   if (!window._fgState.frameDiffEnabled || !window._fgState.frames.length) return;
 
   const n      = window._fgState.frames.length;
-  const pIdx   = Math.max(0, Math.min(n - 1, window._fgState.frameDiffPlateIdx || 0));
-  const blend  = window._fgState.frameDiffBlend   || 'difference';
+  const tick = Number.isFinite(Number(opts.tick))
+    ? Number(opts.tick)
+    : (Number.isFinite(Number(opts.currentFrameIdx)) ? Number(opts.currentFrameIdx) : (Number(window._fgState.currentTick) || 0));
+  const currentFrameIdx = Number.isFinite(Number(opts.currentFrameIdx))
+    ? normalizeFrameIndex(opts.currentFrameIdx, n)
+    : normalizeFrameIndex(tick, n);
+  const pIdx   = resolveFrameDiffPlateIdx({ tick, frameCount: n });
+  const outputMode = getFrameDiffOutputMode();
+  const blend  = getFrameDiffBlendMode();
   const alpha  = (window._fgState.frameDiffOpacity !== undefined) ? window._fgState.frameDiffOpacity : 1.0;
   const frame  = window._fgState.frames[pIdx];
   if (!frame) return;
 
-  var img;
-  if (frameImages && frameImages[pIdx]) {
-    img = frameImages[pIdx];
-    if (!img.naturalWidth && !img.videoWidth && !img.width) return;
-  } else {
-    var src = getFrameDataUrl(frame);
-    if (!src) return;
-    img = frame._diffImg || (frame._diffImg = new Image());
-    if (img.src !== src) img.src = src;
-    if (!img.naturalWidth) return;
+  const img = getFrameImageForCanvas(pIdx, frameImages);
+  if (!img || (!img.naturalWidth && !img.videoWidth && !img.width)) return;
+
+  if (outputMode === 'color-motion-white') {
+    const currentImg = opts.currentImg || getFrameImageForCanvas(currentFrameIdx, frameImages);
+    if (!currentImg) return;
+    const maskSize = getFrameDiffMotionMaskSize(w, h);
+    const currentStack = buildFrameDiffVisualStackCanvas({
+      name: 'exportCurrent',
+      w: maskSize.w,
+      h: maskSize.h,
+      tick,
+      currentFrameIdx,
+      currentImg,
+      cellIdx: opts.cellIdx,
+      cellCount: opts.cellCount,
+      cellOrderIdx: opts.cellOrderIdx,
+      cellInfo: opts.cellInfo,
+      ghostIndices: opts.ghostIndices,
+      seamInfo: opts.seamInfo,
+      frameImages,
+      applyTransform: true,
+      mode: opts.mode
+    });
+    const plateStack = buildFrameDiffVisualStackCanvas({
+      name: 'exportPlate',
+      w: maskSize.w,
+      h: maskSize.h,
+      tick,
+      currentFrameIdx: pIdx,
+      currentImg: img,
+      includeChrono: false,
+      frameImages,
+      applyTransform: true
+    });
+    if (!currentStack || !plateStack) return;
+    renderFrameDiffMotionMatte(ctx, currentStack, plateStack, { x, y, w, h }, {
+      name: 'exportMotionMatte',
+      maskW: maskSize.w,
+      maskH: maskSize.h,
+      threshold: window._fgState.frameDiffThreshold,
+      opacity: alpha,
+      applyTransform: false
+    });
+    return;
   }
 
   const sx = window._fgState.frameImgScaleX !== undefined ? Number(window._fgState.frameImgScaleX) : (Number(window._fgState.frameImgScale) || 1);
@@ -11077,6 +11775,18 @@ function drawFrameDiffStack(ctx, x, y, w, h, frameImages) {
   ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
   ctx.filter = 'none';
   ctx.restore();
+
+  if (outputMode === 'inverted-difference') {
+    ctx.save();
+    ctx.globalCompositeOperation = 'difference';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+  }
 }
 
 function drawFrameCell(ctx, img, x, y, w, h) {
@@ -11327,7 +12037,17 @@ function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout,
       drawChronophotoStack(ctx, _gIdx2, innerX, innerY, innerW, innerH, {
         opacityScale: getChronoCurrentOpacityScale(_seamInfoSingle)
       });
-      drawFrameDiffStack(ctx, innerX, innerY, innerW, innerH, frameImages);
+      drawFrameDiffStack(ctx, innerX, innerY, innerW, innerH, frameImages, {
+        tick: _singleTick,
+        currentFrameIdx: frameIdx,
+        currentImg: img,
+        cellIdx: 0,
+        cellCount: 1,
+        cellOrderIdx: 0,
+        ghostIndices: _gIdx2,
+        seamInfo: _seamInfoSingle,
+        mode: 'single'
+      });
       applyColoramaToCanvas(ctx, innerX, innerY, innerW, innerH, img, coloramaFilterId(0));
       drawChronoSeamBlend(ctx, _seamInfoSingle, innerX, innerY, innerW, innerH, frameImages, coloramaFilterId(0));
     }
@@ -11640,19 +12360,6 @@ async function exportPngSeqDrawings() {
 
     const pngs = [];
 
-    // Pre-load Frame Diff plate image once for whole sequence
-    if (state.frameDiffEnabled && state.frames.length) {
-      const _dpIdx = Math.max(0, Math.min(state.frames.length - 1, state.frameDiffPlateIdx || 0));
-      const _dpFrame = state.frames[_dpIdx];
-      if (_dpFrame) {
-        const _dpSrc = _dpFrame.dataUrl || getFrameDataUrl(_dpFrame);
-        if (_dpSrc) {
-          const _dpImg = _dpFrame._diffImg || (_dpFrame._diffImg = new Image());
-          if (_dpImg.src !== _dpSrc) _dpImg.src = _dpSrc;
-          if (!_dpImg.naturalWidth) await new Promise(r => { _dpImg.onload = r; _dpImg.onerror = r; });
-        }
-      }
-    }
     ensureAnimDirShuffle(frameCount);
 
     for (let i = 0; i < frameCount; i++) {
@@ -11677,7 +12384,18 @@ async function exportPngSeqDrawings() {
         drawChronophotoStack(tmpCtx, _gIdxP, 0, 0, outW, outH, {
           opacityScale: _seamCurrentScalePng
         });
-        drawFrameDiffStack(tmpCtx, 0, 0, outW, outH, null);
+        await ensureFrameDiffPlateImageReady({ tick: i, frameCount });
+        drawFrameDiffStack(tmpCtx, 0, 0, outW, outH, null, {
+          tick: i,
+          currentFrameIdx: i,
+          currentImg: img,
+          cellIdx: 0,
+          cellCount: 1,
+          cellOrderIdx: 0,
+          ghostIndices: _gIdxP,
+          seamInfo: _seamInfoPng,
+          mode: 'single'
+        });
       } else {
         const time = state.frames[i]?.time || 0;
         await seekVideo(time);
@@ -11689,7 +12407,18 @@ async function exportPngSeqDrawings() {
           drawChronophotoStack(tmpCtx, _gIdxP2, 0, 0, outW, outH, {
             opacityScale: _seamCurrentScalePng
           });
-          drawFrameDiffStack(tmpCtx, 0, 0, outW, outH, null);
+          await ensureFrameDiffPlateImageReady({ tick: i, frameCount });
+          drawFrameDiffStack(tmpCtx, 0, 0, outW, outH, null, {
+            tick: i,
+            currentFrameIdx: i,
+            currentImg: videoElement,
+            cellIdx: 0,
+            cellCount: 1,
+            cellOrderIdx: 0,
+            ghostIndices: _gIdxP2,
+            seamInfo: _seamInfoPng,
+            mode: 'single'
+          });
         } catch (e) {
           // If drawImage fails (rare on iOS), leave frame blank.
         }
@@ -12364,20 +13093,6 @@ const canvas = document.createElement('canvas');
   stillCellOrder.forEach((cell, idx) => stillCellOrderMap.set(cell, idx));
   ensureAnimDirShuffle(state.frames.length);
 
-  // Pre-load Frame Diff plate image
-  if (state.frameDiffEnabled && state.frames.length) {
-    const _dpIdx = Math.max(0, Math.min(state.frames.length - 1, state.frameDiffPlateIdx || 0));
-    const _dpFrame = state.frames[_dpIdx];
-    if (_dpFrame) {
-      const _dpSrc = _dpFrame.dataUrl || getFrameDataUrl(_dpFrame);
-      if (_dpSrc) {
-        const _dpImg = _dpFrame._diffImg || (_dpFrame._diffImg = new Image());
-        if (_dpImg.src !== _dpSrc) _dpImg.src = _dpSrc;
-        if (!_dpImg.naturalWidth) await new Promise(r => { _dpImg.onload = r; _dpImg.onerror = r; });
-      }
-    }
-  }
-
   // Pass 1: base frames only
   for (let i = 0; i < total; i++) {
     if ((i % 24) === 0) { await new Promise(r => queueMicrotask(r)); }
@@ -12455,7 +13170,19 @@ const canvas = document.createElement('canvas');
         drawChronophotoStack(ctx, _gIdx2, x, y, cellDrawW, cellDrawH, {
           opacityScale: getChronoCurrentOpacityScale(_seamInfoStill)
         });
-        drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, null);
+        await ensureFrameDiffPlateImageReady({ tick: state.currentTick, frameCount: state.frames.length });
+        drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, null, {
+          tick: state.currentTick,
+          currentFrameIdx: frameIdx,
+          currentImg: img,
+          cellIdx,
+          cellCount,
+          cellOrderIdx,
+          cellInfo: stillCellInfo,
+          ghostIndices: _gIdx2,
+          seamInfo: _seamInfoStill,
+          mode: 'grid'
+        });
         await ensureChronoSeamBlendImagesReady(_seamInfoStill);
         drawChronoSeamBlend(ctx, _seamInfoStill, x, y, cellDrawW, cellDrawH, null, coloramaFilterId(cellIdx));
       } else {
@@ -12743,20 +13470,6 @@ const canvas = document.createElement('canvas');
     const frameIdx = getPrimaryPreviewFrameIndex();
     const frame = state.frames[frameIdx];
 
-    // Pre-load Frame Diff plate image
-    if (state.frameDiffEnabled && state.frames.length) {
-      const _dpIdx = Math.max(0, Math.min(state.frames.length - 1, state.frameDiffPlateIdx || 0));
-      const _dpFrame = state.frames[_dpIdx];
-      if (_dpFrame) {
-        const _dpSrc = _dpFrame.dataUrl || getFrameDataUrl(_dpFrame);
-        if (_dpSrc) {
-          const _dpImg = _dpFrame._diffImg || (_dpFrame._diffImg = new Image());
-          if (_dpImg.src !== _dpSrc) _dpImg.src = _dpSrc;
-          if (!_dpImg.naturalWidth) await new Promise(r => { _dpImg.onload = r; _dpImg.onerror = r; });
-        }
-      }
-    }
-
     // Video frame
     const src = getFrameDataUrl(frame);
     if (src) {
@@ -12792,7 +13505,19 @@ const canvas = document.createElement('canvas');
         drawChronophotoStack(ctx, _gIdx2, dx, dy, frameW, frameH, {
           opacityScale: getChronoCurrentOpacityScale(_seamInfoSingleStill)
         });
-        drawFrameDiffStack(ctx, dx, dy, frameW, frameH, null);
+        await ensureFrameDiffPlateImageReady({ tick: state.currentTick, frameCount: state.frames.length });
+        drawFrameDiffStack(ctx, dx, dy, frameW, frameH, null, {
+          tick: state.currentTick,
+          currentFrameIdx: frameIdx,
+          currentImg: img,
+          cellIdx: 0,
+          cellCount: 1,
+          cellOrderIdx: 0,
+          cellInfo: _singleStillInfo,
+          ghostIndices: _gIdx2,
+          seamInfo: _seamInfoSingleStill,
+          mode: 'single'
+        });
         await ensureChronoSeamBlendImagesReady(_seamInfoSingleStill);
         drawChronoSeamBlend(ctx, _seamInfoSingleStill, dx, dy, frameW, frameH, null, coloramaFilterId(0));
       } else {
@@ -13280,7 +14005,7 @@ window.addEventListener('keydown', (e) => {
     // Use physical key codes - works with ANY keyboard layout (Russian, English, etc.)
     if (code === 'Space') { e.preventDefault(); togglePlay(); }
     else if (code === 'KeyG') { e.preventDefault(); setViewMode(state.viewMode === 'grid' ? 'single' : 'grid'); }
-    else if (code === 'KeyF') { e.preventDefault(); fitActiveView(); }
+    else if (code === 'KeyF') { e.preventDefault(); triggerRepeatFit(); }
     else if (code === 'KeyM') { e.preventDefault(); toggleMenu(); }
     else if (code === 'KeyN') {
       e.preventDefault();
@@ -13437,6 +14162,7 @@ window.addEventListener('keydown', (e) => {
   let viewportTimeout;
   function onViewportChanged() {
     syncMobileViewportVars();
+    applyPanelOpacity();
     clearTimeout(viewportTimeout);
     viewportTimeout = setTimeout(() => {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);

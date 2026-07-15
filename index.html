@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 ╔════════════════════════════════════════════════════════════════╗
-║      TimeGrid v28.29                                         ║
+║      TimeGrid 28.30                                         ║
 ╚════════════════════════════════════════════════════════════════╝
 -->
 
@@ -20,7 +20,7 @@
     gtag('js', new Date());
     gtag('config', 'G-JG9JL2MG9E');
   </script>
-  <title>TimeGrid v28.29</title>
+  <title>TimeGrid 28.30</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
@@ -36,7 +36,7 @@
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell"></span>
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell active2"></span>
           </span>
-          <span class="metadata-logo-text" id="fgLogoText">TimeGrid v28.29</span>
+          <span class="metadata-logo-text" id="fgLogoText">TimeGrid 28.30</span>
         </div>
         <div class="metadata-gap"></div>
         <div class="metadata-group">
@@ -220,7 +220,7 @@
         </div>
         <div class="drop-zone-text">
           <div class="dz-title">TimeGrid</div>
-          <div class="dz-version">v28.29</div>
+          <div class="dz-version">28.30</div>
           <div class="dz-subtitle"><div>Experimental <a class="drop-zone-support-link" href="https://grisha-tsvetkov.com/lab/timegrid" target="_blank" rel="noopener noreferrer">tool</a> for frame sampling and sequencing.</div><div>Sample, arrange, draw on, and export frames from video and images.</div></div>
 </div>
         <div class="drop-zone-btn-row">
@@ -1071,6 +1071,8 @@
               <span class="menu-label">Blend Mode</span>
               <select class="menu-select" id="frameDiffBlendSelect">
                 <option value="difference" selected>Difference</option>
+                <option value="inverted-difference">Inverted Difference</option>
+                <option value="color-motion-white">Color Motion on White</option>
                 <option value="exclusion">Exclusion</option>
                 <option value="subtract">Subtract</option>
                 <option value="lighten">Lighten</option>
@@ -1081,6 +1083,13 @@
                 <option value="plus-lighter">Plus Lighter</option>
                 <option value="plus-darker">Plus Darker</option>
               </select>
+            </div>
+            <div class="menu-row" id="frameDiffThresholdRow">
+              <span class="menu-label">Threshold</span>
+              <div class="menu-slider-row">
+                <input type="range" class="menu-slider" id="frameDiffThreshold" min="0" max="255" step="1" value="24">
+                <input type="number" class="menu-slider-input" id="frameDiffThresholdNum" min="0" max="255" step="1" value="24" inputmode="decimal">
+              </div>
             </div>
             <div class="menu-row">
               <span class="menu-label">Opacity</span>
@@ -1563,6 +1572,7 @@
               <div>GPU vendor: <span id="infoGpuVendor">—</span></div>
               <div>GPU mode: <span id="infoGpuMode">—</span></div>
               <div>GPU hint: <span id="infoGpuHint">—</span></div>
+              <div>Frame Diff engine: <span id="infoFrameDiffEngine">—</span></div>
                <div>UI FPS: <span id="infoUiFps">—</span></div>
                <div>Composite: <span id="infoCompositeMs">—</span></div>
           </div>
@@ -1578,7 +1588,7 @@
           <div class="about-toggle"></div>
         </div>
         <div class="about-content">
-          <div class="about-version">Version v28.29</div>
+          <div class="about-version">28.30</div>
           <div class="about-description">Video frame extraction tool for contact sheets, storyboards, and AI analysis.</div>
           
                     <div class="menu-row" style="margin-bottom: 12px; justify-content: space-between; padding-right: 4px;">
@@ -1594,8 +1604,8 @@
           <div class="menu-row" style="margin-bottom: 12px; justify-content: space-between; padding-right: 4px;">
             <span class="menu-label" style="opacity:0.7">Panel Opacity</span>
             <div class="menu-slider-row" style="width:150px;">
-              <input type="range" class="menu-slider" id="panelOpacitySlider" min="35" max="100" value="50">
-              <span class="menu-slider-value" id="panelOpacityValue">50%</span>
+              <input type="range" class="menu-slider" id="panelOpacitySlider" min="35" max="100" value="95">
+              <span class="menu-slider-value" id="panelOpacityValue">95%</span>
             </div>
           </div>
 
