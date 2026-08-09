@@ -140,7 +140,10 @@ exportQuality: 'hd', // low, medium, high, max
     showExportGuides: false, // overlay guides for export padding in the main viewport
     _exportBgCropGrid: null,
     _exportBgCropSingle: null,
-    exportLoops: 1, // 1-10 loops for MP4
+    exportLoops: 2, // 1-10 loops for MP4
+    exportAudioMontage: false, // slice source audio per rendered frame and mux into MP4
+    audioMontageSlice: 0.2,
+    audioMontageFade: 0.02,
     fgAccentColor: '#35f2a3',
     accent2Color: '#f28c35',  // second accent color (logo last-frame dot)
     panelOpacity: 0.95,
@@ -386,6 +389,13 @@ function getTargetFrameOutputDims() {
   const exportGuides = $('exportGuides');
   const exportPaddingRange = $('exportPaddingRange');
   const exportPaddingNum = $('exportPaddingNum');
+  const toggleExportAudioMontage = $('toggleExportAudioMontage');
+  const audioMontageSliceRange = $('audioMontageSliceRange');
+  const audioMontageSliceInput = $('audioMontageSliceInput');
+  const audioMontageFadeRange = $('audioMontageFadeRange');
+  const audioMontageFadeInput = $('audioMontageFadeInput');
+  const audioMontageInfo = $('audioMontageInfo');
+  const btnPreviewAudio = $('btnPreviewAudio');
   const exportQualitySelect = $('exportQuality');
   const loopsInput = $('loopsInput'), loopsMinus = $('loopsMinus'), loopsPlus = $('loopsPlus');
   const newVideoBtn = $('newVideoBtn'), browseVideoBtn = $('browseVideoBtn'), browseImageBtn = $('browseImageBtn'), browseCutBtn = $('browseCutBtn');
@@ -584,6 +594,7 @@ function getTargetFrameOutputDims() {
       if (!v) { state.loopOffset = 0; if (loopOffsetInput) loopOffsetInput.value = 0; }
       _updateLoopOffsetRowVis();
       updateAllCells();
+      syncAudioMontageUI();
     };
     loopNMinus.onclick = () => {
       if (state.loopAfterN > 0) {
@@ -593,6 +604,7 @@ function getTargetFrameOutputDims() {
         if (!state.loopAfterN) { state.loopOffset = 0; if (loopOffsetInput) loopOffsetInput.value = 0; }
         _updateLoopOffsetRowVis();
         updateAllCells();
+        syncAudioMontageUI();
       }
     };
     loopNPlus.onclick = () => {
@@ -601,12 +613,14 @@ function getTargetFrameOutputDims() {
       loopNInput.value = state.loopAfterN;
       _updateLoopOffsetRowVis();
       updateAllCells();
+      syncAudioMontageUI();
     };
   }
   
   // Quick toolbar
   const qMode = $('qMode'), qReset = $('qReset'), qPrev = $('qPrev'), qPlay = $('qPlay'), qNext = $('qNext'), qDraw = $('qDraw'), qFit = $('qFit');
   const qOne = $('qOne');
+  const qRenderImg = $('qRenderImg'), qRenderVideo = $('qRenderVideo');
   const qMenu = $('qMenu'), qCollapse = $('qCollapse');
   let fitRepeatTriggerAt = 0;
   
@@ -931,6 +945,7 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
       metaFrames.innerHTML = '';
       if (metaGridShape) metaGridShape.innerHTML = '';
       if (metaLayout) metaLayout.innerHTML = '';
+      syncAudioMontageUI();
       return;
     }
 
@@ -955,6 +970,7 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
 
     metaFrames.innerHTML = `<span>${Math.max(0, state.frames.length || 0)}f</span>`;
     updateMetaLayoutInfo();
+    syncAudioMontageUI();
   }
 
   updateLogoFromTick();
@@ -4946,6 +4962,15 @@ function fitToSingleFrame(opts = {}) {
   qPlay.onclick = () => { state.isPlaying ? stopAnimation() : startAnimation(); };
   qFit.onclick = triggerRepeatFit;
   qOne.onclick = () => { zoomTo100(); };
+  if (qRenderImg) {
+    qRenderImg.onclick = () => {
+      if (state.viewMode === 'grid') exportImage('jpeg', EXPORT_CONF.STILL_PREV).catch(e => console.error(e));
+      else exportSingleStill('jpeg', EXPORT_CONF.STILL_PREV).catch(e => console.error(e));
+    };
+  }
+  if (qRenderVideo) {
+    qRenderVideo.onclick = () => runMp4Export(state.viewMode === 'grid' ? 'grid' : 'single');
+  }
   // qRegen and qExport removed from toolbar
   if (qCollapse) qCollapse.onclick = () => toggleAllSections();
   qMenu.onclick = toggleMenu;
@@ -4954,18 +4979,101 @@ function fitToSingleFrame(opts = {}) {
     qPlay.innerHTML = state.isPlaying ? '<svg viewBox="0 0 24 24" style="width:14px;height:14px;"><rect x="5" y="4" width="4" height="16" fill="currentColor"/><rect x="15" y="4" width="4" height="16" fill="currentColor"/></svg>' : '<svg viewBox="0 0 24 24" style="width:14px;height:14px;"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>';
     qPlay.classList.toggle('active', state.isPlaying);
   }
+
+  function clampAudioMontageSlice(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0.2;
+    return Math.max(0.1, Math.min(3, Math.round(n * 1000) / 1000));
+  }
+
+  function clampAudioMontageFade(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0.02;
+    return Math.max(0, Math.min(0.2, Math.round(n * 1000) / 1000));
+  }
+
+  function getAudioMontageTotalTicks(includeLoops = true) {
+    const frameCount = state.frames.length;
+    if (!frameCount) return 0;
+    const cycleLen = getAnimDirectionCycleLength(frameCount, state.animDirection);
+    const loopN = (state.loopAfterN > 0 && state.loopAfterN < frameCount) ? state.loopAfterN : null;
+    const loops = includeLoops ? Math.max(1, Number(state.exportLoops) || 1) : 1;
+    return (loopN ? loopN : cycleLen) * loops;
+  }
+
+  function getAudioMontageOutputSeconds(includeLoops = true) {
+    return getAudioMontageTotalTicks(includeLoops) * clampAudioMontageSlice(state.audioMontageSlice);
+  }
+
+  function syncAudioMontageUI() {
+    state.audioMontageSlice = clampAudioMontageSlice(state.audioMontageSlice);
+    state.audioMontageFade = clampAudioMontageFade(state.audioMontageFade);
+
+    if (toggleExportAudioMontage) {
+      toggleExportAudioMontage.classList.toggle('active', !!state.exportAudioMontage);
+    }
+    const audioLayerEl = document.getElementById('toggleExportAudioLayer');
+    if (audioLayerEl) {
+      audioLayerEl.classList.toggle('active', !!state.exportAudioLayer);
+    }
+    if (audioMontageSliceRange) audioMontageSliceRange.value = String(state.audioMontageSlice);
+    if (audioMontageSliceInput) audioMontageSliceInput.value = String(state.audioMontageSlice);
+    if (audioMontageFadeRange) audioMontageFadeRange.value = String(state.audioMontageFade);
+    if (audioMontageFadeInput) audioMontageFadeInput.value = String(state.audioMontageFade);
+    if (audioMontageInfo) {
+      const seconds = getAudioMontageOutputSeconds(true);
+      audioMontageInfo.textContent = seconds > 0 ? formatTime(seconds) : '--';
+    }
+  }
+
+  function setExportAudioMontageEnabled(enabled) {
+    state.exportAudioMontage = !!enabled;
+    if (state.exportAudioMontage) state.exportAudioLayer = false;
+    if (!state.exportAudioMontage) stopAudioMontagePreview();
+    syncAudioMontageUI();
+  }
+
+  function setExportAudioLayerEnabled(enabled) {
+    state.exportAudioLayer = !!enabled;
+    if (state.exportAudioLayer) {
+      state.exportAudioMontage = false;
+      stopAudioMontagePreview();
+    }
+    syncAudioMontageUI();
+  }
+
+  function shouldRecordAudioSeqExport() {
+    return !state.exportAudioMontage && !!(state.exportAudioLayer || (state.audioSeq && state.audioSeq.enabled));
+  }
+
+  function runMp4Export(mode) {
+    if (shouldRecordAudioSeqExport()) recordAudioSeqAV(mode);
+    else exportMp4(mode);
+  }
+
+  function bindAudioMontageNumberPair(rangeEl, inputEl, stateKey, clampFn) {
+    const apply = (value) => {
+      state[stateKey] = clampFn(value);
+      syncAudioMontageUI();
+    };
+    if (rangeEl) rangeEl.oninput = () => apply(rangeEl.value);
+    if (inputEl) inputEl.oninput = () => apply(inputEl.value);
+  }
+
+  if (toggleExportAudioMontage) {
+    toggleExportAudioMontage.onclick = () => setExportAudioMontageEnabled(!state.exportAudioMontage);
+  }
+  bindAudioMontageNumberPair(audioMontageSliceRange, audioMontageSliceInput, 'audioMontageSlice', clampAudioMontageSlice);
+  bindAudioMontageNumberPair(audioMontageFadeRange, audioMontageFadeInput, 'audioMontageFade', clampAudioMontageFade);
+  if (btnPreviewAudio) btnPreviewAudio.onclick = () => previewAudioMontage();
+  syncAudioMontageUI();
+
   exportSmallBtn.onclick = () => exportImage('jpeg', EXPORT_CONF.STILL_PREV).catch(e => console.error(e));
   exportFullBtn.onclick = () => exportImage('png', EXPORT_CONF.STILL_MAX).catch(e => console.error(e));
-  exportMp4GridBtn.onclick = () => {
-    if (state.exportAudioLayer) recordAudioSeqAV('grid');
-    else exportMp4('grid');
-  };
+  exportMp4GridBtn.onclick = () => runMp4Export('grid');
   if (exportPngSingleBtn) exportPngSingleBtn.onclick = () => exportSingleStill('png').catch(e => console.error(e));
   if (exportJpegSingleBtn) exportJpegSingleBtn.onclick = () => exportSingleStill('jpeg').catch(e => console.error(e));
-  exportMp4SingleBtn.onclick = () => {
-    if (state.exportAudioLayer) recordAudioSeqAV('single');
-    else exportMp4('single');
-  };
+  exportMp4SingleBtn.onclick = () => runMp4Export('single');
   if (exportResampledBtn) exportResampledBtn.onclick = () => exportResampledVideo('single');
   if (exportResampledGridBtn) exportResampledGridBtn.onclick = () => exportResampledVideo('grid');
   if (exportPngSeqDrawBtn) exportPngSeqDrawBtn.onclick = exportPngSeqDrawings;
@@ -4998,9 +5106,9 @@ function fitToSingleFrame(opts = {}) {
  
   // Export quality and loops
   exportQualitySelect.onchange = () => { state.exportQuality = exportQualitySelect.value; };
-  loopsMinus.onclick = () => { if (state.exportLoops > 1) { state.exportLoops--; loopsInput.value = state.exportLoops; } };
-  loopsPlus.onclick = () => { if (state.exportLoops < 10) { state.exportLoops++; loopsInput.value = state.exportLoops; } };
-  loopsInput.onchange = () => { state.exportLoops = Math.max(1, Math.min(10, parseInt(loopsInput.value) || 1)); loopsInput.value = state.exportLoops; };
+  loopsMinus.onclick = () => { if (state.exportLoops > 1) { state.exportLoops--; loopsInput.value = state.exportLoops; syncAudioMontageUI(); } };
+  loopsPlus.onclick = () => { if (state.exportLoops < 10) { state.exportLoops++; loopsInput.value = state.exportLoops; syncAudioMontageUI(); } };
+  loopsInput.onchange = () => { state.exportLoops = Math.max(1, Math.min(10, parseInt(loopsInput.value) || 1)); loopsInput.value = state.exportLoops; syncAudioMontageUI(); };
 
   // Animation controls
   animFpsInput.onchange = () => { state.animFps = Math.max(1, Math.min(60, parseInt(animFpsInput.value) || 8)); animFpsInput.value = state.animFps; if (state.isPlaying) restartAnimation(); updateMetaAnimFps(); };
@@ -10431,18 +10539,14 @@ function updateEdgeSoftness(val) {
       state.exportBgLayer = !state.exportBgLayer;
       toggleExportBg.classList.toggle('active', state.exportBgLayer);
       syncExportPaddingUI();
-    }
-  if (toggleExportAudioLayer) {
-    toggleExportAudioLayer.onclick = () => {
-      state.exportAudioLayer = !state.exportAudioLayer;
-      toggleExportAudioLayer.classList.toggle('active', !!state.exportAudioLayer);
     };
-    toggleExportAudioLayer.classList.toggle('active', !!state.exportAudioLayer);
-  }
-
-;
     toggleExportBg.classList.toggle('active', state.exportBgLayer);
   }
+
+  if (toggleExportAudioLayer) {
+    toggleExportAudioLayer.onclick = () => setExportAudioLayerEnabled(!state.exportAudioLayer);
+  }
+  syncAudioMontageUI();
 
 
 
@@ -10544,6 +10648,228 @@ syncExportPaddingUI();
 
       document.head.appendChild(script);
     });
+  }
+
+  function buildAudioMontageFrameTimes(includeLoops = true) {
+    const frameCount = state.frames.length;
+    if (!frameCount) return [];
+    const totalTicks = getAudioMontageTotalTicks(includeLoops);
+    const frameTimes = [];
+    ensureAnimDirShuffle(frameCount);
+    for (let tick = 0; tick < totalTicks; tick++) {
+      const frameIdx = resolveDirectionFrame(tick, 0, frameCount, state.animDirection, state.animDirShuffle);
+      const frame = state.frames[frameIdx];
+      frameTimes.push(frame ? (Number(frame.time) || 0) : 0);
+    }
+    return frameTimes;
+  }
+
+  async function buildFrameAudioMontage(frameTimes, sliceDur, fadeDur) {
+    try {
+      if (!videoElement || !videoElement.src || !frameTimes || !frameTimes.length) return null;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return null;
+
+      const sliceSeconds = clampAudioMontageSlice(sliceDur);
+      const fadeSeconds = Math.min(clampAudioMontageFade(fadeDur), sliceSeconds / 2);
+
+      loadingProgress.textContent = 'Decoding audio track...';
+      const response = await fetch(videoElement.src);
+      if (!response.ok) return null;
+      const arrayBuf = await response.arrayBuffer();
+      const audioCtx = new AudioCtx();
+      let decodedBuffer = null;
+      try {
+        decodedBuffer = await audioCtx.decodeAudioData(arrayBuf);
+      } finally {
+        try { audioCtx.close(); } catch (e) {}
+      }
+      if (!decodedBuffer) return null;
+
+      const sampleRate = decodedBuffer.sampleRate;
+      const sourceChannels = Math.max(1, decodedBuffer.numberOfChannels || 1);
+      const outputChannels = 2;
+      const srcDuration = Math.max(0, decodedBuffer.duration || 0);
+      const sliceSamples = Math.max(1, Math.ceil(sliceSeconds * sampleRate));
+      const fadeSamples = Math.min(Math.floor(fadeSeconds * sampleRate), Math.floor(sliceSamples / 2));
+      const outSamples = frameTimes.length * sliceSamples;
+      const channels = Array.from({ length: outputChannels }, () => new Float32Array(outSamples));
+
+      loadingProgress.textContent = 'Building audio montage...';
+      for (let ch = 0; ch < outputChannels; ch++) {
+        const sourceChannel = Math.min(ch, sourceChannels - 1);
+        const src = decodedBuffer.getChannelData(sourceChannel);
+        const dst = channels[ch];
+        for (let tick = 0; tick < frameTimes.length; tick++) {
+          const maxStart = Math.max(0, srcDuration - sliceSeconds);
+          const srcStartSec = Math.max(0, Math.min(maxStart, Number(frameTimes[tick]) || 0));
+          const srcStart = Math.floor(srcStartSec * sampleRate);
+          const dstStart = tick * sliceSamples;
+          for (let s = 0; s < sliceSamples; s++) {
+            const srcIdx = srcStart + s;
+            let gain = 1;
+            if (fadeSamples > 0) {
+              if (s < fadeSamples) gain = s / fadeSamples;
+              else if (s >= sliceSamples - fadeSamples) gain = (sliceSamples - 1 - s) / fadeSamples;
+            }
+            dst[dstStart + s] = gain * (srcIdx < src.length ? src[srcIdx] : 0);
+          }
+        }
+      }
+
+      return { channels, sampleRate, numberOfChannels: outputChannels, length: outSamples };
+    } catch (e) {
+      console.warn('Audio montage failed:', e);
+      return null;
+    }
+  }
+
+  function resampleMontageChannels(channels, sourceRate, targetRate, sourceLength) {
+    if (sourceRate === targetRate) return { channels, length: sourceLength };
+    const outLength = Math.max(1, Math.ceil(sourceLength * targetRate / sourceRate));
+    const ratio = sourceRate / targetRate;
+    const outChannels = channels.map(channel => {
+      const out = new Float32Array(outLength);
+      for (let i = 0; i < outLength; i++) {
+        const srcF = i * ratio;
+        const srcI = Math.floor(srcF);
+        const frac = srcF - srcI;
+        const a = channel[srcI] || 0;
+        const b = channel[srcI + 1] || 0;
+        out[i] = a + (b - a) * frac;
+      }
+      return out;
+    });
+    return { channels: outChannels, length: outLength };
+  }
+
+  async function muxAudioMontageTrack(muxer, frameTimes) {
+    if (!muxer || !frameTimes || !frameTimes.length) return false;
+    if (typeof AudioEncoder === 'undefined' || typeof AudioData === 'undefined') {
+      console.warn('Audio Montage requires AudioEncoder and AudioData support.');
+      return false;
+    }
+
+    try {
+      const timeout = new Promise(resolve => setTimeout(() => resolve(null), 30000));
+      const montage = await Promise.race([
+        buildFrameAudioMontage(frameTimes, state.audioMontageSlice, state.audioMontageFade),
+        timeout
+      ]);
+      if (!montage) return false;
+
+      loadingProgress.textContent = 'Encoding audio montage...';
+      const muxSampleRate = 48000;
+      const { channels, length } = resampleMontageChannels(
+        montage.channels,
+        montage.sampleRate,
+        muxSampleRate,
+        montage.length
+      );
+      const numberOfChannels = 2;
+      const frameSamples = Math.max(1, Math.floor(muxSampleRate * 0.02));
+
+      await new Promise(resolveAudio => {
+        const audioEncoder = new AudioEncoder({
+          output: (chunk, meta) => { muxer.addAudioChunk(chunk, meta); },
+          error: (e) => {
+            console.warn('AudioEncoder error:', e);
+            resolveAudio(false);
+          }
+        });
+        audioEncoder.configure({
+          codec: 'opus',
+          sampleRate: muxSampleRate,
+          numberOfChannels,
+          bitrate: 128000
+        });
+
+        let offset = 0;
+        let timestamp = 0;
+        while (offset < length) {
+          const end = Math.min(offset + frameSamples, length);
+          const frameLen = end - offset;
+          const planar = new Float32Array(frameLen * numberOfChannels);
+          for (let ch = 0; ch < numberOfChannels; ch++) {
+            planar.set(channels[ch].subarray(offset, offset + frameLen), ch * frameLen);
+          }
+          const audioData = new AudioData({
+            format: 'f32-planar',
+            sampleRate: muxSampleRate,
+            numberOfFrames: frameLen,
+            numberOfChannels,
+            timestamp,
+            data: planar
+          });
+          audioEncoder.encode(audioData);
+          audioData.close();
+          offset += frameSamples;
+          timestamp += Math.round(frameLen / muxSampleRate * 1000000);
+        }
+
+        audioEncoder.flush()
+          .then(() => { try { audioEncoder.close(); } catch (e) {} resolveAudio(true); })
+          .catch(e => { console.warn('AudioEncoder flush failed:', e); resolveAudio(false); });
+      });
+      loadingProgress.textContent = 'Muxing audio montage...';
+      return true;
+    } catch (e) {
+      console.warn('Audio mux error (export will be silent):', e);
+      return false;
+    }
+  }
+
+  let audioMontagePreviewSource = null;
+  let audioMontagePreviewCtx = null;
+
+  function stopAudioMontagePreview() {
+    if (audioMontagePreviewSource) {
+      try { audioMontagePreviewSource.stop(); } catch (e) {}
+      audioMontagePreviewSource = null;
+    }
+    if (audioMontagePreviewCtx) {
+      try { audioMontagePreviewCtx.close(); } catch (e) {}
+      audioMontagePreviewCtx = null;
+    }
+    if (btnPreviewAudio) btnPreviewAudio.textContent = 'Preview Audio';
+  }
+
+  async function previewAudioMontage() {
+    if (audioMontagePreviewSource) {
+      stopAudioMontagePreview();
+      return;
+    }
+    if (!state.frames.length || !videoElement || !videoElement.src) return;
+
+    if (btnPreviewAudio) btnPreviewAudio.textContent = 'Building...';
+    try {
+      const frameTimes = buildAudioMontageFrameTimes(false);
+      const montage = await buildFrameAudioMontage(frameTimes, state.audioMontageSlice, state.audioMontageFade);
+      if (!montage) {
+        if (btnPreviewAudio) btnPreviewAudio.textContent = 'Preview Audio';
+        return;
+      }
+
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const audioCtx = new AudioCtx();
+      const buffer = audioCtx.createBuffer(montage.numberOfChannels, montage.length, montage.sampleRate);
+      for (let ch = 0; ch < montage.numberOfChannels; ch++) {
+        buffer.copyToChannel(montage.channels[ch], ch);
+      }
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+      source.onended = () => stopAudioMontagePreview();
+      source.start();
+      audioMontagePreviewSource = source;
+      audioMontagePreviewCtx = audioCtx;
+      if (btnPreviewAudio) btnPreviewAudio.textContent = 'Stop Preview';
+    } catch (e) {
+      console.warn('Audio montage preview failed:', e);
+      stopAudioMontagePreview();
+    }
   }
 
 // Export resampled video with original audio (experimental).
@@ -10769,12 +11095,46 @@ async function exportResampledVideo(forceMode = null) {
 
   // MP4 Export using mp4-muxer for true MP4 (H.264)
 
+  function getExportRenderFeatureFlags() {
+    const st = window._fgState || state;
+    const frameCount = st && st.frames ? st.frames.length : 0;
+    const chronoOn = !!(st.chronoEnabled && frameCount);
+    const chronoSeamOn = !!(st.chronoSeamBlend && frameCount);
+    const frameDiffOn = !!(st.frameDiffEnabled && frameCount);
+    let frameDiffMode = '';
+    if (frameDiffOn && typeof getFrameDiffOutputMode === 'function') {
+      try { frameDiffMode = getFrameDiffOutputMode(); } catch (e) {}
+    }
+    const frameDiffMotionOn = frameDiffOn && frameDiffMode === 'color-motion-white';
+    const coloramaOn = !!(st.colorama && st.colorama.enabled);
+    return {
+      chronoOn,
+      chronoSeamOn,
+      frameDiffOn,
+      frameDiffMotionOn,
+      coloramaOn,
+      needsGhostIndices: chronoOn,
+      needsSeamInfo: chronoSeamOn || (frameDiffMotionOn && chronoOn)
+    };
+  }
+
   async function exportMp4(mode, opts = {}) {
   window._exportKind = "mp4";
-  window._exportVariant = state.exportAudioLayer ? "av" : "";
-
     const drawingsOnly = !!(opts && opts.drawingsOnly);
+    const audioMontageRequested = !!(!drawingsOnly && state.exportAudioMontage);
+    window._exportVariant = audioMontageRequested ? "audio-montage" : (state.exportAudioLayer ? "av" : "");
     if (!state.frames.length) return;
+    if (audioMontageRequested) {
+      if (!videoElement || !videoElement.src) {
+        alert('Audio Montage export requires the source video/audio to stay loaded.');
+        return;
+      }
+      if (typeof AudioEncoder === 'undefined' || typeof AudioData === 'undefined') {
+        alert('Audio Montage requires WebCodecs AudioEncoder support. Desktop Chrome/Edge is recommended.');
+        return;
+      }
+    }
+    const audioMontageEnabled = audioMontageRequested;
 
     if (state.exportResetPlay) {
        state.currentTick = 0;
@@ -10965,7 +11325,12 @@ Alternatively, use PNG sequence export.`);
     canvas.height = canvasH;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: 'avc', width: canvasW, height: canvasH }, fastStart: 'in-memory' });
+    const muxer = new Mp4Muxer.Muxer({
+      target: new Mp4Muxer.ArrayBufferTarget(),
+      video: { codec: 'avc', width: canvasW, height: canvasH },
+      audio: audioMontageEnabled ? { codec: 'opus', numberOfChannels: 2, sampleRate: 48000 } : undefined,
+      fastStart: 'in-memory'
+    });
     const frameDuration = 1000000 / state.animFps;
     const encoder = new VideoEncoder({
       output: (chunk, meta) => { muxer.addVideoChunk(chunk, meta); },
@@ -10986,17 +11351,24 @@ Alternatively, use PNG sequence export.`);
 
     audioExportReset();
     state._audioExportDoTrigger = false;
+    const renderFlags = getExportRenderFeatureFlags();
+    const audioFrameTimes = audioMontageEnabled ? [] : null;
+    ensureAnimDirShuffle(frameCount);
 
     for (let tick = 0; tick < totalTicks; tick++) {
       loadingProgress.textContent = `Encoding MP4... ${tick + 1}/${totalTicks}`;
       ctx.fillStyle = state.bgColor;
       ctx.fillRect(0, 0, canvasW, canvasH);
       if (mode === 'grid') {
-        renderMp4GridFrame(ctx, canvasW, canvasH, frameImages, tick, cellOrder, rows, frameAspect, r, g, b, layout, drawingsOnly);
+        renderMp4GridFrame(ctx, canvasW, canvasH, frameImages, tick, cellOrder, rows, frameAspect, r, g, b, layout, drawingsOnly, renderFlags);
       } else {
-        ensureAnimDirShuffle(frameCount);
         const singleFrameIdx = resolveDirectionFrame(tick, 0, frameCount, state.animDirection, state.animDirShuffle);
-        renderMp4SingleFrame(ctx, canvasW, canvasH, frameImages, singleFrameIdx, r, g, b, layout, drawingsOnly, tick);
+        renderMp4SingleFrame(ctx, canvasW, canvasH, frameImages, singleFrameIdx, r, g, b, layout, drawingsOnly, tick, renderFlags);
+      }
+      if (audioFrameTimes !== null) {
+        const audioFrameIdx = resolveDirectionFrame(tick, 0, frameCount, state.animDirection, state.animDirShuffle);
+        const audioFrame = state.frames[audioFrameIdx];
+        audioFrameTimes.push(audioFrame ? (audioFrame.time || 0) : 0);
       }
       const videoFrame = new VideoFrame(canvas, { timestamp: tick * frameDuration, duration: frameDuration });
       encoder.encode(videoFrame, { keyFrame: tick % 30 === 0 });
@@ -11006,19 +11378,22 @@ Alternatively, use PNG sequence export.`);
 
     loadingProgress.textContent = 'Finalizing MP4...';
     await encoder.flush();
+    if (audioMontageEnabled && audioFrameTimes && audioFrameTimes.length) {
+      await muxAudioMontageTrack(muxer, audioFrameTimes);
+    }
     muxer.finalize();
 
     const mp4Data = muxer.target.buffer;
     const blob = new Blob([mp4Data], { type: 'video/mp4' });
     loadingOverlay.classList.remove('visible');
     const link = document.createElement('a');
-    link.download = makeExportFilename({ mode, ext: 'mp4', frames: state.frames.length, fps: state.animFps, extra: (drawingsOnly ? 'drawings' : '') });
+    link.download = makeExportFilename({ mode, ext: 'mp4', frames: state.frames.length, fps: state.animFps, extra: (drawingsOnly ? 'drawings' : (audioMontageEnabled ? 'audiochunk' : '')) });
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
   }
 
-function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frameAspect, r, g, b, layout, drawingsOnly = false) {
+function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frameAspect, r, g, b, layout, drawingsOnly = false, renderFlags = null) {
     const headerHLogical = (layout && Number.isFinite(layout.headerH)) ? layout.headerH : (window._fgState.exportShowMetadata ? 48 : 0);
     const sx = (layout && Number.isFinite(layout.scaleX)) ? layout.scaleX : 1;
     const sy = (layout && Number.isFinite(layout.scaleY)) ? layout.scaleY : 1;
@@ -11037,6 +11412,7 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
     const gapY = gap * sy;
     const cellCount = getEffectiveGridCellCount(window._fgState.frames.length);
     const frameCount = window._fgState.frames.length;
+    const flags = renderFlags || getExportRenderFeatureFlags();
     const cellOrderMap = new Map();
     if (Array.isArray(cellOrder)) cellOrder.forEach((cell, idx) => cellOrderMap.set(cell, idx));
     if (window._fgState.animPattern === 'random') ensureAnimRandomStarts(cellCount);
@@ -11054,7 +11430,7 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
     drawExportBgPattern(ctx, 0, outHeaderH, w, bodyH, 'grid');
 
     const _cells = [];
-    coloramaSetCellCount(cellCount);
+    if (flags.coloramaOn) coloramaSetCellCount(cellCount);
     for (let c = 0; c < cellCount; c++) {
       const col = c % window._fgState.gridCols;
       const row = Math.floor(c / window._fgState.gridCols);
@@ -11085,38 +11461,50 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
         // Actually, just passing the exact integer dimensions completely solves it!
         drawFrameCell(ctx, img, x, y, cellDrawW, cellDrawH);
         const _st = window._fgState;
-        const _gIdx = buildChronoGhostIndicesRaw(tick, baseOffset, frameCount,
-          _st.animDirection, _st.animDirShuffle,
-          _st.chronoDepth||3, Math.max(1,_st.chronoStride||1),
-          !!_st.chronoCleanLoop, _st.frames.length);
-        const _seamInfo = getChronoSeamForCell(c, tick, {
-          frameCount,
-          cellCount,
-          cellOrderIdx: cellOrderMap.get(c),
-          cellInfo,
-          frameIdx: animFrameIdx,
-          shuffle: window._fgState.animDirShuffle,
-          dir: _st.animDirection,
-          mode: 'grid',
-          skipEnsureShuffle: true
-        });
-        drawChronophotoStack(ctx, _gIdx, x, y, cellDrawW, cellDrawH, {
-          opacityScale: getChronoCurrentOpacityScale(_seamInfo)
-        });
-        drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, frameImages, {
-          tick,
-          currentFrameIdx: animFrameIdx,
-          currentImg: img,
-          cellIdx: c,
-          cellCount,
-          cellOrderIdx: cellOrderMap.get(c),
-          cellInfo,
-          ghostIndices: _gIdx,
-          seamInfo: _seamInfo,
-          mode: 'grid'
-        });
-        applyColoramaToCanvas(ctx, x, y, cellDrawW, cellDrawH, img, coloramaFilterId(c));
-        drawChronoSeamBlend(ctx, _seamInfo, x, y, cellDrawW, cellDrawH, frameImages, coloramaFilterId(c));
+        let _gIdx = null;
+        let _seamInfo = null;
+        if (flags.needsGhostIndices) {
+          _gIdx = buildChronoGhostIndicesRaw(tick, baseOffset, frameCount,
+            _st.animDirection, _st.animDirShuffle,
+            _st.chronoDepth||3, Math.max(1,_st.chronoStride||1),
+            !!_st.chronoCleanLoop, _st.frames.length);
+        }
+        if (flags.needsSeamInfo) {
+          _seamInfo = flags.chronoSeamOn
+            ? getChronoSeamForCell(c, tick, {
+                frameCount,
+                cellCount,
+                cellOrderIdx: cellOrderMap.get(c),
+                cellInfo,
+                frameIdx: animFrameIdx,
+                shuffle: window._fgState.animDirShuffle,
+                dir: _st.animDirection,
+                mode: 'grid',
+                skipEnsureShuffle: true
+              })
+            : { alpha: 0 };
+        }
+        if (flags.chronoOn) {
+          drawChronophotoStack(ctx, _gIdx || [], x, y, cellDrawW, cellDrawH, {
+            opacityScale: getChronoCurrentOpacityScale(_seamInfo)
+          });
+        }
+        if (flags.frameDiffOn) {
+          drawFrameDiffStack(ctx, x, y, cellDrawW, cellDrawH, frameImages, {
+            tick,
+            currentFrameIdx: animFrameIdx,
+            currentImg: img,
+            cellIdx: c,
+            cellCount,
+            cellOrderIdx: cellOrderMap.get(c),
+            cellInfo,
+            ghostIndices: _gIdx || [],
+            seamInfo: _seamInfo || { alpha: 0 },
+            mode: 'grid'
+          });
+        }
+        if (flags.coloramaOn) applyColoramaToCanvas(ctx, x, y, cellDrawW, cellDrawH, img, coloramaFilterId(c));
+        if (flags.chronoSeamOn) drawChronoSeamBlend(ctx, _seamInfo, x, y, cellDrawW, cellDrawH, frameImages, coloramaFilterId(c));
       }
       _cells.push({ c, uiC, x, y, frameW: cellDrawW, frameH: cellDrawH, animFrameIdx, frame });
     }
@@ -11991,7 +12379,7 @@ function drawChronoSeamBlend(ctx, seamInfo, x, y, w, h, frameImages = null, filt
   }
 
 
-function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout, drawingsOnly = false, animTick = null) {
+function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout, drawingsOnly = false, animTick = null, renderFlags = null) {
     const headerHLogical = (layout && Number.isFinite(layout.headerH)) ? layout.headerH : (window._fgState.exportShowMetadata ? 36 : 0);
     const sx = (layout && Number.isFinite(layout.scaleX)) ? layout.scaleX : 1;
     const sy = (layout && Number.isFinite(layout.scaleY)) ? layout.scaleY : 1;
@@ -12009,6 +12397,7 @@ function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout,
     const frame = window._fgState.frames[frameIdx];
     const img = frameImages ? frameImages[frameIdx] : null;
     const frameCount = window._fgState.frames.length;
+    const flags = renderFlags || getExportRenderFeatureFlags();
 
     if (window._fgState.exportShowMetadata && outHeaderH > 0) {
       const metaText = buildExportMetaText({ mode: 'single', frameW: frameWLogical, frameH: frameHLogical, frames: frameCount, fps: window._fgState.animFps, frameIdx, time: frame?.time || 0, srcW: window._fgState.videoWidth, srcH: window._fgState.videoHeight, duration: window._fgState.videoDuration, date: window._fgState.videoDate });
@@ -12019,37 +12408,49 @@ function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout,
     if (!drawingsOnly && img) {
       drawFrameCell(ctx, img, innerX, innerY, innerW, innerH);
       const _st2 = window._fgState;
-        const _gIdx2 = buildChronoGhostIndicesRaw(animTick !== null ? animTick : frameIdx, 0, window._fgState.frames.length,
+      const _singleTick = animTick !== null ? animTick : frameIdx;
+      let _gIdx2 = null;
+      let _seamInfoSingle = null;
+      if (flags.needsGhostIndices) {
+        _gIdx2 = buildChronoGhostIndicesRaw(_singleTick, 0, window._fgState.frames.length,
           window._fgState.animDirection, window._fgState.animDirShuffle,
           _st2.chronoDepth||3, Math.max(1,_st2.chronoStride||1),
           !!_st2.chronoCleanLoop, _st2.frames.length);
-      const _singleTick = animTick !== null ? animTick : frameIdx;
-      const _seamInfoSingle = getChronoSeamForCell(0, _singleTick, {
-        frameCount,
-        cellCount: 1,
-        cellOrderIdx: 0,
-        frameIdx,
-        shuffle: window._fgState.animDirShuffle,
-        dir: window._fgState.animDirection,
-        mode: 'single',
-        skipEnsureShuffle: true
-      });
-      drawChronophotoStack(ctx, _gIdx2, innerX, innerY, innerW, innerH, {
-        opacityScale: getChronoCurrentOpacityScale(_seamInfoSingle)
-      });
-      drawFrameDiffStack(ctx, innerX, innerY, innerW, innerH, frameImages, {
-        tick: _singleTick,
-        currentFrameIdx: frameIdx,
-        currentImg: img,
-        cellIdx: 0,
-        cellCount: 1,
-        cellOrderIdx: 0,
-        ghostIndices: _gIdx2,
-        seamInfo: _seamInfoSingle,
-        mode: 'single'
-      });
-      applyColoramaToCanvas(ctx, innerX, innerY, innerW, innerH, img, coloramaFilterId(0));
-      drawChronoSeamBlend(ctx, _seamInfoSingle, innerX, innerY, innerW, innerH, frameImages, coloramaFilterId(0));
+      }
+      if (flags.needsSeamInfo) {
+        _seamInfoSingle = flags.chronoSeamOn
+          ? getChronoSeamForCell(0, _singleTick, {
+              frameCount,
+              cellCount: 1,
+              cellOrderIdx: 0,
+              frameIdx,
+              shuffle: window._fgState.animDirShuffle,
+              dir: window._fgState.animDirection,
+              mode: 'single',
+              skipEnsureShuffle: true
+            })
+          : { alpha: 0 };
+      }
+      if (flags.chronoOn) {
+        drawChronophotoStack(ctx, _gIdx2 || [], innerX, innerY, innerW, innerH, {
+          opacityScale: getChronoCurrentOpacityScale(_seamInfoSingle)
+        });
+      }
+      if (flags.frameDiffOn) {
+        drawFrameDiffStack(ctx, innerX, innerY, innerW, innerH, frameImages, {
+          tick: _singleTick,
+          currentFrameIdx: frameIdx,
+          currentImg: img,
+          cellIdx: 0,
+          cellCount: 1,
+          cellOrderIdx: 0,
+          ghostIndices: _gIdx2 || [],
+          seamInfo: _seamInfoSingle || { alpha: 0 },
+          mode: 'single'
+        });
+      }
+      if (flags.coloramaOn) applyColoramaToCanvas(ctx, innerX, innerY, innerW, innerH, img, coloramaFilterId(0));
+      if (flags.chronoSeamOn) drawChronoSeamBlend(ctx, _seamInfoSingle, innerX, innerY, innerW, innerH, frameImages, coloramaFilterId(0));
     }
 
     if (window._fgState.refFrameAboveDrawings) {
@@ -14051,15 +14452,7 @@ window.addEventListener('keydown', (e) => {
     else if (code === 'KeyH') { e.preventDefault(); toggleRefFrameVisibility(); }
     else if (code === 'Digit0' || code === 'Numpad0') {
       e.preventDefault();
-      if (state.exportAudioLayer || (state.audioSeq && state.audioSeq.enabled)) {
-        recordAudioSeqAV(state.viewMode === 'grid' ? 'grid' : 'single');
-      } else {
-        if (state.exportAudioLayer || (state.audioSeq && state.audioSeq.enabled)) {
-        recordAudioSeqAV(state.viewMode === 'grid' ? 'grid' : 'single');
-      } else {
-        exportMp4(state.viewMode === 'grid' ? 'grid' : 'single');
-      }
-      }
+      runMp4Export(state.viewMode === 'grid' ? 'grid' : 'single');
     }
     else if (code === 'Digit9' || code === 'Numpad9') {
       e.preventDefault();
@@ -14932,8 +15325,7 @@ function audioInitUI() {
 
     if (state.exportAudioLayer === undefined) state.exportAudioLayer = !!(state.audioSeq && state.audioSeq.enabled);
     const syncExportAudioLayerUI = () => {
-      const el = document.getElementById('toggleExportAudioLayer');
-      if (el) el.classList.toggle('active', !!state.exportAudioLayer);
+      syncAudioMontageUI();
     };
   const vel = document.getElementById('audioVel');
     const velNum = document.getElementById('audioVelNum');
@@ -14986,9 +15378,9 @@ function audioInitUI() {
       syncExportAudioLayerUI();
       enableEl.addEventListener('click', () => {
         state.audioSeq.enabled = !state.audioSeq.enabled;
-      state.exportAudioLayer = !!state.audioSeq.enabled;
+        setExportAudioLayerEnabled(!!state.audioSeq.enabled);
         enableEl.classList.toggle('active', !!state.audioSeq.enabled);
-      syncExportAudioLayerUI();
+        syncExportAudioLayerUI();
         if (state.audioSeq.enabled) {
           audioEnsureCtx();
           audioPrimePlayheads();
