@@ -7,7 +7,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = '28.32';
+  const APP_VERSION = '28.33';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -67,6 +67,7 @@ inject();
     pendingImageImportMode: 'loop',
     cutCols: 3,
     cutRows: 3,
+    sourceHasAlpha: false,
     imageUrl: null,
     imageUrls: [],
     imageFiles: [],
@@ -334,7 +335,7 @@ function getTargetFrameOutputDims() {
   const sceneDepthMinus = $('sceneDepthMinus'), sceneDepthPlus = $('sceneDepthPlus');
   const sceneDistanceMinus = $('sceneDistanceMinus'), sceneDistancePlus = $('sceneDistancePlus');
   const startFrameInput = $('startFrame'), endFrameInput = $('endFrame');
-  const cutColsInput = $('cutCols'), cutRowsInput = $('cutRows'), cutTotalInput = $('cutTotal'), sliceFirstImageBtn = $('sliceFirstImageBtn');
+  const cutColsInput = $('cutCols'), cutRowsInput = $('cutRows'), cutTotalInput = $('cutTotal');
   // Frame image transform (preview + export)
   const frameTargetAspectSelect = $('frameTargetAspect');
   const toggleScaleLink = $('toggleScaleLink');
@@ -483,7 +484,7 @@ function getTargetFrameOutputDims() {
 
     // We map the actual grid's state down to the 3x3 logo.
     const frameCount = Math.max(1, state.frames.length || 1);
-    const cellCount = Math.ceil(frameCount / Math.max(1, state.cellSize || 1));
+    const cellCount = getEffectiveGridCellCount(frameCount);
     const totalCells = state.showInfoCard ? cellCount + 1 : cellCount;
     const offset = 0;
     const animCellCount = cellCount; 
@@ -491,7 +492,7 @@ function getTargetFrameOutputDims() {
     // Safety check
     if (animCellCount <= 0) return { first: [0], last: [] };
 
-    const cols = Math.max(1, state.gridCols || 1);
+    const cols = getEffectiveGridCols(totalCells);
     const rows = Math.ceil(totalCells / cols);
 
     const cellOrder = generateCellOrder(animCellCount, cols);
@@ -776,10 +777,12 @@ function handleImageFiles(files, importMode = "loop") {
     // IMAGE MODE: treat imported images as sources for the frame sequence.
     state.isSingleImage = true;
     state.imageImportMode = (importMode === 'cut') ? 'cut' : 'loop';
+    state.sourceHasAlpha = false;
 
-    // Force "Fixed Count" UI for image mode, since interval-based selection doesn't apply here.
-    state.selectionMode = 'count';
+    // Image sequences use Fixed Count; sliced stills use the Slice controls directly.
+    state.selectionMode = state.imageImportMode === 'cut' ? 'slice' : 'count';
     selectionModeSelect.value = 'count';
+    if (state.imageImportMode === 'cut') selectionModeSelect.value = 'slice';
     updateIntervalUI();
 
     // Clear any existing video source
@@ -802,6 +805,11 @@ function handleImageFiles(files, importMode = "loop") {
     const autoCount = (state.imageImportMode === 'cut') ? getCutTotal() : ((imgCount > 1) ? imgCount : 24);
     state.frameCount = Math.max(1, Math.min(3000, autoCount));
     frameCountInput.value = state.frameCount;
+    if (state.imageImportMode === 'cut') {
+      state.quality = 1;
+      if (qualitySelect) qualitySelect.value = '1';
+      resetFrameTransformForSlice();
+    }
     updateCutUI();
     updateGridHint();
 
@@ -834,6 +842,8 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
       state.videoWidth = img.naturalWidth || img.width || 1;
       state.videoHeight = img.naturalHeight || img.height || 1;
       state._frameTileDims = null;
+      state.sourceHasAlpha = imageHasAlpha(img);
+      if (state.sourceHasAlpha) setFrameBgOpacity(0);
 
       // Range + duration are synthetic for image mode (used only for display).
       const n = Math.max(1, Math.min(state.frameCount || 1, 3000));
@@ -870,8 +880,8 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
     const dims = getFrameTileDims();
     const tw = Math.max(0, Math.round(dims?.tw || 0));
     const th = Math.max(0, Math.round(dims?.th || 0));
-    const cols = Math.max(1, Math.round(state.gridCols || 1));
     const visibleCells = getVisibleGridCellCount();
+    const cols = getEffectiveGridCols(visibleCells);
     const rows = Math.max(1, Math.ceil(visibleCells / cols));
     const gw = tw && cols ? tw * cols : 0;
     const gh = th && rows ? th * rows : 0;
@@ -993,6 +1003,10 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
     const totEl = document.getElementById('cutTotalText');
     if (totEl) totEl.textContent = String(tot);
     if (state.selectionMode === 'slice') {
+      state.frameCount = Math.min(3000, tot);
+      if (frameCountInput) frameCountInput.value = state.frameCount;
+      state.gridCols = state.cutCols;
+      if (gridColsInput) gridColsInput.value = state.gridCols;
       const alreadyDone = state.frames.length > 0
         && state._lastSliceCols === state.cutCols
         && state._lastSliceRows === state.cutRows;
@@ -1024,6 +1038,36 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
       img.onerror = reject;
       img.src = src;
     });
+  }
+
+  function imageHasAlpha(img) {
+    if (!img) return false;
+    const srcW = Math.max(1, img.naturalWidth || img.width || 1);
+    const srcH = Math.max(1, img.naturalHeight || img.height || 1);
+    const sampleW = Math.min(96, srcW);
+    const sampleH = Math.min(96, srcH);
+    const cnv = document.createElement('canvas');
+    cnv.width = sampleW;
+    cnv.height = sampleH;
+    const ctx = cnv.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return false;
+    ctx.clearRect(0, 0, sampleW, sampleH);
+    ctx.drawImage(img, 0, 0, sampleW, sampleH);
+    try {
+      const data = ctx.getImageData(0, 0, sampleW, sampleH).data;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] < 255) return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function setFrameBgOpacity(value) {
+    const op = Math.max(0, Math.min(1, Number(value) || 0));
+    state.frameBgOpacity = op;
+    if (frameBgOpacitySlider) frameBgOpacitySlider.value = String(op);
+    if (frameBgOpacityLabel) frameBgOpacityLabel.value = op.toFixed(2);
+    applyFrameImgTransform();
   }
 
   function getMaxFrameIndex() {
@@ -1226,6 +1270,8 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
         const cols = clampCutValue(state.cutCols, 3);
         const rows = clampCutValue(state.cutRows, 3);
         const total = Math.max(1, Math.min(cols * rows, 3000));
+        state.quality = 1;
+        if (qualitySelect) qualitySelect.value = '1';
         state.frameCount = total;
         frameCountInput.value = state.frameCount;
         updateCutUI();
@@ -1249,10 +1295,8 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
               const ex = Math.round(((col + 1) * srcW) / cols);
               const sw = Math.max(1, ex - sx);
 
-              // Apply quality downscaling here for the final slice
-              const qual = Number(state.quality) || 1;
-              const dsW = Math.max(1, Math.round(sw * qual));
-              const dsH = Math.max(1, Math.round(sh * qual));
+              const dsW = Math.max(1, sw);
+              const dsH = Math.max(1, sh);
 
               tileCanvas.width = dsW;
               tileCanvas.height = dsH;
@@ -1291,6 +1335,7 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
       captureCanvas.width = Math.max(1, state.captureW);
       captureCanvas.height = Math.max(1, state.captureH);
       state._frameTileDims = null;
+      updateQualityResHint();
 
       state.videoDuration = Math.max(1, n / state.videoFps);
       state.startFrame = 0;
@@ -1305,9 +1350,12 @@ state.imageUrls = state.imageFiles.map(f => URL.createObjectURL(f));
 
       metaFrames.innerHTML = `<span>${state.frames.length}f</span>`;
 
-      if (state.autoFit) {
+      if (state.imageImportMode === 'cut') {
+        state.gridCols = clampCutValue(state.cutCols, 3);
+        if (gridColsInput) gridColsInput.value = state.gridCols;
+      } else if (state.autoFit) {
         const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-        state.gridCols = state.imageImportMode === 'cut' ? cols : calculateOptimalColumns(cellCount);
+        state.gridCols = calculateOptimalColumns(cellCount);
         gridColsInput.value = state.gridCols;
       }
 
@@ -1526,11 +1574,13 @@ for (let i = 0; i < times.length; i++) {
 
   function updateGridHint() {
     const frameAspect = getEffectiveFrameAspect();
+    const visibleCells = getVisibleGridCellCount();
+    const visibleCols = getEffectiveGridCols(visibleCells);
 
     let targetAspect;
     if (state.canvasAspect === 'custom') {
-      const rowsNow = Math.max(1, Math.ceil(getVisibleGridCellCount() / Math.max(1, state.gridCols || 1)));
-      targetAspect = (Math.max(1, state.gridCols || 1) * frameAspect) / rowsNow;
+      const rowsNow = Math.max(1, Math.ceil(visibleCells / visibleCols));
+      targetAspect = (visibleCols * frameAspect) / rowsNow;
     } else if (state.canvasAspect !== 'auto') {
       const [w, h] = state.canvasAspect.split(':').map(Number);
       targetAspect = w / h;
@@ -1560,7 +1610,6 @@ for (let i = 0; i < times.length; i++) {
       _estFrameCount = Math.max(1, getCutTotal());
     }
     const sourceFrames = Math.max(1, state.frames.length || _estFrameCount);
-    const visibleCells = getVisibleGridCellCount();
     gridHint.classList.remove('hint-good', 'hint-warn', 'hint-bad');
     if (!sourceFrames) {
       gridHint.classList.add('hint-good');
@@ -1569,10 +1618,10 @@ for (let i = 0; i < times.length; i++) {
       return;
     }
 
-    const rows = Math.max(1, Math.ceil(visibleCells / Math.max(1, state.gridCols || 1)));
-    const gridAspect = (Math.max(1, state.gridCols || 1) * frameAspect) / rows;
+    const rows = Math.max(1, Math.ceil(visibleCells / visibleCols));
+    const gridAspect = (visibleCols * frameAspect) / rows;
     const aspectDiffCurrent = Math.abs(gridAspect / targetAspect - 1);
-    const empty = Math.max(0, Math.max(1, state.gridCols || 1) * rows - visibleCells);
+    const empty = Math.max(0, visibleCols * rows - visibleCells);
 
     const divisors = [];
     for (let i = 2; i <= Math.min(visibleCells, 20); i++) if (visibleCells % i === 0) divisors.push(i);
@@ -1588,12 +1637,12 @@ for (let i = 0; i < times.length; i++) {
 
     let html;
     if (cs > 1) {
-      html = `${visibleCells} cells (×${cs}) → ${state.gridCols}×${rows}`;
+      html = `${visibleCells} cells (×${cs}) → ${visibleCols}×${rows}`;
       if (empty > 0) html += ` (+${empty} empty)`;
     } else {
       html = empty === 0
-        ? `✓ ${state.gridCols}×${rows} = ${visibleCells}f (${aspectLabel})`
-        : `${state.gridCols}×${rows} (${empty} empty) ${aspectLabel}`;
+        ? `✓ ${visibleCols}×${rows} = ${visibleCells}f (${aspectLabel})`
+        : `${visibleCols}×${rows} (${empty} empty) ${aspectLabel}`;
     }
 
     if (state.canvasAspect !== 'auto' && state.canvasAspect !== 'custom') html += `<br>Target: ${state.canvasAspect} · Current: ${gridAspect.toFixed(2)}:1`;
@@ -2244,11 +2293,11 @@ function getViewportExportPadForElement(el, mode = 'grid') {
       const dims = getTargetFrameOutputDims();
       const baseFrameW = Math.max(1, Math.round(dims.w));
       const baseFrameH = Math.max(1, Math.round(dims.h));
-      const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-      const total = cellCount + (0);
-      const rows = Math.ceil(total / state.gridCols);
+      const cellCount = getEffectiveGridCellCount();
+      const cols = getEffectiveGridCols(cellCount);
+      const rows = Math.ceil(cellCount / cols);
       const gap = getExportScaledGap(baseFrameW);
-      dstContentW = state.gridCols * baseFrameW + Math.max(0, state.gridCols - 1) * gap;
+      dstContentW = cols * baseFrameW + Math.max(0, cols - 1) * gap;
       dstContentH = rows * baseFrameH + Math.max(0, rows - 1) * gap;
     }
   } catch (e) {}
@@ -2369,6 +2418,9 @@ function getDeterministicVideoExportLayout(mode, rows) {
   const gapBase = getExportScaledGap(frameW);
   const padPx = state.exportBgLayer ? clampExportPaddingPx(state.exportPaddingPx || 0) : 0;
   const qualityCap = EXPORT_CONF.RES[state.exportQuality] || 1080;
+  const layoutCellCount = getEffectiveGridCellCount();
+  const layoutCols = getEffectiveGridCols(layoutCellCount);
+  const layoutRows = Math.max(1, Math.ceil(layoutCellCount / layoutCols));
 
   let logicalCanvasW = 0;
   let logicalCanvasH = 0;
@@ -2393,8 +2445,9 @@ function getDeterministicVideoExportLayout(mode, rows) {
   if (mode === 'grid') {
     // dims and frameW already defined above
     const frameH = Math.max(2, Math.round(dims.h));
-    const gridW = state.gridCols * frameW + Math.max(0, state.gridCols - 1) * gapBase;
-    const gridH = rows * frameH + Math.max(0, rows - 1) * gapBase;
+    const gridRows = Number.isFinite(Number(rows)) ? Math.max(1, Math.round(Number(rows))) : layoutRows;
+    const gridW = layoutCols * frameW + Math.max(0, layoutCols - 1) * gapBase;
+    const gridH = gridRows * frameH + Math.max(0, gridRows - 1) * gapBase;
 
     // Grid width determines the base header size
     const rawHeader = getExportHeaderHeight('grid', gridW);
@@ -2410,7 +2463,8 @@ function getDeterministicVideoExportLayout(mode, rows) {
       const mctx = measureCanvas.getContext('2d');
       const metaTextLocal = buildExportMetaText({
         mode: 'grid',
-        cols: state.gridCols,
+        cols: layoutCols,
+        rows: gridRows,
         frameW,
         frameH,
         frames: state.frames.length,
@@ -2616,6 +2670,19 @@ function schedulePostGridSync() {
     return Math.max(1, Math.ceil(Math.max(1, targetCount) / cellSize));
   }
 
+  function getEffectiveGridCols(cellCount = getEffectiveGridCellCount()) {
+    const cells = Math.max(1, Math.floor(Number(cellCount) || 1));
+    const requested = Math.max(1, Math.round(Number(state.gridCols) || 1));
+    return Math.max(1, Math.min(requested, cells));
+  }
+
+  function getGridLayoutModel(frameCount = state.frames.length) {
+    const cellCount = getEffectiveGridCellCount(frameCount);
+    const cols = getEffectiveGridCols(cellCount);
+    const rows = Math.max(1, Math.ceil(cellCount / cols));
+    return { cellCount, cols, rows };
+  }
+
   function normalizeFrameIndex(idx, frameCount = state.frames.length) {
     const n = Math.max(1, Math.floor(Number(frameCount) || 1));
     const v = Number.isFinite(Number(idx)) ? Math.floor(Number(idx)) : 0;
@@ -2786,12 +2853,15 @@ function schedulePostGridSync() {
 
 function renderGrid() {
     // ── Sync setup ───────────────────────────────────────────────────────────
+    const gridLayout = getGridLayoutModel();
+    const cellCount = gridLayout.cellCount;
+    const gridCols = gridLayout.cols;
     invalidateCellCaches();
     framesGrid._cellCount = 0;
     framesGrid.innerHTML = '';
     framesGrid.classList.toggle('onion-off', !state.drawOnion);
     framesGrid.style.setProperty('--cell-w', `${state.previewCellW || 240}px`);
-    framesGrid.style.gridTemplateColumns = `repeat(${state.gridCols}, var(--cell-w))`;
+    framesGrid.style.gridTemplateColumns = `repeat(${gridCols}, var(--cell-w))`;
     framesGrid.style.gridAutoRows = 'auto';
     framesGrid.style.setProperty('--grid-gap', `${state.spacing}px`);
     framesGrid.classList.toggle('seamless', Number(state.spacing) === 0);
@@ -2812,9 +2882,8 @@ function renderGrid() {
       framesGrid.appendChild(item);
     }
 
-    const cellCount = getEffectiveGridCellCount();
     const tick = Number.isFinite(Number(state.currentTick)) ? Math.floor(Number(state.currentTick)) : 0;
-    const cellOrder = generateCellOrder(cellCount, state.gridCols);
+    const cellOrder = generateCellOrder(cellCount, gridCols);
     const cellOrderMap = new Map();
     cellOrder.forEach((cell, idx) => cellOrderMap.set(cell, idx));
     if (state.animPattern === 'random') ensureAnimRandomStarts(cellCount);
@@ -3632,6 +3701,12 @@ function fitToSingleFrame(opts = {}) {
       const total = Math.max(1, (state.sceneCount || 5) * (state.sceneDepth || 4));
       state.frameCount = total;
       frameCountInput.value = total;
+    } else if (state.selectionMode === 'slice') {
+      state.quality = 1;
+      if (qualitySelect) qualitySelect.value = '1';
+      updateCutUI();
+      updateQualityResHint();
+      resetFrameTransformForSlice();
     }
 
     updateIntervalUI(); markRegenPending();
@@ -3733,28 +3808,52 @@ function fitToSingleFrame(opts = {}) {
   if (sliceRowsMinus) sliceRowsMinus.onclick = () => { if (state.cutRows > 1) { state.cutRows--; cutRowsInput.value = state.cutRows; updateCutUI(); saveCutSettings(); } };
   if (sliceRowsPlus) sliceRowsPlus.onclick = () => { if (state.cutRows < 64) { state.cutRows++; cutRowsInput.value = state.cutRows; updateCutUI(); saveCutSettings(); } };
 
+  function resetFrameTransformForSlice() {
+    state.frameImgScale = 1;
+    state.frameImgScaleX = 1;
+    state.frameImgScaleY = 1;
+    state.frameImgScaleLink = true;
+    state.frameImgOffX = 0;
+    state.frameImgOffY = 0;
+    state.frameImgRot = 0;
+    if (toggleScaleLink) toggleScaleLink.classList.add('active');
+    if (frameImgScaleSliderX) frameImgScaleSliderX.value = '1';
+    if (frameImgScaleNumX) frameImgScaleNumX.value = '1.00';
+    if (frameImgScaleSliderY) frameImgScaleSliderY.value = '1';
+    if (frameImgScaleNumY) frameImgScaleNumY.value = '1.00';
+    if (frameImgOffXSlider) frameImgOffXSlider.value = '0';
+    if (frameImgOffXNum) frameImgOffXNum.value = '0';
+    if (frameImgOffYSlider) frameImgOffYSlider.value = '0';
+    if (frameImgOffYNum) frameImgOffYNum.value = '0';
+    if (frameImgRotSlider) frameImgRotSlider.value = '0';
+    if (frameImgRotNum) frameImgRotNum.value = '0.0';
+    applyFrameImgTransform();
+  }
+
+  function prepareSliceGridGeneration() {
+    state.cutCols = clampCutValue(cutColsInput && cutColsInput.value, state.cutCols);
+    state.cutRows = clampCutValue(cutRowsInput && cutRowsInput.value, state.cutRows);
+    state.imageImportMode = 'cut';
+    state.quality = 1;
+    state.frameCount = Math.min(3000, getCutTotal());
+    state.gridCols = state.cutCols;
+    if (qualitySelect) qualitySelect.value = '1';
+    if (frameCountInput) frameCountInput.value = state.frameCount;
+    if (gridColsInput) gridColsInput.value = state.gridCols;
+    updateCutUI();
+    updateQualityResHint();
+    updateGridHint();
+    saveCutSettings();
+    resetFrameTransformForSlice();
+  }
+
   const loadNewImageBtn = $('loadNewImageBtn');
   if (loadNewImageBtn) {
     loadNewImageBtn.onclick = () => {
       requestImageImport('cut');
     };
   }
-  sliceFirstImageBtn.onclick = () => {
-    state.cutCols = clampCutValue(cutColsInput.value, state.cutCols);
-    state.cutRows = clampCutValue(cutRowsInput.value, state.cutRows);
-    updateCutUI();
-    saveCutSettings();
-    if (!state.imageFiles || !state.imageFiles.length) {
-      requestImageImport('cut');
-      return;
-    }
-    state.imageImportMode = 'cut';
-    state.frameCount = Math.min(3000, getCutTotal());
-    frameCountInput.value = state.frameCount;
-    generateFrames();
-  };
-  
-  const updateQualityResHint = () => {
+  function updateQualityResHint() {
     const el = document.getElementById('qualityResHint');
     if (!el) return;
     const q = parseFloat(state.quality) || 1;
@@ -3762,7 +3861,7 @@ function fitToSingleFrame(opts = {}) {
     const h = state.videoHeight || 0;
     if (!w || !h) { el.textContent = ''; return; }
     el.textContent = `${Math.round(w * q)}×${Math.round(h * q)}`;
-  };
+  }
 
   qualitySelect.onchange = () => {
     state.quality = parseFloat(qualitySelect.value);
@@ -4892,6 +4991,15 @@ function fitToSingleFrame(opts = {}) {
 
   generateBtn.onclick = () => {
     if (state.isPlaying) stopAnimation();
+    if (state.selectionMode === 'slice') {
+      prepareSliceGridGeneration();
+      if (!state.imageFiles || !state.imageFiles.length) {
+        markRegenPending();
+        requestImageImport('cut');
+        return;
+      }
+      state.isSingleImage = true;
+    }
     markRegenDone();
     invalidateCellCaches();
     generateFrames();
@@ -6147,7 +6255,7 @@ function ensureAnimRandomStarts(totalCells) {
     }
 
     const seed = (parseInt(state.animSeed, 10) || 1) >>> 0;
-    const cols = state.gridCols;
+    const cols = getEffectiveGridCols(totalCells);
     const pattern = state.animPattern;
 
     if (!state.animRandomStarts ||
@@ -6250,7 +6358,8 @@ function updateAllCells() {
     if (state.animPattern === 'random') ensureAnimRandomStarts(totalCells);
 
     // Cached cellOrder Map — no rebuild unless pattern/cols changed
-    const { map: cellOrderMap } = getCachedCellOrder(totalCells, state.gridCols);
+    const visualCols = getEffectiveGridCols(totalCells);
+    const { map: cellOrderMap } = getCachedCellOrder(totalCells, visualCols);
 
     // Hoist loop-invariants out of per-cell loop
     const showTC      = computeShowTimecode();
@@ -6565,6 +6674,9 @@ function updateAllCells() {
 
   function updateRegenHint() {
     const el = document.getElementById('regenFrameHint');
+    if (generateBtn) {
+      generateBtn.textContent = state.selectionMode === 'slice' ? 'Generate Slice Grid' : 'Regenerate Grid';
+    }
     if (!el) return;
     const n = getEstimatedFrameCount();
     el.textContent = n ? `${n} frames` : '';
@@ -6573,7 +6685,8 @@ function updateAllCells() {
 
   function updateGridColsOnly() {
     // Fast path: just update CSS column template — no DOM rebuild
-    framesGrid.style.gridTemplateColumns = `repeat(${state.gridCols}, var(--cell-w))`;
+    const cols = getEffectiveGridCols(getVisibleGridCellCount());
+    framesGrid.style.gridTemplateColumns = `repeat(${cols}, var(--cell-w))`;
     invalidateCellCaches();
     updateGridHint();
     fitActiveView();
@@ -10963,9 +11076,10 @@ async function exportResampledVideo(forceMode = null) {
     }
 
     const frameAspect = getEffectiveFrameAspect();
-    const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-    const total = cellCount + (0);
-    const rows = Math.ceil(total / state.gridCols);
+    const gridLayout = getGridLayoutModel();
+    const cellCount = gridLayout.cellCount;
+    const cols = gridLayout.cols;
+    const rows = gridLayout.rows;
 
     const videoLayout = getDeterministicVideoExportLayout(mode, rows);
     const canvasW = videoLayout.canvasW;
@@ -10987,7 +11101,7 @@ async function exportResampledVideo(forceMode = null) {
       for (let i = frameCount - 2; i > 0; i--) sequence.push(i);
     }
 
-    const cellOrder = (mode === 'grid') ? generateCellOrder(cellCount, state.gridCols) : null;
+    const cellOrder = (mode === 'grid') ? generateCellOrder(cellCount, cols) : null;
     const r = parseInt(state.tcBgColor.slice(1,3), 16);
     const g = parseInt(state.tcBgColor.slice(3,5), 16);
     const b = parseInt(state.tcBgColor.slice(5,7), 16);
@@ -11154,9 +11268,10 @@ async function exportResampledVideo(forceMode = null) {
     }
 
     const frameAspect = getEffectiveFrameAspect();
-    const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-    const total = cellCount + (0);
-    const rows = Math.ceil(total / state.gridCols);
+    const gridLayout = getGridLayoutModel();
+    const cellCount = gridLayout.cellCount;
+    const cols = gridLayout.cols;
+    const rows = gridLayout.rows;
     const gapBase = Math.max(0, Number(state.spacing) || 0);
     const padPx = state.exportBgLayer ? clampExportPaddingPx(state.exportPaddingPx || 0) : 0;
     const qualityCap = EXPORT_CONF.RES[state.exportQuality] || 1080;
@@ -11169,7 +11284,7 @@ async function exportResampledVideo(forceMode = null) {
       const dims = getTargetFrameOutputDims();
       const frameW = Math.max(2, Math.round(dims.w));
       const frameH = Math.max(2, Math.round(dims.h));
-      const gridW = state.gridCols * frameW + Math.max(0, state.gridCols - 1) * gapBase;
+      const gridW = cols * frameW + Math.max(0, cols - 1) * gapBase;
       const gridH = rows * frameH + Math.max(0, rows - 1) * gapBase;
 
       const rawHeader = getExportHeaderHeight('grid', gridW);
@@ -11183,7 +11298,7 @@ async function exportResampledVideo(forceMode = null) {
       if (state.exportShowMetadata && baseHeaderH > 0) {
         const measureCanvas = document.createElement('canvas');
         const mctx = measureCanvas.getContext('2d');
-        const metaTextLocal = buildExportMetaText({ mode: 'grid', cols: state.gridCols, frameW, frameH, frames: state.frames.length, fps: state.animFps, srcW: state.videoWidth, srcH: state.videoHeight, duration: state.videoDuration, date: state.videoDate });
+        const metaTextLocal = buildExportMetaText({ mode: 'grid', cols, rows, frameW, frameH, frames: state.frames.length, fps: state.animFps, srcW: state.videoWidth, srcH: state.videoHeight, duration: state.videoDuration, date: state.videoDate });
         const newHeaderH = computeExportMetadataHeaderH(mctx, logicalCanvasW, baseHeaderH, metaTextLocal);
         if (newHeaderH > headerH) {
           logicalCanvasH += (newHeaderH - headerH);
@@ -11234,7 +11349,7 @@ async function exportResampledVideo(forceMode = null) {
       ? _loopN * Math.max(1, state.exportLoops)
       : cycleLen * Math.max(1, state.exportLoops);
 
-    const cellOrder = generateCellOrder(cellCount, state.gridCols);
+    const cellOrder = generateCellOrder(cellCount, cols);
     const r = parseInt(state.tcBgColor.slice(1,3), 16);
     const g = parseInt(state.tcBgColor.slice(3,5), 16);
     const b = parseInt(state.tcBgColor.slice(5,7), 16);
@@ -11411,6 +11526,8 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
     const gapX = gap * sx;
     const gapY = gap * sy;
     const cellCount = getEffectiveGridCellCount(window._fgState.frames.length);
+    const cols = getEffectiveGridCols(cellCount);
+    const rowCount = Number.isFinite(Number(rows)) ? Math.max(1, Math.round(Number(rows))) : Math.max(1, Math.ceil(cellCount / cols));
     const frameCount = window._fgState.frames.length;
     const flags = renderFlags || getExportRenderFeatureFlags();
     const cellOrderMap = new Map();
@@ -11419,7 +11536,7 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
     ensureAnimDirShuffle(frameCount);
 
     if (window._fgState.exportShowMetadata && outHeaderH > 0) {
-      const metaText = buildExportMetaText({ mode: 'grid', cols: window._fgState.gridCols, frameW: frameWLogical, frameH: frameHLogical, frames: frameCount, fps: window._fgState.animFps, srcW: window._fgState.videoWidth, srcH: window._fgState.videoHeight, duration: window._fgState.videoDuration, date: window._fgState.videoDate });
+      const metaText = buildExportMetaText({ mode: 'grid', cols, rows: rowCount, frameW: frameWLogical, frameH: frameHLogical, frames: frameCount, fps: window._fgState.animFps, srcW: window._fgState.videoWidth, srcH: window._fgState.videoHeight, duration: window._fgState.videoDuration, date: window._fgState.videoDate });
       const _dynLogoResult = typeof getLogoActiveIndicesForTick === 'function' ? getLogoActiveIndicesForTick(tick) : { first: exportLogoIndices, last: [] };
       const dynamicLogoIdx  = Array.isArray(_dynLogoResult) ? _dynLogoResult : (_dynLogoResult.first || []);
       const dynamicLogoIdx2 = Array.isArray(_dynLogoResult) ? [] : (_dynLogoResult.last  || []);
@@ -11432,8 +11549,8 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
     const _cells = [];
     if (flags.coloramaOn) coloramaSetCellCount(cellCount);
     for (let c = 0; c < cellCount; c++) {
-      const col = c % window._fgState.gridCols;
-      const row = Math.floor(c / window._fgState.gridCols);
+      const col = c % cols;
+      const row = Math.floor(c / cols);
 
       const exactX1 = Math.floor(offsetX + col * (frameW + gapX));
       const exactY1 = Math.floor(offsetY + row * (frameH + gapY));
@@ -12516,9 +12633,10 @@ async function recordAudioSeqAV(mode = 'grid') {
     for (let loop = 1; loop < (state.exportLoops || 1); loop++) sequence = sequence.concat(singleLoop);
 
     const frameAspect = getEffectiveFrameAspect();
-    const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-    const total = cellCount + (0);
-    const rows = Math.ceil(total / state.gridCols);
+    const gridLayout = getGridLayoutModel();
+    const cellCount = gridLayout.cellCount;
+    const cols = gridLayout.cols;
+    const rows = gridLayout.rows;
     const videoLayout = getDeterministicVideoExportLayout(mode, rows);
     const canvasW = videoLayout.canvasW;
     const canvasH = videoLayout.canvasH;
@@ -12528,7 +12646,7 @@ async function recordAudioSeqAV(mode = 'grid') {
     loadingProgress.textContent = 'Preparing AV recording...';
     const frameImages = await loadFrameImagesWithProgress('Loading frames');
 
-    const cellOrder = generateCellOrder(cellCount, state.gridCols);
+    const cellOrder = generateCellOrder(cellCount, cols);
     const r = parseInt(state.tcBgColor.slice(1,3), 16);
     const g = parseInt(state.tcBgColor.slice(3,5), 16);
     const b = parseInt(state.tcBgColor.slice(5,7), 16);
@@ -13386,12 +13504,17 @@ function getStillExportMaxSize(explicitMaxSize = null) {
   return Number.isFinite(cap) ? Math.max(2, Math.round(cap)) : Infinity;
 }
 
+function shouldUseTransparentStillExport(format) {
+  return format === 'png' && Number(state.frameBgOpacity) <= 0;
+}
+
 
 async function exportImage(format, maxSize) {
   if (!state.frames.length) return;
+  const transparentExport = shouldUseTransparentStillExport(format);
 
   // Export padding is only meaningful when BG layer is included
-  const padBase = state.exportBgLayer ? Math.max(0, Math.round(Number(state.exportPaddingPx) || 0)) : 0;
+  const padBase = (!transparentExport && state.exportBgLayer) ? Math.max(0, Math.round(Number(state.exportPaddingPx) || 0)) : 0;
 
   
 
@@ -13403,11 +13526,13 @@ async function exportImage(format, maxSize) {
   let baseFrameH = Math.max(2, Math.round(dims.h));
 
   const frameAspect = baseFrameW / baseFrameH;
-  const cellCount = Math.ceil(getEffectiveFrameTargetCount() / Math.max(1, state.cellSize || 1));
-  const total = cellCount + (0);
-  const rows = Math.ceil(total / state.gridCols);
+  const gridLayout = getGridLayoutModel();
+  const cellCount = gridLayout.cellCount;
+  const cols = gridLayout.cols;
+  const rows = gridLayout.rows;
+  const total = cellCount;
   const gap = getExportScaledGap(baseFrameW);
-  const rawGridW = state.gridCols * baseFrameW + Math.max(0, state.gridCols - 1) * gap;
+  const rawGridW = cols * baseFrameW + Math.max(0, cols - 1) * gap;
   const rawGridH = rows * baseFrameH + Math.max(0, rows - 1) * gap;
   const rawHeader = getExportHeaderHeight('grid', rawGridW);
   const rawBaseHeaderH = state.exportShowMetadata ? rawHeader : 0;
@@ -13427,7 +13552,7 @@ async function exportImage(format, maxSize) {
   const sPadX = Math.round(padBase * globalScale);
   const sPadY = Math.round(padBase * globalScale);
 
-  const sGridW = state.gridCols * sFrameW + Math.max(0, state.gridCols - 1) * sGap;
+  const sGridW = cols * sFrameW + Math.max(0, cols - 1) * sGap;
   const sGridH = rows * sFrameH + Math.max(0, rows - 1) * sGap;
 
   let baseHeaderH = rawBaseHeaderH * globalScale;
@@ -13441,14 +13566,17 @@ async function exportImage(format, maxSize) {
   let canvasH = Math.round(stillPlacement.canvasH);
 
   // Prepare BG crop regions so BG export matches what you see (including padding)
-  computeExportBgCrop('grid');
-  computeExportBgCrop('single');
+  if (!transparentExport) {
+    computeExportBgCrop('grid');
+    computeExportBgCrop('single');
+  }
 
   // Auto-expand metadata header (no ellipsis: switch to 2 lines and grow header)
   if (state.exportShowMetadata && baseHeaderH > 0) {
     metaText = buildExportMetaText({
       mode: 'grid',
-      cols: state.gridCols,
+      cols,
+      rows,
       frameW: sFrameW,
       frameH: sFrameH,
       frames: state.frames.length,
@@ -13476,20 +13604,23 @@ const canvas = document.createElement('canvas');
   canvas.height = canvasH;
   const ctx = canvas.getContext('2d');
 
-  // Background fill (JPEG needs opaque anyway; PNG becomes easier to read)
-  ctx.fillStyle = state.bgColor || '#000';
-  ctx.fillRect(0, 0, canvasW, canvasH);
+  if (!transparentExport) {
+    ctx.fillStyle = state.bgColor || '#000';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+  }
 
-  drawExportBgLayer(ctx, 0, sHeaderH, canvasW, canvasH - sHeaderH, 'grid');
-  const stillCapGrid = getStillExportMaxSize(maxSize);
-  const stillScaleGrid = Number.isFinite(stillCapGrid) ? Math.min(1, stillCapGrid / Math.max(1, Math.max(canvasW, canvasH))) : 1;
-  drawExportBgPattern(ctx, 0, sHeaderH, canvasW, canvasH - sHeaderH, 'grid', stillScaleGrid);
+  if (!transparentExport) {
+    drawExportBgLayer(ctx, 0, sHeaderH, canvasW, canvasH - sHeaderH, 'grid');
+    const stillCapGrid = getStillExportMaxSize(maxSize);
+    const stillScaleGrid = Number.isFinite(stillCapGrid) ? Math.min(1, stillCapGrid / Math.max(1, Math.max(canvasW, canvasH))) : 1;
+    drawExportBgPattern(ctx, 0, sHeaderH, canvasW, canvasH - sHeaderH, 'grid', stillScaleGrid);
+  }
 
   // Draw frames
   const offset = 0;
   const __exportCells = [];
   const previewItems = framesGrid ? framesGrid.querySelectorAll('.frame-item') : null;
-  const stillCellOrder = generateCellOrder(cellCount, state.gridCols);
+  const stillCellOrder = generateCellOrder(cellCount, cols);
   const stillCellOrderMap = new Map();
   stillCellOrder.forEach((cell, idx) => stillCellOrderMap.set(cell, idx));
   ensureAnimDirShuffle(state.frames.length);
@@ -13497,8 +13628,8 @@ const canvas = document.createElement('canvas');
   // Pass 1: base frames only
   for (let i = 0; i < total; i++) {
     if ((i % 24) === 0) { await new Promise(r => queueMicrotask(r)); }
-    const row = Math.floor(i / state.gridCols);
-    const col = i % state.gridCols;
+    const row = Math.floor(i / cols);
+    const col = i % cols;
 
     const exactX1 = Math.floor(stillPlacement.dx + col * (sFrameW + sGap));
     const exactY1 = Math.floor(sHeaderH + stillPlacement.dy + row * (sFrameH + sGap));
@@ -13586,12 +13717,12 @@ const canvas = document.createElement('canvas');
         });
         await ensureChronoSeamBlendImagesReady(_seamInfoStill);
         drawChronoSeamBlend(ctx, _seamInfoStill, x, y, cellDrawW, cellDrawH, null, coloramaFilterId(cellIdx));
-      } else {
+      } else if (!transparentExport) {
         // Best-effort: draw placeholder
         ctx.fillStyle = '#111';
         ctx.fillRect(x, y, cellDrawW, cellDrawH);
       }
-    } else {
+    } else if (!transparentExport) {
       ctx.fillStyle = '#111';
       ctx.fillRect(x, y, cellDrawW, cellDrawH);
     }
@@ -13613,7 +13744,7 @@ const canvas = document.createElement('canvas');
     }
   }
 
-  if (state.bgLayerAboveDrawings) {
+  if (!transparentExport && state.bgLayerAboveDrawings) {
     drawExportBgLayer(ctx, 0, sHeaderH, canvasW, canvasH - sHeaderH, 'grid');
   }
 
@@ -13781,12 +13912,13 @@ const canvas = document.createElement('canvas');
   // Export current frame (Single) as still image (PNG/JPEG)
   async function exportSingleStill(format = 'png', maxSize = EXPORT_CONF.STILL_PREV) {
     if (!state.frames.length) return;
+    const transparentExport = shouldUseTransparentStillExport(format);
 
     
 
   const { first: exportLogoIndices, last: exportLogoIndices2 } = getLogoActiveIndicesForTick(state.currentTick);
 // Export padding is only meaningful when BG layer is included
-    const padBase = state.exportBgLayer ? Math.max(0, Math.round(Number(state.exportPaddingPx) || 0)) : 0;
+    const padBase = (!transparentExport && state.exportBgLayer) ? Math.max(0, Math.round(Number(state.exportPaddingPx) || 0)) : 0;
 
     let metaText = '';
 
@@ -13817,7 +13949,7 @@ const canvas = document.createElement('canvas');
     let canvasH = Math.round(stillPlacement.canvasH);
 
     // Ensure BG crop is up to date for single view (includes padding)
-    computeExportBgCrop('single');
+    if (!transparentExport) computeExportBgCrop('single');
 
     // Auto-expand metadata header (no ellipsis: switch to 2 lines and grow header)
     if (state.exportShowMetadata && baseHeaderH > 0) {
@@ -13855,14 +13987,17 @@ const canvas = document.createElement('canvas');
     canvas.height = canvasH;
     const ctx = canvas.getContext('2d');
 
-    // Background fill
-    ctx.fillStyle = state.bgColor || '#000';
-    ctx.fillRect(0, 0, canvasW, canvasH);
+    if (!transparentExport) {
+      ctx.fillStyle = state.bgColor || '#000';
+      ctx.fillRect(0, 0, canvasW, canvasH);
+    }
 
-    drawExportBgLayer(ctx, 0, headerH, canvasW, Math.max(1, canvasH - headerH), 'single');
-    const stillCapSingle = getStillExportMaxSize(maxSize);
-    const stillScaleSingle = Number.isFinite(stillCapSingle) ? Math.min(1, stillCapSingle / Math.max(1, Math.max(canvasW, canvasH))) : 1;
-    drawExportBgPattern(ctx, 0, headerH, canvasW, Math.max(1, canvasH - headerH), 'single', stillScaleSingle);
+    if (!transparentExport) {
+      drawExportBgLayer(ctx, 0, headerH, canvasW, Math.max(1, canvasH - headerH), 'single');
+      const stillCapSingle = getStillExportMaxSize(maxSize);
+      const stillScaleSingle = Number.isFinite(stillCapSingle) ? Math.min(1, stillCapSingle / Math.max(1, Math.max(canvasW, canvasH))) : 1;
+      drawExportBgPattern(ctx, 0, headerH, canvasW, Math.max(1, canvasH - headerH), 'single', stillScaleSingle);
+    }
 
 // Compose target rect inside preview-matched padding
     const dx = stillPlacement.dx;
@@ -13921,11 +14056,11 @@ const canvas = document.createElement('canvas');
         });
         await ensureChronoSeamBlendImagesReady(_seamInfoSingleStill);
         drawChronoSeamBlend(ctx, _seamInfoSingleStill, dx, dy, frameW, frameH, null, coloramaFilterId(0));
-      } else {
+      } else if (!transparentExport) {
         ctx.fillStyle = '#111';
         ctx.fillRect(dx, dy, frameW, frameH);
       }
-    } else {
+    } else if (!transparentExport) {
       ctx.fillStyle = '#111';
       ctx.fillRect(dx, dy, frameW, frameH);
     }
@@ -13939,7 +14074,7 @@ const canvas = document.createElement('canvas');
       drawExportDrawings(ctx, dx, dy, frameW, frameH, frameIdx);
     }
 
-    if (state.bgLayerAboveDrawings) {
+    if (!transparentExport && state.bgLayerAboveDrawings) {
       drawExportBgLayer(ctx, 0, headerH, canvasW, Math.max(1, canvasH - headerH), 'single');
     }
 
