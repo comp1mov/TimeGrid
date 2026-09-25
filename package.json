@@ -3,6 +3,7 @@
   "version": "28.33.0",
   "description": "An experimental spatial montage and frame-sampling browser application",
   "scripts": {
+    "test": "node --test tests/chrono-animation.test.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"

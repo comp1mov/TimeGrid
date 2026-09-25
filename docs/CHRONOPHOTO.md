@@ -1,6 +1,53 @@
 # Chronophoto Architecture Notes
 
-Обновлено: 2026-06-30
+Обновлено: 2026-09-25
+
+## Depth animation
+
+`Animate Depth` is a collapsible key table inside Chronophoto. Its switch enables
+animation independently of the disclosure arrow. The main Chronophoto switch
+still controls whether the effect is visible.
+
+- Frame numbers are **one-based indices in the sampled frame bank**, not original
+  video frame numbers or elapsed export ticks. Each grid cell evaluates the curve
+  at its own displayed frame. Repeated loops reuse it; reverse playback traverses
+  it backwards.
+- First activation creates keys at frame 1 / midpoint / last frame with
+  0 / 100 / 0 percent. One-frame clips get a single 100% key; two-frame clips get
+  0 / 100%. There are no duplicate indices or artificial key count limits.
+- Percent scales the existing Frame Depth. Linear, Smooth (smoothstep per segment),
+  and Step interpolation are available. Values before/after the key range hold
+  the nearest key. Matching first/last values produce a continuous loop boundary.
+- Add Key uses the primary cell's current frame and interpolated value. Existing
+  keys are focused instead of duplicated. Frame edits sort the table, and duplicate
+  frame edits are rejected. The small arrow in each row seeks the primary cell to
+  that frame; frames skipped by the playback pattern are reported.
+- Disabling animation preserves keys. An empty table uses static Frame Depth;
+  deleting everything does not recreate defaults. There is no Reset control.
+- If resampling shortens the frame bank, keys retain their indices, including
+  those beyond its end. The table reports these keys instead of silently deleting
+  them. The curve remains indexed to the prepared frames, not source timestamps.
+- Keys live in application state for the current session; this does not add project
+  files or persistence across page reloads.
+
+`src/js/chrono-animation.mjs` contains pure curve and opacity calculations.
+Fractional depth blends the alpha profiles of the neighboring integer stacks,
+including Cascade/Mirror, so both the additional copy and the existing copies
+change continuously. At integer depths the existing opacity profiles are preserved.
+Clean Loop still clips ghost history, so the number of visible copies can be lower
+than the requested depth at the start of a loop.
+
+DOM preview, canvas video/still/PNG-sequence export, and the Frame Diff visual
+source use the shared calculations with an explicit displayed frame index.
+The table/editor is isolated in `src/js/chrono-animation-ui.mjs`.
+
+Validation: `npm test` runs the pure calculation tests. The optional browser suite
+`tests/chrono-animation.browser.cjs` runs against Vite (`TEST_URL`, default
+`http://127.0.0.1:5180`), using Playwright (`PLAYWRIGHT_MODULE` if not installed in
+the project) and Edge (`BROWSER_CHANNEL` to override). It checks table interactions,
+frame-based Grid/Single behavior, alpha parity, real MP4 downloads and PNG export.
+Its response-only test hooks never modify the app on disk. Artifacts are written
+to a temporary `timegrid-chrono-*` directory.
 
 ## Что делает Chronophoto
 

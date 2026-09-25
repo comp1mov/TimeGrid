@@ -970,6 +970,32 @@
               <button class="menu-input-btn" id="chronoDepthPlus">+</button>
             </div>
           </div>
+          <div class="chrono-animation" id="chronoAnimationPanel">
+            <div class="menu-row">
+              <button type="button" class="chrono-disclosure menu-label" id="chronoAnimationDisclosure" aria-expanded="false" aria-controls="chronoAnimationBody">Animate Depth<span id="chronoAnimationCount"></span></button>
+              <button type="button" class="menu-toggle-switch" id="toggleChronoAnimation" role="switch" aria-checked="false" aria-label="Animate Chronophoto depth"></button>
+            </div>
+            <div id="chronoAnimationBody" hidden>
+              <div class="chrono-key-head"><span>Frame</span><span>Copies %</span></div>
+              <div class="chrono-key-rows" id="chronoAnimationRows" role="group" aria-label="Depth animation keys"></div>
+              <button type="button" class="menu-btn chrono-add" id="chronoAnimationAdd" title="Add a key at the frame shown in the first cell">+ Add key at current frame</button>
+              <div class="menu-row">
+                <label class="menu-label" for="chronoAnimationInterpolation">Transition</label>
+                <select class="menu-select" id="chronoAnimationInterpolation">
+                  <option value="smooth">Smooth</option>
+                  <option value="linear">Linear</option>
+                  <option value="step">Step</option>
+                </select>
+              </div>
+              <svg class="chrono-curve" viewBox="0 0 200 52" preserveAspectRatio="none" role="img" aria-label="Copies percentage over one loop">
+                <path d="M0 48H200 M0 4H200" class="chrono-curve-guide" />
+                <polyline id="chronoAnimationCurve" points="" />
+                <line id="chronoAnimationMarker" x1="0" x2="0" y1="0" y2="52" />
+              </svg>
+              <p class="chrono-caption">Frame index · one loop · % of Frame Depth</p>
+              <p class="chrono-status" id="chronoAnimationStatus" role="status"></p>
+            </div>
+          </div>
           <div class="menu-row">
             <span class="menu-label">Layer Opacity</span>
             <div class="menu-slider-row">

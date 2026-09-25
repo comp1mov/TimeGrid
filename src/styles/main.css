@@ -531,6 +531,29 @@
       transition: transform 0.2s ease;
     }
     .menu-toggle-switch.active::after { transform: translateX(16px); }
+    .chrono-animation { margin: 0 0 12px; padding: 10px 0; border-block: 1px solid rgba(255,255,255,0.12); }
+    .chrono-animation > .menu-row { margin-bottom: 0; gap: 8px; }
+    .chrono-animation .menu-toggle-switch { border: 0; padding: 0; flex-shrink: 0; }
+    .chrono-disclosure { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
+    .chrono-disclosure::before { content: '▸'; display: inline-block; width: 14px; }
+    .chrono-disclosure[aria-expanded="true"]::before { content: '▾'; }
+    #chronoAnimationBody { margin-top: 12px; }
+    .chrono-key-head, .chrono-key-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 24px 24px; gap: 5px; align-items: center; }
+    .chrono-key-head { color: rgba(255,255,255,0.55); font-size: 10px; margin-bottom: 5px; }
+    .chrono-key-row { margin-bottom: 5px; }
+    .chrono-key-row .menu-input { width: 100%; min-width: 0; height: 28px; padding: 3px 5px; }
+    .chrono-key-row .menu-input-btn { width: 24px; }
+    .chrono-key-row:focus-within { background: rgba(255,255,255,0.07); }
+    .chrono-add { width: 100%; margin: 5px 0 10px; font-size: 10px; }
+    .chrono-animation button:disabled { opacity: 0.4; cursor: default; }
+    .chrono-animation :focus-visible { outline: 1px solid var(--fg-accent, #35f2a3); outline-offset: 2px; }
+    .chrono-curve { display: block; width: 100%; height: 48px; background: rgba(0,0,0,0.2); }
+    .chrono-curve polyline { fill: none; stroke: var(--fg-accent, #35f2a3); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+    .chrono-curve-guide { fill: none; stroke: rgba(255,255,255,0.12); }
+    #chronoAnimationMarker { stroke: rgba(255,255,255,0.6); stroke-width: 1; }
+    .chrono-caption, .chrono-status { font-size: 9px; line-height: 1.5; color: rgba(255,255,255,0.5); margin: 5px 0 0; }
+    .chrono-status { color: var(--fg-accent, #35f2a3); }
+    .chrono-status:empty { display: none; }
     .menu-slider-row { display: flex; align-items: center; gap: 10px; }
     .menu-slider {
       flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
