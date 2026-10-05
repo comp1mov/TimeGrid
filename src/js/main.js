@@ -1,5 +1,5 @@
 import { inject } from '@vercel/analytics';
-import { getChronoAnimatedDepth, getChronoLayerOpacity } from './chrono-animation.mjs';
+import { buildChronoStackPlan } from './chrono-compositing.mjs';
 import { mountChronoAnimation } from './chrono-animation-ui.mjs';
 
 let chronoAnimationUI;
@@ -11,7 +11,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = '28.33';
+  const APP_VERSION = '28.34';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -63,6 +63,11 @@ inject();
   document.addEventListener('gestureend', e => e.preventDefault(), { passive: false });
   
 
+  // iPadOS can identify as a Mac. Touch alone does not make a Windows laptop mobile.
+  const isMobileDevice = navigator.userAgentData?.mobile === true
+    || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
   const state = {
     videoFile: null, filenameOverride: '', drawCanvasDpr: 1, videoUrl: null, videoDuration: 0,
     // Source type
@@ -81,7 +86,7 @@ inject();
     sceneCount: 5,
     sceneDepth: 8,
     sceneDistance: 1, gridCols: 6,
-    selectionMode: 'count', intervalValue: 3, quality: 0.5,
+    selectionMode: 'count', intervalValue: 3, quality: isMobileDevice ? 0.5 : 1,
     startFrame: 0, endFrame: 0, // Frame range
     showMetadata: true, // Timecode format options
     tcShowIndex: false,
@@ -101,7 +106,7 @@ inject();
     tcFontPreset: 'monoItalic', tcFontStyle: 'italic', tcFontWeight: 600,
     tcAlign: 'center', tcPosition: 'center', tcPadding: 4, tcMargin: 0, tcBgFill: 'lines',
     // Frame image transform inside each cell (preview + export)
-    frameImgScale: 1.02, frameImgScaleX: 1.02, frameImgScaleY: 1.02, frameImgScaleLink: true,
+    frameImgScale: 1, frameImgScaleX: 1, frameImgScaleY: 1, frameImgScaleLink: true,
     frameImgRot: 0,
     frameImgOffX: 0, // percent of cell width
     frameImgOffY: 0, // percent of cell height
@@ -141,7 +146,7 @@ inject();
     sceneCount: 5, // number of scenes to sample
     sceneDepth: 3, // frames around each scene anchor
     sceneSpacing: 10, // min frames between scene anchors
-exportQuality: 'hd', // low, medium, high, max
+exportQuality: 'max', // same as imported frames; half/quarter/eighth reduce further
     exportPaddingPx: 160, // padding around export content (px, applied only when BG export is ON)
     showExportGuides: false, // overlay guides for export padding in the main viewport
     _exportBgCropGrid: null,
@@ -239,9 +244,23 @@ exportShowMetadata: false, // metadata header in exports (independent from UI ba
     return target || getSourceAspectSafe();
   }
 
+  function frameUsesSourceAspect() {
+    return Math.abs(getEffectiveFrameAspect() - getSourceAspectSafe()) < 1e-9;
+  }
+
+  function getFrameMediaSize(srcW, srcH, w, h) {
+    // A source-aspect cell is the complete frame. Its raster bounds may differ
+    // by one pixel after grid partitioning or video encoder size rounding.
+    // Fitting again would turn that rounding into black letterbox seams.
+    if (frameUsesSourceAspect()) return { w, h };
+    const contain = Math.min(w / Math.max(1, srcW), h / Math.max(1, srcH));
+    return { w: srcW * contain, h: srcH * contain };
+  }
+
   function applyFrameTargetAspect() {
     if (!framesGrid) return;
     framesGrid.style.setProperty('--video-aspect', String(getEffectiveFrameAspect()));
+    framesGrid.style.setProperty('--frame-object-fit', frameUsesSourceAspect() ? 'fill' : 'contain');
   }
 
   function getExportScaledGap(frameW) {
@@ -254,8 +273,11 @@ exportShowMetadata: false, // metadata header in exports (independent from UI ba
 }
 
 function getTargetFrameOutputDims() {
-    const srcW = Math.max(1, Math.round(Number(state.videoWidth) || 1));
-    const srcH = Math.max(1, Math.round(Number(state.videoHeight) || 1));
+    // Use the dimensions captured at generation time, not the current import
+    // dropdown: changing that dropdown does not regenerate existing frames.
+    const divisor = { half: 2, quarter: 4, eighth: 8 }[state.exportQuality] || 1;
+    const srcW = Math.max(1, Math.round((Number(state.captureW) || Number(state.videoWidth) || 1) / divisor));
+    const srcH = Math.max(1, Math.round((Number(state.captureH) || Number(state.videoHeight) || 1) / divisor));
     const srcAspect = srcW / srcH;
 
     const targetAspect = parseAspectValue(state.frameTargetAspect);
@@ -335,6 +357,7 @@ function getTargetFrameOutputDims() {
   const customFramesInput = $('customFramesInput'), customFramesCount = $('customFramesCount');
   const countMinus = $('countMinus'), countPlus = $('countPlus');
   const intervalValueInput = $('intervalValue'), qualitySelect = $('qualitySelect');
+  if (qualitySelect) qualitySelect.value = String(state.quality);
   const sceneCountInput = $('sceneCountInput'), sceneDepthInput = $('sceneDepthInput'), sceneDistanceInput = $('sceneDistanceInput');
   const sceneCountMinus = $('sceneCountMinus'), sceneCountPlus = $('sceneCountPlus');
   const sceneDepthMinus = $('sceneDepthMinus'), sceneDepthPlus = $('sceneDepthPlus');
@@ -818,13 +841,7 @@ function handleImageFiles(files, importMode = "loop") {
     updateCutUI();
     updateGridHint();
 
-    // Power-user auto-settings for big image sequences
-    // If many images are imported, default to Quarter quality for smoother preview.
-    // If the sequence is very large, also switch to Single view and disable auto-fit (avoids auto-centering jumps).
-    if (imgCount > 100) {
-      state.quality = 0.25;
-      if (qualitySelect) qualitySelect.value = '0.25';
-    }
+    // Large sequences use Single view, but retain the selected frame quality.
     if (imgCount > 500) {
       state.viewMode = 'single';
       state.gridCols = 1;
@@ -2422,7 +2439,7 @@ function getDeterministicVideoExportLayout(mode, rows) {
   const frameW = Math.max(2, Math.round(dims.w));
   const gapBase = getExportScaledGap(frameW);
   const padPx = state.exportBgLayer ? clampExportPaddingPx(state.exportPaddingPx || 0) : 0;
-  const qualityCap = EXPORT_CONF.RES[state.exportQuality] || 1080;
+  const qualityCap = EXPORT_CONF.RES[state.exportQuality] || Infinity;
   const layoutCellCount = getEffectiveGridCellCount();
   const layoutCols = getEffectiveGridCols(layoutCellCount);
   const layoutRows = Math.max(1, Math.ceil(layoutCellCount / layoutCols));
@@ -3204,6 +3221,29 @@ function renderGrid() {
     btn.addEventListener('touchstart', e => { e.stopPropagation(); }, { passive: true });
     btn.addEventListener('touchmove', e => { e.stopPropagation(); }, { passive: true });
   });
+  function alignPreviewGridToPixels() {
+    framesGrid.style.transform = '';
+    // Integer local dimensions also keep compositor textures from acquiring a
+    // partially transparent last row before the outer zoom is applied.
+    framesGrid.style.setProperty('--preview-cell-h', `${Math.max(1, Math.round((state.previewCellW || 240) / getEffectiveFrameAspect()))}px`);
+    if (Number(state.spacing) !== 0) return;
+    const frame = framesGrid.querySelector('.frame-image-wrap');
+    if (!frame) return;
+    const frameRect = frame.getBoundingClientRect();
+    if (!frameRect.width || !frameRect.height) return;
+    const dpr = window.devicePixelRatio || 1;
+    const sx = state.scale * Math.max(1, Math.round(frameRect.width * dpr)) / (frameRect.width * dpr);
+    const sy = state.scale * Math.max(1, Math.round(frameRect.height * dpr)) / (frameRect.height * dpr);
+    canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${sx}, ${sy})`;
+    const gridRect = framesGrid.getBoundingClientRect();
+    const dx = Math.round(gridRect.left * dpr) / dpr - gridRect.left;
+    const dy = Math.round(gridRect.top * dpr) / dpr - gridRect.top;
+    // Snap the whole preview plane so drawings and media stay together. Source
+    // pixels and export dimensions are unaffected by this display rounding.
+    canvasInner.style.transform = `translate(${state.panX + dx}px, ${state.panY + dy}px) scale(${sx}, ${sy})`;
+
+  }
+
   function updateTransform() {
     // view scale is clamped globally
 
@@ -3213,6 +3253,7 @@ function renderGrid() {
     if (!Number.isFinite(state.panX)) state.panX = 0;
     if (!Number.isFinite(state.panY)) state.panY = 0;
 canvasInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+    alignPreviewGridToPixels();
     if (templateFrame && templateFrame.classList.contains('visible')) updateTemplateFrameFollow();
 
     // Keep brush cursor size in sync with zoom even when the pointer is stationary.
@@ -4116,6 +4157,14 @@ function fitToSingleFrame(opts = {}) {
 
   const updateChronoUI = () => {
     syncChronoSeamUI();
+    const exposure = state.chronoBlend === 'exposure';
+    const opacityLabel = $('chronoOpacityLabel');
+    if (opacityLabel) {
+      opacityLabel.textContent = exposure ? 'Exposure Mix' : 'Layer Opacity';
+      opacityLabel.title = exposure ? '0 = current frame; 1 = weighted frame average. Keeps static backgrounds at the same brightness.' : 'Opacity of each ghost layer';
+    }
+    if (chronoOpacity) chronoOpacity.min = exposure ? '0' : '0.01';
+    if (chronoOpacityNum) chronoOpacityNum.min = exposure ? '0' : '0.01';
     updateAllCells();
   };
 
@@ -4441,6 +4490,11 @@ function fitToSingleFrame(opts = {}) {
   if (chronoBlend) {
     chronoBlend.onchange = () => {
       state.chronoBlend = chronoBlend.value;
+      if (state.chronoBlend !== 'exposure' && state.chronoOpacity < 0.01) {
+        state.chronoOpacity = 0.01;
+        if (chronoOpacity) chronoOpacity.value = '0.01';
+        if (chronoOpacityNum) chronoOpacityNum.value = '0.01';
+      }
       updateChronoUI();
     };
   }
@@ -4475,7 +4529,8 @@ function fitToSingleFrame(opts = {}) {
 
   if (chronoOpacity) {
     chronoOpacity.oninput = () => {
-      state.chronoOpacity = parseFloat(chronoOpacity.value) || 0.05;
+      const v = parseFloat(chronoOpacity.value);
+      state.chronoOpacity = isNaN(v) ? 0.05 : Math.max(state.chronoBlend === 'exposure' ? 0 : 0.01, Math.min(1, v));
       if (chronoOpacityNum) chronoOpacityNum.value = state.chronoOpacity.toFixed(2);
       updateChronoUI();
     };
@@ -4484,7 +4539,7 @@ function fitToSingleFrame(opts = {}) {
   if (chronoOpacityNum) {
     chronoOpacityNum.oninput = () => {
       const v = parseFloat(chronoOpacityNum.value);
-      state.chronoOpacity = isNaN(v) ? 0.05 : Math.max(0.01, Math.min(1.0, v));
+      state.chronoOpacity = isNaN(v) ? 0.05 : Math.max(state.chronoBlend === 'exposure' ? 0 : 0.01, Math.min(1.0, v));
       if (chronoOpacity) chronoOpacity.value = String(state.chronoOpacity);
       updateChronoUI();
     };
@@ -4909,6 +4964,9 @@ function fitToSingleFrame(opts = {}) {
   // Frame image transform UI
   function applyFrameImgTransform() {
     if (!framesGrid) return;
+    const neutral = Number(state.frameImgScaleX ?? 1) === 1 && Number(state.frameImgScaleY ?? 1) === 1
+      && !Number(state.frameImgRot) && !Number(state.frameImgOffX) && !Number(state.frameImgOffY);
+    framesGrid.classList.toggle('frame-transform-neutral', neutral);
     framesGrid.style.setProperty('--img-scale-x', String(state.frameImgScaleX !== undefined ? state.frameImgScaleX : 1));
     framesGrid.style.setProperty('--img-scale-y', String(state.frameImgScaleY !== undefined ? state.frameImgScaleY : 1));
     framesGrid.style.setProperty('--img-rot', `${state.frameImgRot}deg`);
@@ -5304,29 +5362,6 @@ function fitToSingleFrame(opts = {}) {
     // Build ghost frame indices for chronophoto using tick-based logic.
   // Works correctly for all directions (forward, pingpong, bounce, shuffle).
   
-  // Shared cascade opacity calculator — used in both preview and export.
-  function computeCascadeOpacity(step, depth, alphaBase) {
-    const mirror   = window._fgState ? window._fgState.chronoCascadeMirror : false;
-    const constVal = Math.max(1, Math.min(depth, Math.round(
-      (window._fgState ? window._fgState.chronoCascadeConst : 1) || 1
-    )));
-
-    if (mirror) {
-      // Mirror mode: centre of stack is fully opaque, fades to both edges
-      const fadeCount = depth - constVal;         // how many frames actually fade
-      const cStart    = (depth - constVal) / 2;   // start of plateau (can be fractional)
-      const dist      = Math.abs(step - (depth - 1) / 2) - constVal / 2;  // distance outside plateau
-      const t         = fadeCount > 0 ? Math.max(0, dist / (fadeCount / 2)) : 0;
-      return alphaBase * (1 - Math.min(1, t));
-    } else {
-      // Normal mode: newest ghost fully opaque for constVal frames, then fades
-      const fadeCount = depth - constVal;
-      const fadeStep  = step - constVal;          // how far past the plateau
-      if (fadeStep < 0) return alphaBase;          // within constant zone
-      return alphaBase * (1 - (fadeStep + 1) / (fadeCount + 1));
-    }
-  }
-
   function buildChronoGhostIndices(tick, baseOffset, frameCount, dir, shuffle) {
     const depth     = state.chronoDepth  || 3;
     const stride    = Math.max(1, state.chronoStride || 1);
@@ -5357,10 +5392,9 @@ function fitToSingleFrame(opts = {}) {
       return;
     }
 
-    const blendMode = state.chronoBlend   || 'screen';
     const stackScale = Number.isFinite(Number(opacityScale)) ? Math.max(0, Math.min(1, Number(opacityScale))) : 1;
-    const animatedDepth = getChronoAnimatedDepth(state, frameIdx, ghostIndices.length);
-    const depth = Math.ceil(animatedDepth);
+    const plan = buildChronoStackPlan(state, ghostIndices, frameIdx, stackScale);
+    const depth = plan.alphas.length;
     const imgArr    = Array.from(xform.querySelectorAll('.frame-chrono'));
     let slot = 0;
 
@@ -5376,7 +5410,7 @@ function fitToSingleFrame(opts = {}) {
       const frame = state.frames[ghostFrameIdx];
       if (!frame) { slot++; continue; }
 
-      const finalOpacity = getChronoLayerOpacity(step, animatedDepth, state) * stackScale;
+      const finalOpacity = plan.alphas[step];
 
       let img = imgArr[slot];
       if (!img) {
@@ -5389,7 +5423,7 @@ function fitToSingleFrame(opts = {}) {
         img.style.inset = '0';
         img.style.width = '100%';
         img.style.height = '100%';
-        img.style.objectFit = 'contain';
+        img.style.objectFit = 'var(--frame-object-fit, contain)';
         img.style.pointerEvents = 'none';
         img.style.zIndex = '1';
         xform.appendChild(img);
@@ -5398,8 +5432,8 @@ function fitToSingleFrame(opts = {}) {
 
       if (img.src !== frame.dataUrl) img.src = frame.dataUrl;
       img.style.display = '';
-      img.style.mixBlendMode = blendMode;
-      img.style.opacity = Math.max(0, Math.min(1, finalOpacity)).toFixed(3);
+      img.style.mixBlendMode = plan.cssBlend;
+      img.style.opacity = Math.max(0, Math.min(1, finalOpacity)).toFixed(6);
       img.style.filter = (state.cc && state.cc.enabled) ? buildCCFilter() : '';
       slot++;
     }
@@ -5417,7 +5451,7 @@ function fitToSingleFrame(opts = {}) {
     img.style.inset = '0';
     img.style.width = '100%';
     img.style.height = '100%';
-    img.style.objectFit = 'contain';
+    img.style.objectFit = 'var(--frame-object-fit, contain)';
     img.style.pointerEvents = 'none';
     img.style.zIndex = String(zIndex);
     return img;
@@ -5462,9 +5496,8 @@ function fitToSingleFrame(opts = {}) {
     const ghostIndices = state.chronoEnabled && ghostOpacityScale > 0 ? (seamInfo.targetGhostIndices || []) : [];
     const ghostArr = Array.from(xform.querySelectorAll('.frame-seam-chrono'));
     let slot = 0;
-    const blendMode = state.chronoBlend || 'screen';
-    const alphaBase = (state.chronoOpacity !== undefined) ? state.chronoOpacity : 1.0;
-    const depth = ghostIndices.length;
+    const plan = buildChronoStackPlan(state, ghostIndices, seamInfo.targetFrameIdx, ghostOpacityScale);
+    const depth = plan.alphas.length;
 
     for (let step = 0; step < depth; step++) {
       const ghostFrameIdx = ghostIndices[step];
@@ -5478,9 +5511,7 @@ function fitToSingleFrame(opts = {}) {
       const ghostFrame = state.frames[normalizeFrameIndex(ghostFrameIdx, state.frames.length)];
       if (!ghostFrame) { slot++; continue; }
 
-      let finalOpacity = alphaBase;
-      if (state.chronoCascade) finalOpacity = computeCascadeOpacity(step, depth, alphaBase);
-      finalOpacity *= ghostOpacityScale;
+      const finalOpacity = plan.alphas[step];
 
       let img = ghostArr[slot];
       if (!img) {
@@ -5490,8 +5521,8 @@ function fitToSingleFrame(opts = {}) {
       }
       if (img.src !== ghostFrame.dataUrl) img.src = ghostFrame.dataUrl;
       img.style.display = '';
-      img.style.mixBlendMode = blendMode;
-      img.style.opacity = Math.max(0, Math.min(1, finalOpacity)).toFixed(3);
+      img.style.mixBlendMode = plan.cssBlend;
+      img.style.opacity = Math.max(0, Math.min(1, finalOpacity)).toFixed(6);
       img.style.filter = (state.cc && state.cc.enabled) ? buildCCFilter() : '';
       slot++;
     }
@@ -5575,9 +5606,9 @@ function fitToSingleFrame(opts = {}) {
       : 1;
     const ox = applyTransform ? (Number(st.frameImgOffX) || 0) * 0.01 * w : 0;
     const oy = applyTransform ? (Number(st.frameImgOffY) || 0) * 0.01 * h : 0;
-    const contain = Math.min(w / Math.max(1, srcW), h / Math.max(1, srcH));
-    const dw = srcW * contain * sx;
-    const dh = srcH * contain * sy;
+    const mediaSize = getFrameMediaSize(srcW, srcH, w, h);
+    const dw = mediaSize.w * sx;
+    const dh = mediaSize.h * sy;
     const dx = x + w / 2 - dw / 2 + ox;
     const dy = y + h / 2 - dh / 2 + oy;
 
@@ -5657,14 +5688,13 @@ function fitToSingleFrame(opts = {}) {
     const st = window._fgState || state;
     if (!st.chronoEnabled || !st.frames.length || !ghostIndices || !ghostIndices.length) return true;
 
-    const blendMode = st.chronoBlend || 'screen';
     const opacityScale = Number.isFinite(Number(opts.opacityScale)) ? Math.max(0, Math.min(1, Number(opts.opacityScale))) : 1;
-    const animatedDepth = getChronoAnimatedDepth(st, opts.currentFrameIdx, ghostIndices.length);
-    const depth = Math.ceil(animatedDepth);
+    const plan = buildChronoStackPlan(st, ghostIndices, opts.currentFrameIdx, opacityScale);
+    const depth = plan.alphas.length;
     let ready = true;
 
     ctx.save();
-    ctx.globalCompositeOperation = blendMode;
+    ctx.globalCompositeOperation = plan.canvasBlend;
     for (let step = 0; step < depth; step++) {
       const ghostFrameIdx = ghostIndices[step];
       if (ghostFrameIdx === null) continue;
@@ -5675,7 +5705,7 @@ function fitToSingleFrame(opts = {}) {
         continue;
       }
 
-      const finalOpacity = getChronoLayerOpacity(step, animatedDepth, st) * opacityScale;
+      const finalOpacity = plan.alphas[step];
       if (finalOpacity <= 0) continue;
 
       ctx.globalAlpha = Math.max(0, Math.min(1, finalOpacity));
@@ -11297,7 +11327,7 @@ async function exportResampledVideo(forceMode = null) {
     const rows = gridLayout.rows;
     const gapBase = Math.max(0, Number(state.spacing) || 0);
     const padPx = state.exportBgLayer ? clampExportPaddingPx(state.exportPaddingPx || 0) : 0;
-    const qualityCap = EXPORT_CONF.RES[state.exportQuality] || 1080;
+    const qualityCap = EXPORT_CONF.RES[state.exportQuality] || Infinity;
 
     let logicalCanvasW = 0;
     let logicalCanvasH = 0;
@@ -11399,7 +11429,8 @@ Alternatively, use PNG sequence export.`);
     desiredW = even(desiredW);
     desiredH = even(desiredH);
 
-    const sizeFactors = [1, 0.9, 0.8, 0.75, 0.67, 0.5, 0.4, 0.33, 0.25];
+    // Max means original dimensions, never an undisclosed smaller fallback.
+    const sizeFactors = ['max', 'half', 'quarter', 'eighth'].includes(state.exportQuality) ? [1] : [1, 0.9, 0.8, 0.75, 0.67, 0.5, 0.4, 0.33, 0.25];
     const bitrateCaps = { low: 8000000, medium: 12000000, hd: 18000000, high: 25000000, max: 30000000 };
     const bitrateMins = { low: 6000000, medium: 8000000, hd: 10000000, high: 15000000, max: 20000000 };
     const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -11447,7 +11478,7 @@ Alternatively, use PNG sequence export.`);
 
     if (!chosenConfig) {
       loadingOverlay.classList.remove('visible');
-      alert('No supported video codec found for this resolution. Try a lower quality setting or a different browser.');
+      alert(`MP4 encoding is not supported at ${desiredW}×${desiredH} in this browser. No smaller video was exported. Choose a smaller Export Resolution, use PNG sequence export, or try a different browser.`);
       return;
     }
 
@@ -11575,15 +11606,15 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
       const col = c % cols;
       const row = Math.floor(c / cols);
 
-      const exactX1 = Math.floor(offsetX + col * (frameW + gapX));
-      const exactY1 = Math.floor(offsetY + row * (frameH + gapY));
-      const exactX2 = Math.floor(offsetX + (col + 1) * frameW + col * gapX);
-      const exactY2 = Math.floor(offsetY + (row + 1) * frameH + row * gapY);
+      const exactX1 = Math.round(offsetX + col * (frameW + gapX));
+      const exactY1 = Math.round(offsetY + row * (frameH + gapY));
+      const exactX2 = Math.round(offsetX + (col + 1) * frameW + col * gapX);
+      const exactY2 = Math.round(offsetY + (row + 1) * frameH + row * gapY);
 
       const x = exactX1;
       const y = exactY1;
-      const cellDrawW = (gapX > 0) ? Math.ceil(frameW) : (exactX2 - exactX1 + 1);
-      const cellDrawH = (gapY > 0) ? Math.ceil(frameH) : (exactY2 - exactY1 + 1);
+      const cellDrawW = (gapX > 0) ? Math.ceil(frameW) : (exactX2 - exactX1);
+      const cellDrawH = (gapY > 0) ? Math.ceil(frameH) : (exactY2 - exactY1);
 
       const uiC = c + (0);
       const cellInfo = getFrameCellInfo(c, tick, {
@@ -11598,8 +11629,8 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
       const img = frameImages ? frameImages[animFrameIdx] : null;
 
       if (!drawingsOnly && img) {
-        // Actually, just passing the exact integer dimensions completely solves it!
-        drawFrameCell(ctx, img, x, y, cellDrawW, cellDrawH);
+        // Adjacent cells share integer edges; their pixels never overlap.
+        drawFrameCell(ctx, img, x, y, cellDrawW, cellDrawH, coloramaFilterId(c));
         const _st = window._fgState;
         let _gIdx = null;
         let _seamInfo = null;
@@ -11626,6 +11657,7 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
         }
         if (flags.chronoOn) {
           drawChronophotoStack(ctx, _gIdx || [], x, y, cellDrawW, cellDrawH, {
+            filterId: coloramaFilterId(c),
             currentFrameIdx: animFrameIdx,
             opacityScale: getChronoCurrentOpacityScale(_seamInfo)
           });
@@ -11644,7 +11676,6 @@ function renderMp4GridFrame(ctx, w, h, frameImages, tick, cellOrder, rows, frame
             mode: 'grid'
           });
         }
-        if (flags.coloramaOn) applyColoramaToCanvas(ctx, x, y, cellDrawW, cellDrawH, img, coloramaFilterId(c));
         if (flags.chronoSeamOn) drawChronoSeamBlend(ctx, _seamInfo, x, y, cellDrawW, cellDrawH, frameImages, coloramaFilterId(c));
       }
       _cells.push({ c, uiC, x, y, frameW: cellDrawW, frameH: cellDrawH, animFrameIdx, frame });
@@ -12049,40 +12080,6 @@ function updateColoramaBar() {
   ctx.fillRect(0, 0, W, bar.height);
 }
 
-// Apply colorama to canvas for export (single frame, given cell offset)
-function applyColoramaToCanvas(ctx, x, y, w, h, srcImg, filterId) {
-  var ca = (window._fgState || {}).colorama;
-  if (!ca || !ca.enabled || !srcImg) return;
-  var fid = filterId || 'fgColorama';
-  var blend   = ca.blend   || 'normal';
-  var opacity = isFinite(ca.opacity) ? ca.opacity : 1;
-  ctx.save();
-  // Opacity + blend handled inside SVG filter via feBlend + feFuncA
-  // So here we draw at full alpha
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 1;
-  ctx.filter = 'url(#' + fid + ')';
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  var st = window._fgState;
-  var sx = st.frameImgScaleX !== undefined ? Number(st.frameImgScaleX) : (Number(st.frameImgScale)||1);
-  var sy = st.frameImgScaleY !== undefined ? Number(st.frameImgScaleY) : (Number(st.frameImgScale)||1);
-  var ox = (Number(st.frameImgOffX)||0)*0.01*w;
-  var oy = (Number(st.frameImgOffY)||0)*0.01*h;
-  var srcW = srcImg.videoWidth||srcImg.naturalWidth||srcImg.width||1;
-  var srcH = srcImg.videoHeight||srcImg.naturalHeight||srcImg.height||1;
-  var contain = Math.min(w/Math.max(1,srcW), h/Math.max(1,srcH));
-  var dw = srcW*contain*sx, dh = srcH*contain*sy;
-  var dx = x+w/2-dw/2+ox, dy = y+h/2-dh/2+oy;
-  ctx.translate(dx+dw/2, dy+dh/2);
-  ctx.rotate((Number(st.frameImgRot)||0)*Math.PI/180);
-  ctx.drawImage(srcImg, -dw/2, -dh/2, dw, dh);
-  ctx.filter = 'none';
-  ctx.restore();
-}
-
-
 // Ghost indices for STILL exports (JPEG/PNG): direct frame index offset.
 // No direction logic — ghost = "N frames earlier in the source clip"
 function buildChronoGhostIndicesStill(frameIdx, n) {
@@ -12147,16 +12144,15 @@ function drawChronophotoStack(ctx, ghostIndices, x, y, w, h, opts = {}) {
   if (!window._fgState.chronoEnabled || !window._fgState.frames.length) return;
   if (!ghostIndices || !ghostIndices.length) return;
 
-  const blendMode = window._fgState.chronoBlend  || 'screen';
   const opacityScale = Number.isFinite(Number(opts.opacityScale)) ? Math.max(0, Math.min(1, Number(opts.opacityScale))) : 1;
   if (opacityScale <= 0) return;
-  const animatedDepth = getChronoAnimatedDepth(window._fgState, opts.currentFrameIdx, ghostIndices.length);
-  const depth = Math.ceil(animatedDepth);
+  const plan = buildChronoStackPlan(window._fgState, ghostIndices, opts.currentFrameIdx, opacityScale);
+  const depth = plan.alphas.length;
   const frameImages = opts.frameImages || null;
   const filterId = opts.filterId || 'fgColorama';
 
   ctx.save();
-  ctx.globalCompositeOperation = blendMode;
+  ctx.globalCompositeOperation = plan.canvasBlend;
 
   for (let step = 0; step < depth; step++) {
     const ghostFrameIdx = ghostIndices[step];
@@ -12174,8 +12170,7 @@ function drawChronophotoStack(ctx, ghostIndices, x, y, w, h, opts = {}) {
     }
     if (!img.naturalWidth && !img.videoWidth && !img.width) continue;
 
-    const finalOpacity = getChronoLayerOpacity(step, animatedDepth, window._fgState);
-    ctx.globalAlpha = finalOpacity * opacityScale;
+    ctx.globalAlpha = plan.alphas[step];
 
     const _st = window._fgState;
     const sx = _st.frameImgScaleX !== undefined ? Number(_st.frameImgScaleX) : (Number(_st.frameImgScale) || 1);
@@ -12184,9 +12179,9 @@ function drawChronophotoStack(ctx, ghostIndices, x, y, w, h, opts = {}) {
     const oy = (Number(_st.frameImgOffY) || 0) * 0.01 * h;
     const srcW = img.videoWidth || img.naturalWidth || img.width || 1;
     const srcH = img.videoHeight || img.naturalHeight || img.height || 1;
-    const contain = Math.min(w / Math.max(1, srcW), h / Math.max(1, srcH));
-    const dw = srcW * contain * sx;
-    const dh = srcH * contain * sy;
+    const mediaSize = getFrameMediaSize(srcW, srcH, w, h);
+    const dw = mediaSize.w * sx;
+    const dh = mediaSize.h * sy;
     const dx = x + w/2 - dw/2 + ox;
     const dy = y + h/2 - dh/2 + oy;
 
@@ -12280,9 +12275,9 @@ function drawFrameDiffStack(ctx, x, y, w, h, frameImages, opts = {}) {
   const srcW = img.videoWidth || img.naturalWidth || img.width || 1;
   const srcH = img.videoHeight || img.naturalHeight || img.height || 1;
 
-  const contain = Math.min(w / Math.max(1, srcW), h / Math.max(1, srcH));
-  const dw = srcW * contain * sx;
-  const dh = srcH * contain * sy;
+  const mediaSize = getFrameMediaSize(srcW, srcH, w, h);
+  const dw = mediaSize.w * sx;
+  const dh = mediaSize.h * sy;
   const dx = x + w / 2 - dw / 2 + ox;
   const dy = y + h / 2 - dh / 2 + oy;
 
@@ -12296,7 +12291,7 @@ function drawFrameDiffStack(ctx, x, y, w, h, frameImages, opts = {}) {
   ctx.rotate((Number(window._fgState.frameImgRot) || 0) * Math.PI / 180);
   var _st2 = window._fgState;
   var _ccf2 = (_st2 && _st2.cc && _st2.cc.enabled) ? buildCCFilter() : 'none';
-  var _caf2 = (_st2 && _st2.colorama && _st2.colorama.enabled) ? ' url(#fgColorama)' : '';
+  var _caf2 = (_st2 && _st2.colorama && _st2.colorama.enabled) ? ' url(#' + coloramaFilterId(opts.cellIdx || 0) + ')' : '';
   ctx.filter = (_ccf2 === 'none' && !_caf2) ? 'none' : (_ccf2 === 'none' ? _caf2.trim() : _ccf2 + _caf2);
   ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
   ctx.filter = 'none';
@@ -12315,7 +12310,7 @@ function drawFrameDiffStack(ctx, x, y, w, h, frameImages, opts = {}) {
   }
 }
 
-function drawFrameCell(ctx, img, x, y, w, h) {
+function drawFrameCell(ctx, img, x, y, w, h, filterId = 'fgColorama') {
     if (!img) return;
 
     const sx = window._fgState.frameImgScaleX !== undefined ? Number(window._fgState.frameImgScaleX) : (Number(window._fgState.frameImgScale) || 1);
@@ -12344,10 +12339,10 @@ function drawFrameCell(ctx, img, x, y, w, h) {
     srcW = Math.max(1, Number(srcW) || 1);
     srcH = Math.max(1, Number(srcH) || 1);
 
-    // Match UI behavior: object-fit contain, then apply Scale + Offset.
-    const contain = Math.min(w / srcW, h / srcH);
-    const dw = srcW * contain * sx;
-    const dh = srcH * contain * sy;
+    // Match preview fitting, then apply Scale + Offset.
+    const mediaSize = getFrameMediaSize(srcW, srcH, w, h);
+    const dw = mediaSize.w * sx;
+    const dh = mediaSize.h * sy;
     const dx = x + (w - dw) / 2 + ox;
     const dy = y + (h - dh) / 2 + oy;
 
@@ -12366,7 +12361,9 @@ function drawFrameCell(ctx, img, x, y, w, h) {
     ctx.rotate((Number(window._fgState.frameImgRot) || 0) * Math.PI / 180);
     ctx.globalAlpha = window._fgState.frameImgOpacity !== undefined ? Number(window._fgState.frameImgOpacity) : 1;
     const _ccf = buildCCFilter();
-    ctx.filter = _ccf;
+    // Colorama belongs to each source layer, before Chronophoto and Frame Diff.
+    const _caf = window._fgState.colorama?.enabled ? `url(#${filterId})` : '';
+    ctx.filter = [_ccf === 'none' ? '' : _ccf, _caf].filter(Boolean).join(' ') || 'none';
     ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
     ctx.filter = 'none';
     ctx.globalAlpha = 1;
@@ -12416,9 +12413,9 @@ function drawFrameImageOverlay(ctx, img, x, y, w, h, alpha = 1, filterId = 'fgCo
     const ox = (Number(window._fgState.frameImgOffX) || 0) * 0.01 * w;
     const oy = (Number(window._fgState.frameImgOffY) || 0) * 0.01 * h;
 
-    const contain = Math.min(w / srcW, h / srcH);
-    const dw = srcW * contain * sx;
-    const dh = srcH * contain * sy;
+    const mediaSize = getFrameMediaSize(srcW, srcH, w, h);
+    const dw = mediaSize.w * sx;
+    const dh = mediaSize.h * sy;
     const dx = x + (w - dw) / 2 + ox;
     const dy = y + (h - dh) / 2 + oy;
 
@@ -12589,7 +12586,6 @@ function renderMp4SingleFrame(ctx, w, h, frameImages, frameIdx, r, g, b, layout,
           mode: 'single'
         });
       }
-      if (flags.coloramaOn) applyColoramaToCanvas(ctx, innerX, innerY, innerW, innerH, img, coloramaFilterId(0));
       if (flags.chronoSeamOn) drawChronoSeamBlend(ctx, _seamInfoSingle, innerX, innerY, innerW, innerH, frameImages, coloramaFilterId(0));
     }
 
@@ -13523,7 +13519,7 @@ function drawExportMetadataBar(ctx, w, headerH, metaInput, opts = {}) {
 
 
 function getStillExportMaxSize(explicitMaxSize = null) {
-  const uiCap = EXPORT_CONF.RES[state.exportQuality] || 1080;
+  const uiCap = EXPORT_CONF.RES[state.exportQuality] || Infinity;
   const argCap = Number.isFinite(explicitMaxSize) && explicitMaxSize > 0 ? explicitMaxSize : Infinity;
   const cap = Math.min(uiCap, argCap);
   return Number.isFinite(cap) ? Math.max(2, Math.round(cap)) : Infinity;
@@ -13656,15 +13652,15 @@ const canvas = document.createElement('canvas');
     const row = Math.floor(i / cols);
     const col = i % cols;
 
-    const exactX1 = Math.floor(stillPlacement.dx + col * (sFrameW + sGap));
-    const exactY1 = Math.floor(sHeaderH + stillPlacement.dy + row * (sFrameH + sGap));
-    const exactX2 = Math.floor(stillPlacement.dx + (col + 1) * sFrameW + col * sGap);
-    const exactY2 = Math.floor(sHeaderH + stillPlacement.dy + (row + 1) * sFrameH + row * sGap);
+    const exactX1 = Math.round(stillPlacement.dx + col * (sFrameW + sGap));
+    const exactY1 = Math.round(sHeaderH + stillPlacement.dy + row * (sFrameH + sGap));
+    const exactX2 = Math.round(stillPlacement.dx + (col + 1) * sFrameW + col * sGap);
+    const exactY2 = Math.round(sHeaderH + stillPlacement.dy + (row + 1) * sFrameH + row * sGap);
 
     const x = exactX1;
     const y = exactY1;
-    const cellDrawW = (sGap > 0) ? Math.ceil(sFrameW) : (exactX2 - exactX1 + 1);
-    const cellDrawH = (sGap > 0) ? Math.ceil(sFrameH) : (exactY2 - exactY1 + 1);
+    const cellDrawW = (sGap > 0) ? Math.ceil(sFrameW) : (exactX2 - exactX1);
+    const cellDrawH = (sGap > 0) ? Math.ceil(sFrameH) : (exactY2 - exactY1);
 
     if (i === 0 && state.showInfoCard) {
       // Info card cell
@@ -13709,7 +13705,7 @@ const canvas = document.createElement('canvas');
         await ensureImageReady(img);
       }
       if (img.naturalWidth) {
-        drawFrameCell(ctx, img, x, y, cellDrawW, cellDrawH);
+        drawFrameCell(ctx, img, x, y, cellDrawW, cellDrawH, coloramaFilterId(cellIdx));
         const _gIdx2 = state.chronoEnabled
           ? buildChronoGhostIndices(state.currentTick, stillCellInfo.baseOffset, state.frames.length, state.animDirection, state.animDirShuffle)
           : [];
@@ -13725,6 +13721,7 @@ const canvas = document.createElement('canvas');
           skipEnsureShuffle: true
         });
         drawChronophotoStack(ctx, _gIdx2, x, y, cellDrawW, cellDrawH, {
+          filterId: coloramaFilterId(cellIdx),
           currentFrameIdx: frameIdx,
           opacityScale: getChronoCurrentOpacityScale(_seamInfoStill)
         });

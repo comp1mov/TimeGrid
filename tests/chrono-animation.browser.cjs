@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'timegrid-chrono-'));
-const expose = ['renderGrid', 'updateAllCells', 'setViewMode', 'fitActiveView', 'getFrameCellInfo', 'exportMp4', 'exportSingleStill', 'exportImage', 'buildChronoGhostIndices', 'drawChronophotoStack'];
+const expose = ['renderGrid', 'updateAllCells', 'setViewMode', 'fitActiveView', 'getFrameCellInfo', 'exportMp4', 'exportSingleStill', 'exportImage', 'buildChronoGhostIndices', 'drawChronophotoStack', 'drawFrameCell'];
 const injection = `
 window.__chronoTest = { ${expose.join(',')} };
 window.__chronoDraws = [];
@@ -197,8 +197,62 @@ drawChronophotoStack = function(ctx, indices, x, y, w, h, opts = {}) {
     await page.locator('#chronoAnimationAdd').click();
     assert.equal(await page.locator('.chrono-key-row').count(), 1);
     assert.equal(await page.evaluate(() => _fgState.chronoAnimation.keys[0].percent), 100);
+
+    // Exposure reuses the same UI and preserves static background brightness.
+    await page.locator('#chronoBlend').selectOption('exposure');
+    assert.equal(await page.locator('#chronoOpacityLabel').innerText(), 'Exposure Mix');
+    await page.locator('#chronoOpacityNum').fill('0');
+    await page.locator('#chronoOpacityNum').press('Tab');
+    assert.equal(await page.evaluate(() => _fgState.chronoOpacity), 0);
+    const zeroAlphas = await page.locator('.frame-item').first().locator('.frame-chrono').evaluateAll(nodes => nodes.map(n => Number(n.style.opacity)));
+    assert.ok(zeroAlphas.every(alpha => alpha === 0));
+    await page.locator('#chronoOpacityNum').fill('1');
+    await page.locator('#chronoOpacityNum').press('Tab');
+
+    const exposurePixels = await page.evaluate(async () => {
+      const s = _fgState, results = [];
+      const saved = { frames: s.frames, depth: s.chronoDepth, animation: s.chronoAnimation, cascade: s.chronoCascade, mirror: s.chronoCascadeMirror };
+      const makeFrame = async (value) => {
+        const c = document.createElement('canvas'); c.width = 320; c.height = 180;
+        const ctx = c.getContext('2d'); ctx.fillStyle = `rgb(${value},${value},${value})`; ctx.fillRect(0, 0, 320, 180);
+        const dataUrl = c.toDataURL(), img = new Image(); img.src = dataUrl; await img.decode();
+        return { dataUrl, img, time: 0, frameNumber: 0 };
+      };
+      s.chronoAnimation = { enabled: false, keys: [] };
+      const flat = await makeFrame(128);
+      s.frames = [flat];
+      for (const depth of [1, 5, 20, 100]) {
+        s.chronoDepth = depth;
+        const c = document.createElement('canvas'); c.width = 320; c.height = 180;
+        const ctx = c.getContext('2d'); ctx.drawImage(flat.img, 0, 0);
+        __chronoTest.drawChronophotoStack(ctx, Array(depth).fill(0), 0, 0, 320, 180, { currentFrameIdx: 0 });
+        results.push({ depth, pixel: [...ctx.getImageData(160, 90, 1, 1).data] });
+      }
+      s.frames = await Promise.all([200, 20, 80, 100].map(makeFrame));
+      s.chronoDepth = 3;
+      const c = document.createElement('canvas'); c.width = 320; c.height = 180;
+      const ctx = c.getContext('2d'); ctx.drawImage(s.frames[0].img, 0, 0);
+      __chronoTest.drawChronophotoStack(ctx, [1, 2, 3], 0, 0, 320, 180, { currentFrameIdx: 0 });
+      results.push({ expected: 100, pixel: [...ctx.getImageData(160, 90, 1, 1).data] });
+      Object.assign(s, { frames: saved.frames, chronoDepth: saved.depth, chronoAnimation: saved.animation, chronoCascade: saved.cascade, chronoCascadeMirror: saved.mirror });
+      __chronoTest.setViewMode('single'); __chronoTest.updateAllCells(); __chronoTest.fitActiveView();
+      await Promise.all([...document.querySelectorAll('.frame-item img')].map(img => img.decode().catch(() => {})));
+      await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+      return results;
+    });
+    for (const sample of exposurePixels) {
+      for (const channel of sample.pixel.slice(0, 3)) assert.ok(Math.abs(channel - (sample.expected ?? 128)) <= 2, JSON.stringify(sample));
+    }
+    assert.ok((await page.locator('.frame-item').first().locator('.frame-chrono').evaluateAll(nodes => nodes.map(n => n.style.mixBlendMode))).every(mode => mode === 'normal'));
+    await page.screenshot({ path: path.join(output, 'exposure.png') });
+    const exposureDownload = page.waitForEvent('download');
+    await page.evaluate(() => __chronoTest.exportMp4('single'));
+    const exposurePath = path.join(output, 'exposure.mp4');
+    await (await exposureDownload).saveAs(exposurePath);
+    assert.ok(fs.statSync(exposurePath).size > 1000);
+
     assert.deepEqual(errors, []);
-    const result = { passed: true, gridChecks: gridChecks.length, alphaChecks: alphaChecks.length, exports, errors, output };
+    const result = { passed: true, gridChecks: gridChecks.length, alphaChecks: alphaChecks.length, exposurePixels, exports, errors, output };
     fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
   } finally { await browser.close(); }
