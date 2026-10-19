@@ -1,0 +1,409 @@
+{
+  "version": "28.35.0-drawing.1",
+  "date": "2026-10-19T07:13:52.276Z",
+  "browser": "155.0.4283.62",
+  "fixture": "deterministic 1920x1080 frames; no video decoding",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "dpr": 1,
+  "cases": [
+    {
+      "count": 24,
+      "quality": 0.125,
+      "before": {
+        "w": 0,
+        "h": 0,
+        "bytes": 0
+      },
+      "opened": {
+        "w": 0,
+        "h": 0,
+        "bytes": 0
+      },
+      "painted": {
+        "w": 1920,
+        "h": 408,
+        "hash": "7a3fc9afb59b68f5a2eb4d343b8c06d3682c141d27e5d26ba7e7b642cd9c184a",
+        "pixels": 14848
+      },
+      "checks": {
+        "roundTrip": {
+          "w": 1920,
+          "h": 408,
+          "hash": "7a3fc9afb59b68f5a2eb4d343b8c06d3682c141d27e5d26ba7e7b642cd9c184a",
+          "pixels": 14848
+        },
+        "export": {
+          "w": 960,
+          "h": 204,
+          "hash": "7e60fe16f83e96814ac6e0bbd1cf0dfc97f3f8aae32fee390c139ae7c92e38a1",
+          "pixels": 4238
+        },
+        "undo": {
+          "w": 1920,
+          "h": 408,
+          "hash": "b97a1f8797dc1a116be16ef0172883c79961fbbbcd984369dd1f2c7b6dcfac65",
+          "pixels": 553
+        },
+        "bg": {
+          "w": 3044,
+          "h": 1469,
+          "hash": "b999baa6684bae0cc921fe0a404e865e0fccbc19084ce9ddbf83157760f15f8b",
+          "pixels": 15408
+        },
+        "tpl": {
+          "w": 1024,
+          "h": 576,
+          "hash": "4295641308c0a391e1ca1ba65f9e6a8dcc0a46333400b9d9d6524300308372b4",
+          "pixels": 22182
+        },
+        "pen": {
+          "w": 1920,
+          "h": 408,
+          "hash": "d640c55722e13c8c96bf96e4cabd64f785c129254e6feb59905ef2a0973d629e",
+          "pixels": 6441
+        },
+        "touchErase": {
+          "w": 1920,
+          "h": 408,
+          "hash": "d108138612f547d55c784c458cfa19e3e9e2d3a68770c791b5d65d59e6161c25",
+          "pixels": 1956
+        }
+      },
+      "rects": 400,
+      "times": {
+        "getFrameAtPoint": {
+          "n": 339,
+          "median": 0,
+          "p95": 0,
+          "max": 0.19999999552965164
+        },
+        "compositeAllLayers": {
+          "n": 15,
+          "median": 0.20000000298023224,
+          "p95": 0.30000000447034836,
+          "max": 0.30000000447034836
+        },
+        "drawFrameStrokeResampled": {
+          "n": 9,
+          "median": 2.7999999970197678,
+          "p95": 3.899999998509884,
+          "max": 3.899999998509884
+        }
+      },
+      "extended": {
+        "bgSingle": {
+          "w": 3044,
+          "h": 1175,
+          "hash": "2ab89b3780b981accfef0f028c92e75d533ccc3d3351e6fc0b3bf0942b78d6a4",
+          "pixels": 1332
+        },
+        "onion": {
+          "w": 136,
+          "h": 136,
+          "hash": "a490f1acecaf606b419d9ca8f31ce869a0db49595202d91f3e4af43b0618a29e",
+          "pixels": 204
+        },
+        "reference": {
+          "w": 2480,
+          "h": 2000,
+          "hash": "440448fe302cc85d6ab5ffa0dd8561a545ce20fd571afa2ead0bd0775df20d02",
+          "pixels": 796369
+        },
+        "round": {
+          "w": 816,
+          "h": 544,
+          "hash": "668be70e046c470e13ad074d34d25b240ad9bb1be2c448c9097b24372a922aba",
+          "pixels": 4502
+        },
+        "spray": {
+          "w": 816,
+          "h": 544,
+          "hash": "e471124ddb1a064de27baddcbc7cf7665f52e1605411828b03de4a1bd07b3a7a",
+          "pixels": 7319
+        },
+        "pencil": {
+          "w": 816,
+          "h": 544,
+          "hash": "24ac337a7114f2fd370eed4dd6da05b3ceba81561aeb27367281ad404359c955",
+          "pixels": 3247
+        },
+        "calligraphy": {
+          "w": 816,
+          "h": 544,
+          "hash": "680ee8f58eb30d5cc85473a270dbedf79e68364c1841ca0f45411314181f23ac",
+          "pixels": 3244
+        },
+        "longStroke": {
+          "w": 816,
+          "h": 544,
+          "hash": "73c78b3cd322c740cae48027a4f42ccd11293c9d0fee878f8233ca36a2ebb54f",
+          "pixels": 11438
+        },
+        "baked": {
+          "w": 816,
+          "h": 544,
+          "hash": "18cf22c387af25a041d60cb81d9851cd8088498086e98af703da705443c9b1ce",
+          "pixels": 11448
+        }
+      }
+    },
+    {
+      "count": 24,
+      "quality": 0.5,
+      "before": {
+        "w": 0,
+        "h": 0,
+        "bytes": 0
+      },
+      "opened": {
+        "w": 0,
+        "h": 0,
+        "bytes": 0
+      },
+      "painted": {
+        "w": 7680,
+        "h": 1620,
+        "hash": "786c2bb8e4c0c7a55dce21faf676003703d5c14c86d9b5da5dd361c425999478",
+        "pixels": 216377
+      },
+      "checks": {
+        "roundTrip": {
+          "w": 7680,
+          "h": 1620,
+          "hash": "786c2bb8e4c0c7a55dce21faf676003703d5c14c86d9b5da5dd361c425999478",
+          "pixels": 216377
+        },
+        "export": {
+          "w": 960,
+          "h": 204,
+          "hash": "506b1e251ecd8264a152bd5292f1b05c63e21182fc669c61a6a6d004a1a5d0dc",
+          "pixels": 3557
+        },
+        "undo": {
+          "w": 7680,
+          "h": 1620,
+          "hash": "036e6ce5d1933b846bd048493ca88177d44ed4879d5b130e37d6acc5c13f466f",
+          "pixels": 7441
+        },
+        "bg": {
+          "w": 3044,
+          "h": 1469,
+          "hash": "b999baa6684bae0cc921fe0a404e865e0fccbc19084ce9ddbf83157760f15f8b",
+          "pixels": 15408
+        },
+        "tpl": {
+          "w": 1024,
+          "h": 576,
+          "hash": "4295641308c0a391e1ca1ba65f9e6a8dcc0a46333400b9d9d6524300308372b4",
+          "pixels": 22182
+        },
+        "pen": {
+          "w": 7680,
+          "h": 1620,
+          "hash": "ec441df5356f534550d091d7c60ba007eae1a15b006057cc2e59db7346c22e5e",
+          "pixels": 93463
+        },
+        "touchErase": {
+          "w": 7680,
+          "h": 1620,
+          "hash": "865ffb9386b6a5eb1f2acca4f12ebc21d096eb14078e7fb58fa0912785d7adad",
+          "pixels": 13708
+        }
+      },
+      "rects": 400,
+      "times": {
+        "getFrameAtPoint": {
+          "n": 339,
+          "median": 0,
+          "p95": 0,
+          "max": 0.30000000447034836
+        },
+        "compositeAllLayers": {
+          "n": 15,
+          "median": 0.29999999701976776,
+          "p95": 0.7999999970197678,
+          "max": 0.7999999970197678
+        },
+        "drawFrameStrokeResampled": {
+          "n": 9,
+          "median": 3.2999999970197678,
+          "p95": 8.700000002980232,
+          "max": 8.700000002980232
+        }
+      }
+    },
+    {
+      "count": 96,
+      "quality": 0.125,
+      "before": {
+        "w": 0,
+        "h": 0,
+        "bytes": 0
+      },
+      "opened": {
+        "w": 0,
+        "h": 0,
+        "bytes": 0
+      },
+      "painted": {
+        "w": 1920,
+        "h": 1632,
+        "hash": "e6e12cba0501f2120b45744051c3e083bfde9910e9ec87db56eada3adb18c839",
+        "pixels": 19702
+      },
+      "checks": {
+        "roundTrip": {
+          "w": 1920,
+          "h": 1632,
+          "hash": "e6e12cba0501f2120b45744051c3e083bfde9910e9ec87db56eada3adb18c839",
+          "pixels": 19702
+        },
+        "export": {
+          "w": 960,
+          "h": 816,
+          "hash": "e19e771c8782812df5af59d835c09ccc9eb3788c698c055b60ca6dee952057d9",
+          "pixels": 5759
+        },
+        "undo": {
+          "w": 1920,
+          "h": 1632,
+          "hash": "61269e6ca60ec955832c266490c5a53a21a868e050005454cfca8335d908d3b8",
+          "pixels": 695
+        },
+        "bg": {
+          "w": 3044,
+          "h": 2792,
+          "hash": "b4503b24e15d1574f141a37b469ced63a1fbc7ad170214ad158d25273b057e59",
+          "pixels": 20558
+        },
+        "tpl": {
+          "w": 1024,
+          "h": 576,
+          "hash": "009acf926636afa5b7cd3251194bd2c2bdf24271bc5f413a6b06ad180225632a",
+          "pixels": 24362
+        },
+        "pen": {
+          "w": 1920,
+          "h": 1632,
+          "hash": "90d0c7948f500720fda43718bd6bfedeca8528ccda70eab75b7314456e9fcc9f",
+          "pixels": 1410
+        },
+        "touchErase": {
+          "w": 1920,
+          "h": 1632,
+          "hash": "1d6b0baa879e358cec46dfa98fed4656f295b5c125c72ed95cc4310989301cb6",
+          "pixels": 976
+        }
+      },
+      "rects": 1552,
+      "times": {
+        "getFrameAtPoint": {
+          "n": 444,
+          "median": 0,
+          "p95": 0,
+          "max": 0.20000000298023224
+        },
+        "compositeAllLayers": {
+          "n": 15,
+          "median": 0.5,
+          "p95": 1.3999999985098839,
+          "max": 1.3999999985098839
+        },
+        "drawFrameStrokeResampled": {
+          "n": 13,
+          "median": 6.799999997019768,
+          "p95": 32.400000005960464,
+          "max": 32.400000005960464
+        }
+      }
+    },
+    {
+      "count": 96,
+      "quality": 0.5,
+      "before": {
+        "w": 0,
+        "h": 0,
+        "bytes": 0
+      },
+      "opened": {
+        "w": 0,
+        "h": 0,
+        "bytes": 0
+      },
+      "painted": {
+        "w": 7552,
+        "h": 6360,
+        "hash": "4ac276dd6bbe038519e76fe87049ccf819ba1e6dbf155da6ab80de76b98925aa",
+        "pixels": 272860
+      },
+      "checks": {
+        "roundTrip": {
+          "w": 7552,
+          "h": 6360,
+          "hash": "4ac276dd6bbe038519e76fe87049ccf819ba1e6dbf155da6ab80de76b98925aa",
+          "pixels": 272860
+        },
+        "export": {
+          "w": 960,
+          "h": 816,
+          "hash": "93558b9576838ad4ed6bbe45fe78f65a203ab89d052b989472d78625209bffd1",
+          "pixels": 4678
+        },
+        "undo": {
+          "w": 7552,
+          "h": 6360,
+          "hash": "49a08a480bdc793cf480f510dcb84d715a93a27fb9ed78dc4e81d48ae6094d0f",
+          "pixels": 8870
+        },
+        "bg": {
+          "w": 3044,
+          "h": 2792,
+          "hash": "b4503b24e15d1574f141a37b469ced63a1fbc7ad170214ad158d25273b057e59",
+          "pixels": 20558
+        },
+        "tpl": {
+          "w": 1024,
+          "h": 576,
+          "hash": "009acf926636afa5b7cd3251194bd2c2bdf24271bc5f413a6b06ad180225632a",
+          "pixels": 24362
+        },
+        "pen": {
+          "w": 7552,
+          "h": 6360,
+          "hash": "b5b9cab262f99af74c09b27b9b6df17c5e0c6894b4408e147c3eb11b2912d301",
+          "pixels": 18021
+        },
+        "touchErase": {
+          "w": 7552,
+          "h": 6360,
+          "hash": "b280608b868e3dba543371a99374ea7995eae42baa3862fe5a59672bed0d0d60",
+          "pixels": 9755
+        }
+      },
+      "rects": 1552,
+      "times": {
+        "getFrameAtPoint": {
+          "n": 444,
+          "median": 0,
+          "p95": 0,
+          "max": 0.10000000149011612
+        },
+        "compositeAllLayers": {
+          "n": 15,
+          "median": 0.8999999985098839,
+          "p95": 2.7999999970197678,
+          "max": 2.7999999970197678
+        },
+        "drawFrameStrokeResampled": {
+          "n": 13,
+          "median": 6.200000002980232,
+          "p95": 9.399999998509884,
+          "max": 9.399999998509884
+        }
+      }
+    }
+  ]
+}

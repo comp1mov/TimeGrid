@@ -1,0 +1,47 @@
+{
+  "results": {
+    "beforeExport": {
+      "tick": 7,
+      "offset": 0.17,
+      "normalizedGap": 192,
+      "layoutGap": 192
+    },
+    "export": {
+      "first": {
+        "tick": 0,
+        "offset": 0.17,
+        "gap": 24
+      },
+      "last": {
+        "tick": 71,
+        "offset": 0.17,
+        "gap": 24
+      },
+      "frames": 72,
+      "distinctOffsets": [
+        0.17
+      ],
+      "maxEncodeQueue": 71,
+      "engine": "Idle"
+    },
+    "stillColorama": {
+      "enabled": true,
+      "offset": 0.17,
+      "expectedFilteredPixel": [
+        136,
+        136,
+        136,
+        255
+      ]
+    },
+    "bg": {
+      "sourceAlpha": 128,
+      "compositeAlpha": 192
+    },
+    "race": {
+      "expected": 6,
+      "actual": 246
+    }
+  },
+  "errors": []
+}

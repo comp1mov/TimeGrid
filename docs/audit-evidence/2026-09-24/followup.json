@@ -1,0 +1,104 @@
+{
+  "results": {
+    "drawing": {
+      "points": [
+        {
+          "x": 319.24444274902345,
+          "y": 235.075,
+          "under": ""
+        },
+        {
+          "x": 319.24444274902345,
+          "y": 806.575,
+          "under": "drawCanvas"
+        }
+      ],
+      "stats": {}
+    },
+    "motionMask": {
+      "stats": {
+        "drawImage": {
+          "calls": 5780,
+          "sumMs": 62.1,
+          "p95Ms": 0.1,
+          "maxMs": 0.2
+        },
+        "texImage2D": {
+          "calls": 1920,
+          "sumMs": 197.6,
+          "p95Ms": 0.2,
+          "maxMs": 0.6
+        },
+        "getError": {
+          "calls": 2880,
+          "sumMs": 706.7,
+          "p95Ms": 1.4,
+          "maxMs": 27.9
+        },
+        "drawArrays": {
+          "calls": 960,
+          "sumMs": 1.2,
+          "p95Ms": 0,
+          "maxMs": 0.1
+        },
+        "getBoundingClientRect": {
+          "calls": 1940,
+          "sumMs": 2.2,
+          "p95Ms": 0,
+          "maxMs": 0.1
+        },
+        "compositeAllLayers": {
+          "calls": 10,
+          "sumMs": 10.6,
+          "p95Ms": 1.6,
+          "maxMs": 1.6
+        }
+      },
+      "engine": "WebGL mask 0.50x"
+    },
+    "singleMotion": {
+      "ms": 61.30000001192093,
+      "cells": 96,
+      "visible": 1,
+      "stats": {
+        "drawImage": {
+          "calls": 578,
+          "sumMs": 6.4,
+          "p95Ms": 0.1,
+          "maxMs": 0.1
+        },
+        "texImage2D": {
+          "calls": 192,
+          "sumMs": 18.4,
+          "p95Ms": 0.2,
+          "maxMs": 0.2
+        },
+        "getError": {
+          "calls": 288,
+          "sumMs": 30.6,
+          "p95Ms": 0.2,
+          "maxMs": 0.7
+        },
+        "drawArrays": {
+          "calls": 96,
+          "sumMs": 0,
+          "p95Ms": 0,
+          "maxMs": 0
+        },
+        "getBoundingClientRect": {
+          "calls": 290,
+          "sumMs": 0.2,
+          "p95Ms": 0,
+          "maxMs": 0.1
+        },
+        "compositeAllLayers": {
+          "calls": 1,
+          "sumMs": 0.3,
+          "p95Ms": 0.3,
+          "maxMs": 0.3
+        }
+      }
+    }
+  },
+  "errors": []
+}

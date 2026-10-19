@@ -1,6 +1,7 @@
 import { inject } from '@vercel/analytics';
 import { buildChronoStackPlan } from './chrono-compositing.mjs';
 import { mountChronoAnimation } from './chrono-animation-ui.mjs';
+import { buildDrawingHitMap, hitDrawingMap } from './drawing-geometry.mjs';
 
 let chronoAnimationUI;
 
@@ -11,7 +12,7 @@ inject();
 
   // Single source of truth
   const APP_NAME = 'TimeGrid';
-  const APP_VERSION = '28.34';
+  const APP_VERSION = '28.35.0-drawing.1';
   const APP_LABEL = `${APP_NAME} ${APP_VERSION}`;
   const UI_FONT_FAMILY = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const TIMECODE_FONT_FAMILY = '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -2631,7 +2632,7 @@ function schedulePostGridSync() {
     postGridSyncRAF = 0;
     requestAnimationFrame(() => {
       try {
-        // Sync drawing geometry after grid build
+        // Sync existing drawing geometry; an untouched FRM layer stays empty.
         ensureFrameSheet();
         const dims = getFrameTileDims();
 
@@ -2874,6 +2875,7 @@ function schedulePostGridSync() {
   }
 
 function renderGrid() {
+    invalidateDrawingGeometry();
     chronoAnimationUI?.sync();
     // ── Sync setup ───────────────────────────────────────────────────────────
     const gridLayout = getGridLayoutModel();
@@ -3245,6 +3247,7 @@ function renderGrid() {
   }
 
   function updateTransform() {
+    invalidateDrawingGeometry();
     // view scale is clamped globally
 
     if (!Number.isFinite(state.scale)) state.scale = 1;
@@ -3577,6 +3580,7 @@ function fitToSingleFrame(opts = {}) {
   }
 
   function setViewMode(mode, opts = {}) {
+    invalidateDrawingGeometry();
     state.viewMode = mode;
     qMode.textContent = mode === 'grid' ? 'GRID' : '1';
     qMode.classList.toggle('active', mode === 'single');
@@ -6494,7 +6498,7 @@ function updateAllCells() {
     if (state.drawMode && isDrawing && lastPointerPos && state.drawTarget === 'frame' && !state.drawLongStroke) {
       const hit = getFrameAtPoint(lastPointerPos);
       if (hit && typeof hit.frameIdx === 'number' && hit.frameIdx !== holdStampLastFrame) {
-        ensureFrameSheet();
+        ensureFrameSheet(true);
         const u = Math.min(1, Math.max(0, hit.localX / Math.max(1, hit.width)));
         const v = Math.min(1, Math.max(0, hit.localY / Math.max(1, hit.height)));
         const sp = sheetPoint(hit.frameIdx, u, v);
@@ -7055,6 +7059,45 @@ function updateAllCells() {
   
   const frameSheetCanvas = document.createElement('canvas'); // per-frame sheet layer
   const frameSheetCtx = frameSheetCanvas.getContext('2d', { willReadFrequently: true });
+  // An untouched FRM layer has no pixel backing. Read/layout paths must not
+  // allocate a full sheet; only painting, baking or restoring pixels may do so.
+  frameSheetCanvas.width = 0;
+  frameSheetCanvas.height = 0;
+
+  let drawingGeometry = null;
+  let drawingGeometryExpiry = 0;
+  function invalidateDrawingGeometry() { drawingGeometry = null; }
+  // Explicit invalidation handles synchronous changes within one input batch.
+  // Expiry at the next animation frame also covers layout changes elsewhere in
+  // this legacy UI without retaining stale screen coordinates across frames.
+  window.addEventListener('resize', invalidateDrawingGeometry);
+  window.addEventListener('scroll', invalidateDrawingGeometry, true);
+  window.visualViewport?.addEventListener('resize', invalidateDrawingGeometry);
+  window.visualViewport?.addEventListener('scroll', invalidateDrawingGeometry);
+  const drawingGeometryObserver = new MutationObserver(invalidateDrawingGeometry);
+  drawingGeometryObserver.observe(framesGrid, { childList:true, subtree:true, attributes:true, attributeFilter:['style','class'] });
+  drawingGeometryObserver.observe(canvasInner, { attributes:true, attributeFilter:['style','class'] });
+  drawingGeometryObserver.observe(drawCanvas, { attributes:true, attributeFilter:['style','width','height'] });
+
+  function getDrawingGeometry() {
+    if (drawingGeometryObserver.takeRecords().length) invalidateDrawingGeometry();
+    if (drawingGeometry) return drawingGeometry;
+    const drawRect = drawCanvas.getBoundingClientRect();
+    const scaleX = drawCanvas.width / Math.max(1, drawRect.width);
+    const scaleY = drawCanvas.height / Math.max(1, drawRect.height);
+    const rects = Array.from(framesGrid.querySelectorAll('.frame-item'), (cellEl, i) => {
+      const r = cellEl.getBoundingClientRect();
+      return { cellEl, i, x:(r.left-drawRect.left)*scaleX, y:(r.top-drawRect.top)*scaleY,
+        w:r.width*scaleX, h:r.height*scaleY };
+    });
+    drawingGeometry = { drawRect, scaleX, scaleY, rects,
+      hitMap:buildDrawingHitMap(rects, state.gridCols) };
+    if (!drawingGeometryExpiry) drawingGeometryExpiry = requestAnimationFrame(() => {
+      drawingGeometryExpiry = 0;
+      invalidateDrawingGeometry();
+    });
+    return drawingGeometry;
+  }
 let isDrawing = false;
   let suppressDrawTouchUntilRelease = false; // multi-touch gesture guard (iPad)
   let skipNextSegment = false; // used when pointer leaves drawable area or misses frame hit
@@ -7192,10 +7235,10 @@ let isDrawing = false;
 
     if (t === 'frame') {
       try {
-        ensureFrameSheet();
-        const tw = state.frameSheetTileW || 1;
-        const th = state.frameSheetTileH || 1;
-        const cols = state.frameSheetCols || 1;
+        // A press outside the frames is not a drawing. Prepare undo metadata
+        // without allocating the sheet; the first accepted hit will allocate it.
+        const { tw, th } = getFrameTileDims();
+        const cols = Math.max(1, state.gridCols || 1);
         const entry = { kind: 'frm', tw, th, cols, tiles: new Map() };
         pushUndoEntry(entry);
         activeUndoEntry = entry;
@@ -7212,7 +7255,7 @@ let isDrawing = false;
     const top = drawUndoStack[drawUndoStack.length - 1];
     if (top && top.kind === 'frm') { activeUndoEntry = top; return; }
     try {
-      ensureFrameSheet();
+      ensureFrameSheet(true);
       const entry = { kind: 'frm', tw: state.frameSheetTileW || 1,
         th: state.frameSheetTileH || 1, cols: state.frameSheetCols || 1,
         tiles: new Map() };
@@ -7278,8 +7321,8 @@ let isDrawing = false;
 
     if (kind === 'frm') {
       try {
-        ensureFrameSheet();
         if (!entry.tiles || !(entry.tiles instanceof Map) || entry.tiles.size === 0) return;
+        ensureFrameSheet(true);
         const tw = entry.tw || state.frameSheetTileW || 1;
         const th = entry.th || state.frameSheetTileH || 1;
         const cols = entry.cols || state.frameSheetCols || 1;
@@ -7316,7 +7359,7 @@ let isDrawing = false;
       }
 
       if (entry.sheet) {
-        ensureFrameSheet();
+        ensureFrameSheet(true);
         try {
           const tmp = document.createElement('canvas');
           tmp.width = entry.sheet.width;
@@ -7460,6 +7503,7 @@ function toggleDrawMode() {
     }
   }
 function resizeDrawCanvas() {
+    invalidateDrawingGeometry();
     const { cssW, cssH } = getDrawCanvasLayoutSize();
     const dpr = resolveDrawCanvasDpr(cssW, cssH);
     state.drawCanvasDpr = dpr;
@@ -7739,8 +7783,9 @@ function resizeDrawCanvas() {
   }
 
 
-  function ensureFrameSheet() {
+  function ensureFrameSheet(allocate = false) {
     if (!state.frames.length) return;
+    if (!allocate && (!frameSheetCanvas.width || !frameSheetCanvas.height)) return;
     const { tw, th } = getFrameTileDims();
     const newCols = Math.max(1, state.gridCols || 1);
     const rows = Math.ceil(state.frames.length / newCols);
@@ -7751,6 +7796,13 @@ function resizeDrawCanvas() {
     if (frameSheetCanvas.width === newW && frameSheetCanvas.height === newH &&
         state.frameSheetCols === newCols && state.frameSheetTileW === tw && state.frameSheetTileH === th) {
       return;
+    }
+
+    // Recreate the legacy empty seed/remap only when first written. The bitmap
+    // copy preserves Chromium's rasterization path (covered by pixel parity).
+    if (!frameSheetCanvas.width || !frameSheetCanvas.height) {
+      frameSheetCanvas.width = 300;
+      frameSheetCanvas.height = 150;
     }
 
     // Remap old content tile-by-tile
@@ -7786,7 +7838,7 @@ function resizeDrawCanvas() {
   }
 
   function sheetPoint(frameIdx, u, v) {
-    ensureFrameSheet();
+    ensureFrameSheet(true);
     const tw = state.frameSheetTileW || 1;
     const th = state.frameSheetTileH || 1;
     const cols = state.frameSheetCols || 1;
@@ -7858,14 +7910,10 @@ function compositeAllLayers() {
   function renderRefFrameOnFramesOnCanvas() {
     if (!state.refFrameSource || !state.refFrameVisible) return;
 
-    const items = framesGrid.querySelectorAll('.frame-item');
-    const offset = 0;
+    const { drawRect, rects } = getDrawingGeometry();
 
-    const drawRect = drawCanvas.getBoundingClientRect();
     if (!drawRect.width || !drawRect.height) return;
 
-    const scaleX = drawCanvas.width / Math.max(1, drawRect.width);
-    const scaleY = drawCanvas.height / Math.max(1, drawRect.height);
 
     // Media dims (stable across cells)
     let srcW = 1, srcH = 1;
@@ -7888,13 +7936,7 @@ function compositeAllLayers() {
     const rot = (Number(state.refFrameRot) || 0) + mainRot;
     const alpha = Math.max(0, Math.min(1, Number(state.refFrameOpacity) || 0));
 
-    for (let i = offset; i < items.length; i++) {
-      const item = items[i];
-      const rect = item.getBoundingClientRect();
-      const x = (rect.left - drawRect.left) * scaleX;
-      const y = (rect.top - drawRect.top) * scaleY;
-      const w = rect.width * scaleX;
-      const h = rect.height * scaleY;
+    for (const { cellEl:item, i, x, y, w, h } of rects) {
 
       const ox = ((Number(state.refFrameOffX) || 0) + mainOffXPct) * 0.01 * w;
       const oy = ((Number(state.refFrameOffY) || 0) + mainOffYPct) * 0.01 * h;
@@ -7925,22 +7967,12 @@ function compositeAllLayers() {
     if (!state.showTemplateDrawing) return;
     if (!tplCanvas.width || !tplCanvas.height) return;
 
-    const items = framesGrid.querySelectorAll('.frame-item');
-    const offset = 0;
+    const { drawRect, rects } = getDrawingGeometry();
 
-    const drawRect = drawCanvas.getBoundingClientRect();
     if (!drawRect.width || !drawRect.height) return;
 
-    const scaleX = drawCanvas.width / Math.max(1, drawRect.width);
-    const scaleY = drawCanvas.height / Math.max(1, drawRect.height);
 
-    for (let i = offset; i < items.length; i++) {
-      const item = items[i];
-      const rect = item.getBoundingClientRect();
-      const x = (rect.left - drawRect.left) * scaleX;
-      const y = (rect.top - drawRect.top) * scaleY;
-      const w = rect.width * scaleX;
-      const h = rect.height * scaleY;
+    for (const { cellEl:item, i, x, y, w, h } of rects) {
 
       // Draw template as a per-frame overlay (scaled to the cell)
       drawCtx.drawImage(tplCanvas, x, y, w, h);
@@ -7951,28 +7983,18 @@ function compositeAllLayers() {
   function renderFrameDrawingsOnCanvas() {
     // Per-frame sheet: each visible cell gets the slice for its current frameIdx
     if (!frameSheetCanvas.width || !frameSheetCanvas.height) return;
-    const items = framesGrid.querySelectorAll('.frame-item');
-    const offset = 0;
+    const { drawRect, rects } = getDrawingGeometry();
 
-    const drawRect = drawCanvas.getBoundingClientRect();
     if (!drawRect.width || !drawRect.height) return;
-    const scaleX = drawCanvas.width / Math.max(1, drawRect.width);
-    const scaleY = drawCanvas.height / Math.max(1, drawRect.height);
 
     const tw = state.frameSheetTileW || 1;
     const th = state.frameSheetTileH || 1;
     const cols = state.frameSheetCols || 1;
 
-    for (let i = offset; i < items.length; i++) {
-      const item = items[i];
-      const frameIdx = Number.isFinite(parseInt(item.dataset.frameIdx)) ? parseInt(item.dataset.frameIdx) : (i - offset) * state.cellSize;
+    for (const { cellEl:item, i, x, y, w, h } of rects) {
+      const frameIdx = Number.isFinite(parseInt(item.dataset.frameIdx)) ? parseInt(item.dataset.frameIdx) : i * state.cellSize;
       if (!Number.isFinite(frameIdx)) continue;
 
-      const rect = item.getBoundingClientRect();
-      const x = (rect.left - drawRect.left) * scaleX;
-      const y = (rect.top - drawRect.top) * scaleY;
-      const w = rect.width * scaleX;
-      const h = rect.height * scaleY;
 
       const sx = (frameIdx % cols) * tw;
       const sy = Math.floor(frameIdx / cols) * th;
@@ -8004,103 +8026,29 @@ function compositeAllLayers() {
   
   // Get point relative to canvas
   function getCanvasPoint(e) {
-    const rect = drawCanvas.getBoundingClientRect();
-    const scaleX = drawCanvas.width / rect.width;
-    const scaleY = drawCanvas.height / rect.height;
-    
-    if (e.touches && e.touches.length > 0) {
-      return {
-        x: (e.touches[0].clientX - rect.left) * scaleX,
-        y: (e.touches[0].clientY - rect.top) * scaleY
-      };
-    }
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY
-    };
+    const p = (e.touches && e.touches.length) ? e.touches[0] : e;
+    return getCanvasPointXY(p.clientX, p.clientY);
   }
   
   // Get point from raw clientX/Y coordinates (used by Pointer Events)
   function getCanvasPointXY(clientX, clientY) {
-    const rect = drawCanvas.getBoundingClientRect();
+    const { drawRect:rect, scaleX, scaleY } = getDrawingGeometry();
     return {
-      x: (clientX - rect.left) * (drawCanvas.width  / rect.width),
-      y: (clientY - rect.top)  * (drawCanvas.height / rect.height)
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
     };
   }
 
   // Find which frame cell a point is over (returns null if on background)
   function getFrameAtPoint(point) {
-    const items = framesGrid.querySelectorAll('.frame-item');
-    const offset = 0;
-    const drawRect = drawCanvas.getBoundingClientRect();
-    const scaleX = drawCanvas.width / Math.max(1, drawRect.width);
-    const scaleY = drawCanvas.height / Math.max(1, drawRect.height);
-
-    if (typeof dbg === 'function') {
-    }
-
-    const rects = [];
-    for (let i = offset; i < items.length; i++) {
-      const rect = items[i].getBoundingClientRect();
-      const x = (rect.left - drawRect.left) * scaleX;
-      const y = (rect.top - drawRect.top) * scaleY;
-      const w = rect.width * scaleX;
-      const h = rect.height * scaleY;
-
-      const frameIdx = (Number.isFinite(parseInt(items[i].dataset.frameIdx))
-        ? parseInt(items[i].dataset.frameIdx)
-        : (i - offset) * state.cellSize);
-
-      rects.push({ i, x, y, w, h, frameIdx, cellEl: items[i] });
-
-      if (point.x >= x && point.x <= x + w && point.y >= y && point.y <= y + h) {
-        return {
-          frameIdx,
-          cellEl: items[i],
-          localX: point.x - x,
-          localY: point.y - y,
-          width: w,
-          height: h,
-          snapped: false
-        };
-      }
-    }
-
-    // SNAP: allow drawing slightly inside gaps between frames (important for fast strokes on iPad)
-    const snapCss = _isCoarsePointer ? 22 : 12; // px in screen space
-    const tol = snapCss * Math.max(scaleX, scaleY);
-
-    let best = null;
-    let bestD2 = Infinity;
-    for (const r of rects) {
-      const rx2 = r.x + r.w;
-      const ry2 = r.y + r.h;
-      const dx = (point.x < r.x) ? (r.x - point.x) : (point.x > rx2 ? (point.x - rx2) : 0);
-      const dy = (point.y < r.y) ? (r.y - point.y) : (point.y > ry2 ? (point.y - ry2) : 0);
-      const d2 = dx * dx + dy * dy;
-
-      if (d2 < bestD2 && dx <= tol && dy <= tol) {
-        best = r;
-        bestD2 = d2;
-      }
-    }
-
-    if (best) {
-      const lx = Math.min(best.w, Math.max(0, point.x - best.x));
-      const ly = Math.min(best.h, Math.max(0, point.y - best.y));
-      return {
-        frameIdx: best.frameIdx,
-        cellEl: best.cellEl,
-        localX: lx,
-        localY: ly,
-        width: best.w,
-        height: best.h,
-        snapped: true
-      };
-    }
-
-    return null;
+    const geometry = getDrawingGeometry();
+    const tol = (_isCoarsePointer ? 22 : 12) * Math.max(geometry.scaleX, geometry.scaleY);
+    const hit = hitDrawingMap(geometry.hitMap, point, tol);
+    if (!hit) return null;
+    const { rect:r, localX, localY, snapped } = hit;
+    const current = parseInt(r.cellEl.dataset.frameIdx);
+    return { frameIdx:Number.isFinite(current) ? current : r.i*state.cellSize,
+      cellEl:r.cellEl, localX, localY, width:r.w, height:r.h, snapped };
   }
   
     // Brush sizing helpers
@@ -8117,7 +8065,7 @@ function compositeAllLayers() {
   function getBrushSizeFrame(hit) {
     // Frame drawings live on a stable frame-sheet tile (tw x th).
     // Convert drawSize (CSS px at scale=1) into sheet pixels so that on-screen width matches the brush cursor.
-    ensureFrameSheet();
+    ensureFrameSheet(true);
     const tw = state.frameSheetTileW || getFrameTileDims().tw;
     const dpr = getEffectiveDpr();
 
@@ -8473,7 +8421,7 @@ ctx.beginPath();
         return;
       }
       holdStampLastFrame = hit.frameIdx;
-      ensureFrameSheet();
+      ensureFrameSheet(true);
       const u = Math.min(1, Math.max(0, hit.localX / Math.max(1, hit.width)));
       const v = Math.min(1, Math.max(0, hit.localY / Math.max(1, hit.height)));
       const sp = sheetPoint(hit.frameIdx, u, v);
@@ -8546,9 +8494,7 @@ ctx.beginPath();
   // resample the segment and draw on each touched frame so strokes don't get "cut" near borders.
   function drawFrameStrokeResampled(p0, p1) {
     _ensureActiveUndoEntry();
-    const rect = drawCanvas.getBoundingClientRect();
-    const scaleX = drawCanvas.width / Math.max(1, rect.width);
-    const scaleY = drawCanvas.height / Math.max(1, rect.height);
+    const { scaleX, scaleY } = getDrawingGeometry();
     const scale = Math.min(scaleX, scaleY);
 
     const dx = p1.x - p0.x;
@@ -8571,7 +8517,7 @@ ctx.beginPath();
       const hit = getFrameAtPoint({ x: px, y: py });
       if (!hit) continue;
 
-      ensureFrameSheet();
+      ensureFrameSheet(true);
       const u = Math.min(1, Math.max(0, hit.localX / Math.max(1, hit.width)));
       const v = Math.min(1, Math.max(0, hit.localY / Math.max(1, hit.height)));
       const sp = sheetPoint(hit.frameIdx, u, v);
@@ -8619,7 +8565,7 @@ drawCanvas.onmousemove = e => {
       if (state.drawTarget === 'frame' && activeFrameStroke) {
         const hit0 = getFrameAtPoint(currentPoint);
         if (!hit0) return;
-        ensureFrameSheet();
+        ensureFrameSheet(true);
         const u0 = Math.min(1, Math.max(0, hit0.localX / Math.max(1, hit0.width)));
         const v0 = Math.min(1, Math.max(0, hit0.localY / Math.max(1, hit0.height)));
         const sp0 = sheetPoint(hit0.frameIdx, u0, v0);
@@ -8651,7 +8597,7 @@ drawCanvas.onmousemove = e => {
     if (state.drawTarget === 'frame' && activeFrameStroke) {
       const hit = getFrameAtPoint(currentPoint);
       if (!hit) { skipNextSegment = true; return; }
-      ensureFrameSheet();
+      ensureFrameSheet(true);
 
       const u = Math.min(1, Math.max(0, hit.localX / Math.max(1, hit.width)));
       const v = Math.min(1, Math.max(0, hit.localY / Math.max(1, hit.height)));
@@ -8792,7 +8738,7 @@ function getLongStrokeTrailFrames() {
     // If a previous trail is still around, restore + reset first
     stopLongStrokeDecayTimer();
     cancelLongStrokeTrail(true);
-    ensureFrameSheet();
+    ensureFrameSheet(true);
 
     // Reset virtual tick baseline for stopped-animation mode
     longStrokeVirtualTick = (state.isPlaying && typeof state.currentTick === 'number') ? state.currentTick : 0;
@@ -9082,7 +9028,7 @@ function stampLongStrokeFrame(frameIdx) {
   // Draw accumulated long stroke path on a specific frame (legacy mode only)
   function drawLongStrokeOnFrame(frameIdx) {
     if (longStrokePath.length < 1) return;
-    ensureFrameSheet();
+    ensureFrameSheet(true);
     captureUndoFrameTile(frameIdx);
 
     const fadeFrames = state.longStrokeFade || 0;
@@ -9285,7 +9231,7 @@ function stampLongStrokeFrame(frameIdx) {
         return;
       }
       holdStampLastFrame = hit.frameIdx;
-      ensureFrameSheet();
+      ensureFrameSheet(true);
       const u = Math.min(1, Math.max(0, hit.localX / Math.max(1, hit.width)));
       const v = Math.min(1, Math.max(0, hit.localY / Math.max(1, hit.height)));
       const sp = sheetPoint(hit.frameIdx, u, v);
@@ -9356,7 +9302,7 @@ function stampLongStrokeFrame(frameIdx) {
       if (state.drawTarget === 'frame' && activeFrameStroke) {
         const hit0 = getFrameAtPoint(currentPoint);
         if (!hit0) return;
-        ensureFrameSheet();
+        ensureFrameSheet(true);
         const u0 = Math.min(1, Math.max(0, hit0.localX / Math.max(1, hit0.width)));
         const v0 = Math.min(1, Math.max(0, hit0.localY / Math.max(1, hit0.height)));
         const sp0 = sheetPoint(hit0.frameIdx, u0, v0);
@@ -9388,7 +9334,7 @@ function stampLongStrokeFrame(frameIdx) {
     if (state.drawTarget === 'frame' && activeFrameStroke) {
       const hit = getFrameAtPoint(currentPoint);
       if (!hit) { skipNextSegment = true; return; }
-      ensureFrameSheet();
+      ensureFrameSheet(true);
       
       const u = Math.min(1, Math.max(0, hit.localX / Math.max(1, hit.width)));
       const v = Math.min(1, Math.max(0, hit.localY / Math.max(1, hit.height)));
@@ -9519,7 +9465,7 @@ function stampLongStrokeFrame(frameIdx) {
       const hit = getFrameAtPoint(pt);
       if (!hit) { isDrawing = false; lastPoint = null; _activePointerId = null; _pointerEventsActive = false; return; }
       holdStampLastFrame = hit.frameIdx;
-      ensureFrameSheet();
+      ensureFrameSheet(true);
       const u = Math.min(1, Math.max(0, hit.localX / Math.max(1, hit.width)));
       const v = Math.min(1, Math.max(0, hit.localY / Math.max(1, hit.height)));
       const sp = sheetPoint(hit.frameIdx, u, v);
@@ -9556,7 +9502,7 @@ function stampLongStrokeFrame(frameIdx) {
         if (state.drawTarget === 'frame' && activeFrameStroke) {
           const hit0 = getFrameAtPoint(currentPoint);
           if (!hit0) continue;
-          ensureFrameSheet();
+          ensureFrameSheet(true);
           const u0 = Math.min(1, Math.max(0, hit0.localX / Math.max(1, hit0.width)));
           const v0 = Math.min(1, Math.max(0, hit0.localY / Math.max(1, hit0.height)));
           const sp0 = sheetPoint(hit0.frameIdx, u0, v0);
@@ -9581,7 +9527,7 @@ function stampLongStrokeFrame(frameIdx) {
       if (state.drawTarget === 'frame' && activeFrameStroke) {
         const hit = getFrameAtPoint(currentPoint);
         if (!hit) { skipNextSegment = true; continue; }
-        ensureFrameSheet();
+        ensureFrameSheet(true);
         const u = Math.min(1, Math.max(0, hit.localX / Math.max(1, hit.width)));
         const v = Math.min(1, Math.max(0, hit.localY / Math.max(1, hit.height)));
         const sp = sheetPoint(hit.frameIdx, u, v);
@@ -9672,7 +9618,8 @@ function stampLongStrokeFrame(frameIdx) {
     bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
     bgCtxSingle.clearRect(0, 0, bgCanvasSingle.width, bgCanvasSingle.height);
     tplCtx.clearRect(0, 0, tplCanvas.width, tplCanvas.height);
-    frameSheetCtx.clearRect(0, 0, frameSheetCanvas.width, frameSheetCanvas.height);
+    frameSheetCanvas.width = 0;
+    frameSheetCanvas.height = 0;
     drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
 
     // Reset stored ImageData / caches
@@ -10389,7 +10336,8 @@ if (refFrameOffXSlider) refFrameOffXSlider.disabled = !hasRef;
       renderTemplateFramePreview();
       
     } else if (state.drawTarget === 'frame') {
-      frameSheetCtx.clearRect(0, 0, frameSheetCanvas.width, frameSheetCanvas.height);
+      frameSheetCanvas.width = 0;
+      frameSheetCanvas.height = 0;
       state.frameDrawings = {};
       state.frameSheetDrawing = null;
       
@@ -10418,7 +10366,7 @@ if (refFrameOffXSlider) refFrameOffXSlider.disabled = !hasRef;
   function applyTemplateToFrames() {
     // Bake TEMPLATE layer into per-frame sheet, then clear TEMPLATE
     ensureTplCanvasSized();
-    ensureFrameSheet();
+    ensureFrameSheet(true);
 
     if (!tplCanvas || !tplCanvas.width || !tplCanvas.height) return;
     if (!frameSheetCanvas || !frameSheetCanvas.width || !frameSheetCanvas.height) return;
@@ -10646,7 +10594,7 @@ function updateEdgeSoftness(val) {
       tLast = mapPoint(ev);
       drawDot(tplCtx, tLast, state.drawColor, getTemplateFrameBrushSize(), state.drawEraser);
       saveCurrentLayer();
-      compositeAllLayers();
+      requestComposite();
       ev.preventDefault();
     };
     templateFrameCanvas.onmousemove = ev => {
@@ -10655,7 +10603,7 @@ function updateEdgeSoftness(val) {
       drawSmoothLine(tplCtx, tLast, p, state.drawColor, getTemplateFrameBrushSize(), state.drawEraser);
       tLast = p;
       saveCurrentLayer();
-      compositeAllLayers();
+      requestComposite();
     };
     templateFrameCanvas.onmouseup = () => { tDrawing = false; tLast = null; saveCurrentLayer(); };
     templateFrameCanvas.onmouseleave = () => { tDrawing = false; tLast = null; saveCurrentLayer(); };
@@ -10670,7 +10618,7 @@ function updateEdgeSoftness(val) {
       tLast = mapPoint(ev);
       drawDot(tplCtx, tLast, state.drawColor, getTemplateFrameBrushSize(), state.drawEraser);
       saveCurrentLayer();
-      compositeAllLayers();
+      requestComposite();
       ev.preventDefault();
     };
     templateFrameCanvas.ontouchmove = ev => {
@@ -10679,7 +10627,7 @@ function updateEdgeSoftness(val) {
       drawSmoothLine(tplCtx, tLast, p, state.drawColor, getTemplateFrameBrushSize(), state.drawEraser);
       tLast = p;
       saveCurrentLayer();
-      compositeAllLayers();
+      requestComposite();
       ev.preventDefault();
     };
     templateFrameCanvas.ontouchend = () => { tDrawing = false; tLast = null; saveCurrentLayer(); };
@@ -16066,7 +16014,7 @@ function audioInitUI() {
       if (sp.frameSheetBlob) {
         try {
           const bitmap = await createImageBitmap(sp.frameSheetBlob);
-          ensureFrameSheet();
+          ensureFrameSheet(true);
           frameSheetCtx.clearRect(0, 0, frameSheetCanvas.width, frameSheetCanvas.height);
           frameSheetCtx.drawImage(bitmap, 0, 0);
           bitmap.close();
@@ -16077,7 +16025,8 @@ function audioInitUI() {
         } catch(e) {}
       } else {
         // slot was saved with empty frameSheet — clear it
-        if (frameSheetCanvas) frameSheetCtx.clearRect(0, 0, frameSheetCanvas.width, frameSheetCanvas.height);
+        frameSheetCanvas.width = 0;
+        frameSheetCanvas.height = 0;
         state.frameSheetDrawing = null;
       }
 

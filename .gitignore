@@ -12,3 +12,9 @@ docs/PROJECT_NARRATIVE.md
 docs/Animation Grids.md
 docs/teory/
 FrameGrid 313a0c4a812c8080aea8cf392b536cc6.md
+
+# Local experimental runs and deployment linkage
+.timegrid-bench/
+.vercel/
+.env.*
+!.env.example

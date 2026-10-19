@@ -1,0 +1,1017 @@
+{
+  "meta": {
+    "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+    "gpu": {
+      "renderer": "ANGLE (AMD, AMD Radeon(TM) 890M Graphics (0x0000150E) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "vendor": "Google Inc. (AMD)",
+      "mode": "Integrated / Auto",
+      "hint": "You can force Chrome to High Performance in Windows Graphics settings"
+    },
+    "hardwareConcurrency": 24
+  },
+  "cases": [
+    {
+      "label": "import-default24",
+      "wallMs": 3461,
+      "sourceActualFps": 24,
+      "sourceActualFrames": 192,
+      "reported": {
+        "videoFps": 30,
+        "endFrame": 239,
+        "capture": [
+          960,
+          540
+        ]
+      },
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 1,
+          "sumMs": 1.7,
+          "medianMs": 1.7,
+          "p95Ms": 1.7,
+          "maxMs": 1.7
+        },
+        "compositeAllLayers": {
+          "calls": 3,
+          "sumMs": 2.5,
+          "medianMs": 0.2,
+          "p95Ms": 2.1,
+          "maxMs": 2.1
+        },
+        "captureFrame": {
+          "calls": 24,
+          "sumMs": 4.6,
+          "medianMs": 0.2,
+          "p95Ms": 0.4,
+          "maxMs": 0.6
+        },
+        "drawImageHQ": {
+          "calls": 24,
+          "sumMs": 20.9,
+          "medianMs": 0.9,
+          "p95Ms": 1.3,
+          "maxMs": 1.4
+        },
+        "audioUpdateChips": {
+          "calls": 1,
+          "sumMs": 0.1,
+          "medianMs": 0.1,
+          "p95Ms": 0.1,
+          "maxMs": 0.1
+        },
+        "ensureFrameSheet": {
+          "calls": 1,
+          "sumMs": 50.7,
+          "medianMs": 50.7,
+          "p95Ms": 50.7,
+          "maxMs": 50.7
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 42,
+        "getImageData": 9
+      },
+      "tick": 0,
+      "uiFps": 54,
+      "compAvg": 1.485500001385808,
+      "canvases": {
+        "sheet": [
+          3840,
+          3240
+        ],
+        "draw": [
+          300,
+          150
+        ],
+        "bg": [
+          300,
+          150
+        ],
+        "bgSingle": [
+          300,
+          150
+        ],
+        "tpl": [
+          960,
+          540
+        ]
+      },
+      "cells": 24,
+      "visibleCells": 24,
+      "svgFilters": 1
+    },
+    {
+      "label": "24-plain",
+      "wallMs": 2204,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 30,
+          "sumMs": 12,
+          "medianMs": 0.4,
+          "p95Ms": 0.6,
+          "maxMs": 0.7
+        },
+        "audioUpdateChips": {
+          "calls": 30,
+          "sumMs": 1.4,
+          "medianMs": 0,
+          "p95Ms": 0.1,
+          "maxMs": 0.1
+        },
+        "updateAllCells": {
+          "calls": 30,
+          "sumMs": 33.2,
+          "medianMs": 1.1,
+          "p95Ms": 1.4,
+          "maxMs": 1.5
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 24
+      },
+      "tick": 30,
+      "uiFps": 60,
+      "compAvg": 1.485500001385808,
+      "canvases": {
+        "sheet": [
+          3840,
+          3240
+        ],
+        "draw": [
+          300,
+          150
+        ],
+        "bg": [
+          300,
+          150
+        ],
+        "bgSingle": [
+          300,
+          150
+        ],
+        "tpl": [
+          960,
+          540
+        ]
+      },
+      "cells": 24,
+      "visibleCells": 24,
+      "svgFilters": 1
+    },
+    {
+      "label": "24-colorama-cascade",
+      "wallMs": 2204,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 30,
+          "sumMs": 40.3,
+          "medianMs": 1.4,
+          "p95Ms": 1.8,
+          "maxMs": 1.9
+        },
+        "audioUpdateChips": {
+          "calls": 30,
+          "sumMs": 1.1,
+          "medianMs": 0,
+          "p95Ms": 0.1,
+          "maxMs": 0.1
+        },
+        "updateAllCells": {
+          "calls": 30,
+          "sumMs": 60.7,
+          "medianMs": 2,
+          "p95Ms": 2.5,
+          "maxMs": 2.6
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 24
+      },
+      "tick": 30,
+      "uiFps": 60,
+      "compAvg": 1.485500001385808,
+      "canvases": {
+        "sheet": [
+          3840,
+          3240
+        ],
+        "draw": [
+          300,
+          150
+        ],
+        "bg": [
+          300,
+          150
+        ],
+        "bgSingle": [
+          300,
+          150
+        ],
+        "tpl": [
+          960,
+          540
+        ]
+      },
+      "cells": 24,
+      "visibleCells": 24,
+      "svgFilters": 25
+    },
+    {
+      "label": "24-chrono-depth8",
+      "wallMs": 2202,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 30,
+          "sumMs": 11.8,
+          "medianMs": 0.4,
+          "p95Ms": 0.5,
+          "maxMs": 0.6
+        },
+        "audioUpdateChips": {
+          "calls": 30,
+          "sumMs": 1,
+          "medianMs": 0,
+          "p95Ms": 0.1,
+          "maxMs": 0.1
+        },
+        "updateAllCells": {
+          "calls": 30,
+          "sumMs": 105.9,
+          "medianMs": 3.6,
+          "p95Ms": 4.6,
+          "maxMs": 5
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 24
+      },
+      "tick": 30,
+      "uiFps": 60,
+      "compAvg": 1.485500001385808,
+      "canvases": {
+        "sheet": [
+          3840,
+          3240
+        ],
+        "draw": [
+          300,
+          150
+        ],
+        "bg": [
+          300,
+          150
+        ],
+        "bgSingle": [
+          300,
+          150
+        ],
+        "tpl": [
+          960,
+          540
+        ]
+      },
+      "cells": 24,
+      "visibleCells": 24,
+      "svgFilters": 1
+    },
+    {
+      "label": "24-motion-mask",
+      "wallMs": 2203,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 30,
+          "sumMs": 8.4,
+          "medianMs": 0.3,
+          "p95Ms": 0.4,
+          "maxMs": 0.4
+        },
+        "renderFrameDiffMotionMask": {
+          "calls": 720,
+          "sumMs": 979.6,
+          "medianMs": 1.2,
+          "p95Ms": 2.6,
+          "maxMs": 10
+        },
+        "audioUpdateChips": {
+          "calls": 30,
+          "sumMs": 1.9,
+          "medianMs": 0.1,
+          "p95Ms": 0.1,
+          "maxMs": 0.1
+        },
+        "updateAllCells": {
+          "calls": 30,
+          "sumMs": 1231.7,
+          "medianMs": 37.2,
+          "p95Ms": 82,
+          "maxMs": 97.5
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 24
+      },
+      "tick": 30,
+      "uiFps": 46,
+      "compAvg": 1.485500001385808,
+      "canvases": {
+        "sheet": [
+          3840,
+          3240
+        ],
+        "draw": [
+          300,
+          150
+        ],
+        "bg": [
+          300,
+          150
+        ],
+        "bgSingle": [
+          300,
+          150
+        ],
+        "tpl": [
+          960,
+          540
+        ]
+      },
+      "cells": 24,
+      "visibleCells": 24,
+      "svgFilters": 1
+    },
+    {
+      "label": "import-96-q0.5",
+      "wallMs": 9535,
+      "stats": {
+        "captureFrame": {
+          "calls": 96,
+          "sumMs": 20.1,
+          "medianMs": 0.2,
+          "p95Ms": 0.5,
+          "maxMs": 0.8
+        },
+        "compositeAllLayers": {
+          "calls": 3,
+          "sumMs": 1.2,
+          "medianMs": 0.1,
+          "p95Ms": 1,
+          "maxMs": 1
+        },
+        "drawImageHQ": {
+          "calls": 96,
+          "sumMs": 87.4,
+          "medianMs": 0.7,
+          "p95Ms": 1.6,
+          "maxMs": 1.7
+        },
+        "audioUpdateChips": {
+          "calls": 1,
+          "sumMs": 0.1,
+          "medianMs": 0.1,
+          "p95Ms": 0.1,
+          "maxMs": 0.1
+        },
+        "ensureFrameSheet": {
+          "calls": 1,
+          "sumMs": 165.2,
+          "medianMs": 165.2,
+          "p95Ms": 165.2,
+          "maxMs": 165.2
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 115,
+        "getImageData": 9
+      },
+      "tick": 30,
+      "uiFps": 41,
+      "compAvg": 1.0375701841131693,
+      "canvases": {
+        "sheet": [
+          7552,
+          6360
+        ],
+        "draw": [
+          300,
+          150
+        ],
+        "bg": [
+          300,
+          150
+        ],
+        "bgSingle": [
+          300,
+          150
+        ],
+        "tpl": [
+          944,
+          530
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 96,
+      "svgFilters": 1
+    },
+    {
+      "label": "96-q0.5-plain",
+      "wallMs": 2204,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 30,
+          "sumMs": 10.5,
+          "medianMs": 0.4,
+          "p95Ms": 0.5,
+          "maxMs": 0.5
+        },
+        "audioUpdateChips": {
+          "calls": 30,
+          "sumMs": 2,
+          "medianMs": 0.1,
+          "p95Ms": 0.2,
+          "maxMs": 0.2
+        },
+        "updateAllCells": {
+          "calls": 30,
+          "sumMs": 73.2,
+          "medianMs": 2.4,
+          "p95Ms": 3.2,
+          "maxMs": 3.3
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 96
+      },
+      "tick": 30,
+      "uiFps": 60,
+      "compAvg": 1.0375701841131693,
+      "canvases": {
+        "sheet": [
+          7552,
+          6360
+        ],
+        "draw": [
+          300,
+          150
+        ],
+        "bg": [
+          300,
+          150
+        ],
+        "bgSingle": [
+          300,
+          150
+        ],
+        "tpl": [
+          944,
+          530
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 96,
+      "svgFilters": 1
+    },
+    {
+      "label": "96-q0.5-motion-mask",
+      "wallMs": 2357,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 12,
+          "sumMs": 3.6,
+          "medianMs": 0.3,
+          "p95Ms": 0.4,
+          "maxMs": 0.4
+        },
+        "renderFrameDiffMotionMask": {
+          "calls": 1152,
+          "sumMs": 1814.8,
+          "medianMs": 1.2,
+          "p95Ms": 4,
+          "maxMs": 8.2
+        },
+        "audioUpdateChips": {
+          "calls": 12,
+          "sumMs": 1.9,
+          "medianMs": 0.2,
+          "p95Ms": 0.2,
+          "maxMs": 0.2
+        },
+        "updateAllCells": {
+          "calls": 12,
+          "sumMs": 2196.1,
+          "medianMs": 147.4,
+          "p95Ms": 367.5,
+          "maxMs": 367.5
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 96
+      },
+      "tick": 12,
+      "uiFps": 7,
+      "compAvg": 1.0375701841131693,
+      "canvases": {
+        "sheet": [
+          7552,
+          6360
+        ],
+        "draw": [
+          300,
+          150
+        ],
+        "bg": [
+          300,
+          150
+        ],
+        "bgSingle": [
+          300,
+          150
+        ],
+        "tpl": [
+          944,
+          530
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 96,
+      "svgFilters": 1
+    },
+    {
+      "label": "96-q0.5-single",
+      "wallMs": 2203,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 30,
+          "sumMs": 9,
+          "medianMs": 0.3,
+          "p95Ms": 0.4,
+          "maxMs": 0.4
+        },
+        "audioUpdateChips": {
+          "calls": 30,
+          "sumMs": 2.2,
+          "medianMs": 0.1,
+          "p95Ms": 0.2,
+          "maxMs": 0.2
+        },
+        "updateAllCells": {
+          "calls": 30,
+          "sumMs": 63.6,
+          "medianMs": 2.2,
+          "p95Ms": 2.7,
+          "maxMs": 2.8
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 96
+      },
+      "tick": 30,
+      "uiFps": 60,
+      "compAvg": 0.8969346556021242,
+      "canvases": {
+        "sheet": [
+          7552,
+          6360
+        ],
+        "draw": [
+          300,
+          150
+        ],
+        "bg": [
+          300,
+          150
+        ],
+        "bgSingle": [
+          300,
+          150
+        ],
+        "tpl": [
+          944,
+          530
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 1,
+      "svgFilters": 1
+    },
+    {
+      "label": "96-q0.5-draw-cross-grid",
+      "stats": {},
+      "counters": {
+        "getBoundingClientRect": 192
+      },
+      "tick": 30,
+      "uiFps": 60,
+      "compAvg": 3.1984049928079097,
+      "canvases": {
+        "sheet": [
+          7552,
+          6360
+        ],
+        "draw": [
+          2960,
+          2660
+        ],
+        "bg": [
+          2960,
+          2660
+        ],
+        "bgSingle": [
+          2960,
+          2660
+        ],
+        "tpl": [
+          1024,
+          576
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 96,
+      "svgFilters": 1
+    },
+    {
+      "label": "import-96-q0.125",
+      "wallMs": 8999,
+      "stats": {
+        "captureFrame": {
+          "calls": 96,
+          "sumMs": 15.5,
+          "medianMs": 0.1,
+          "p95Ms": 0.5,
+          "maxMs": 0.6
+        },
+        "compositeAllLayers": {
+          "calls": 3,
+          "sumMs": 6.3,
+          "medianMs": 1.5,
+          "p95Ms": 3.3,
+          "maxMs": 3.3
+        },
+        "drawImageHQ": {
+          "calls": 96,
+          "sumMs": 97.8,
+          "medianMs": 0.9,
+          "p95Ms": 1.9,
+          "maxMs": 2.7
+        },
+        "audioUpdateChips": {
+          "calls": 1,
+          "sumMs": 0,
+          "medianMs": 0,
+          "p95Ms": 0,
+          "maxMs": 0
+        },
+        "ensureFrameSheet": {
+          "calls": 1,
+          "sumMs": 11,
+          "medianMs": 11,
+          "p95Ms": 11,
+          "maxMs": 11
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 691,
+        "getImageData": 9
+      },
+      "tick": 30,
+      "uiFps": 54,
+      "compAvg": 2.761695464574245,
+      "canvases": {
+        "sheet": [
+          1920,
+          1632
+        ],
+        "draw": [
+          2960,
+          2660
+        ],
+        "bg": [
+          2960,
+          2660
+        ],
+        "bgSingle": [
+          2960,
+          2660
+        ],
+        "tpl": [
+          240,
+          136
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 96,
+      "svgFilters": 1
+    },
+    {
+      "label": "96-q0.125-plain",
+      "wallMs": 2203,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 30,
+          "sumMs": 10.3,
+          "medianMs": 0.3,
+          "p95Ms": 0.5,
+          "maxMs": 0.6
+        },
+        "audioUpdateChips": {
+          "calls": 30,
+          "sumMs": 2.2,
+          "medianMs": 0.1,
+          "p95Ms": 0.1,
+          "maxMs": 0.2
+        },
+        "updateAllCells": {
+          "calls": 30,
+          "sumMs": 69.2,
+          "medianMs": 2.3,
+          "p95Ms": 2.7,
+          "maxMs": 2.7
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 96
+      },
+      "tick": 30,
+      "uiFps": 60,
+      "compAvg": 2.761695464574245,
+      "canvases": {
+        "sheet": [
+          1920,
+          1632
+        ],
+        "draw": [
+          2960,
+          2660
+        ],
+        "bg": [
+          2960,
+          2660
+        ],
+        "bgSingle": [
+          2960,
+          2660
+        ],
+        "tpl": [
+          240,
+          136
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 96,
+      "svgFilters": 1
+    },
+    {
+      "label": "96-q0.125-motion-mask",
+      "wallMs": 2238,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 19,
+          "sumMs": 6,
+          "medianMs": 0.3,
+          "p95Ms": 1,
+          "maxMs": 1
+        },
+        "renderFrameDiffMotionMask": {
+          "calls": 1824,
+          "sumMs": 1642,
+          "medianMs": 0.8,
+          "p95Ms": 1.3,
+          "maxMs": 7.6
+        },
+        "audioUpdateChips": {
+          "calls": 19,
+          "sumMs": 2.6,
+          "medianMs": 0.1,
+          "p95Ms": 0.3,
+          "maxMs": 0.3
+        },
+        "updateAllCells": {
+          "calls": 19,
+          "sumMs": 2050,
+          "medianMs": 100.8,
+          "p95Ms": 134.4,
+          "maxMs": 134.4
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 96
+      },
+      "tick": 19,
+      "uiFps": 9,
+      "compAvg": 2.761695464574245,
+      "canvases": {
+        "sheet": [
+          1920,
+          1632
+        ],
+        "draw": [
+          2960,
+          2660
+        ],
+        "bg": [
+          2960,
+          2660
+        ],
+        "bgSingle": [
+          2960,
+          2660
+        ],
+        "tpl": [
+          240,
+          136
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 96,
+      "svgFilters": 1
+    },
+    {
+      "label": "96-q0.125-single",
+      "wallMs": 2202,
+      "stats": {
+        "updateColoramaSVG": {
+          "calls": 30,
+          "sumMs": 11.2,
+          "medianMs": 0.4,
+          "p95Ms": 0.5,
+          "maxMs": 0.5
+        },
+        "audioUpdateChips": {
+          "calls": 30,
+          "sumMs": 2,
+          "medianMs": 0.1,
+          "p95Ms": 0.2,
+          "maxMs": 0.2
+        },
+        "updateAllCells": {
+          "calls": 30,
+          "sumMs": 63,
+          "medianMs": 2.2,
+          "p95Ms": 2.6,
+          "maxMs": 2.7
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 96
+      },
+      "tick": 30,
+      "uiFps": 60,
+      "compAvg": 2.4824411457821776,
+      "canvases": {
+        "sheet": [
+          1920,
+          1632
+        ],
+        "draw": [
+          2960,
+          2660
+        ],
+        "bg": [
+          2960,
+          2660
+        ],
+        "bgSingle": [
+          2960,
+          2660
+        ],
+        "tpl": [
+          240,
+          136
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 1,
+      "svgFilters": 1
+    },
+    {
+      "label": "96-q0.125-draw-cross-grid",
+      "stats": {
+        "ensureFrameSheet": {
+          "calls": 1691,
+          "sumMs": 3.2,
+          "medianMs": 0,
+          "p95Ms": 0,
+          "maxMs": 0.1
+        },
+        "getFrameAtPoint": {
+          "calls": 568,
+          "sumMs": 70,
+          "medianMs": 0.1,
+          "p95Ms": 0.3,
+          "maxMs": 1.7
+        },
+        "compositeAllLayers": {
+          "calls": 21,
+          "sumMs": 20.8,
+          "medianMs": 0.9,
+          "p95Ms": 1.6,
+          "maxMs": 3.1
+        },
+        "drawFrameStrokeResampled": {
+          "calls": 14,
+          "sumMs": 156.7,
+          "medianMs": 10.4,
+          "p95Ms": 40,
+          "maxMs": 40
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 36857,
+        "getImageData": 15
+      },
+      "tick": 30,
+      "uiFps": 56,
+      "compAvg": 0.9499398036981663,
+      "canvases": {
+        "sheet": [
+          1920,
+          1632
+        ],
+        "draw": [
+          2960,
+          2660
+        ],
+        "bg": [
+          2960,
+          2660
+        ],
+        "bgSingle": [
+          2960,
+          2660
+        ],
+        "tpl": [
+          1024,
+          576
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 96,
+      "svgFilters": 1
+    },
+    {
+      "label": "final",
+      "stats": {
+        "ensureFrameSheet": {
+          "calls": 1691,
+          "sumMs": 3.2,
+          "medianMs": 0,
+          "p95Ms": 0,
+          "maxMs": 0.1
+        },
+        "getFrameAtPoint": {
+          "calls": 568,
+          "sumMs": 70,
+          "medianMs": 0.1,
+          "p95Ms": 0.3,
+          "maxMs": 1.7
+        },
+        "compositeAllLayers": {
+          "calls": 21,
+          "sumMs": 20.8,
+          "medianMs": 0.9,
+          "p95Ms": 1.6,
+          "maxMs": 3.1
+        },
+        "drawFrameStrokeResampled": {
+          "calls": 14,
+          "sumMs": 156.7,
+          "medianMs": 10.4,
+          "p95Ms": 40,
+          "maxMs": 40
+        }
+      },
+      "counters": {
+        "getBoundingClientRect": 36953,
+        "getImageData": 15
+      },
+      "tick": 30,
+      "uiFps": 56,
+      "compAvg": 0.9499398036981663,
+      "canvases": {
+        "sheet": [
+          1920,
+          1632
+        ],
+        "draw": [
+          2960,
+          2660
+        ],
+        "bg": [
+          2960,
+          2660
+        ],
+        "bgSingle": [
+          2960,
+          2660
+        ],
+        "tpl": [
+          1024,
+          576
+        ]
+      },
+      "cells": 96,
+      "visibleCells": 96,
+      "svgFilters": 1
+    }
+  ],
+  "errors": []
+}

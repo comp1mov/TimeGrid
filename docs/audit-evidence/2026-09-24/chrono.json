@@ -1,0 +1,69 @@
+{
+  "cases": [
+    {
+      "quality": 0.5,
+      "depth": 8,
+      "wallMs": 2613,
+      "ticks": 36,
+      "uiFps": 60,
+      "capture": [
+        960,
+        540
+      ],
+      "images": 864,
+      "updates": 36,
+      "medianMs": 7.0999999940395355,
+      "p95Ms": 7.699999988079071,
+      "maxMs": 7.700000017881393
+    },
+    {
+      "quality": 0.5,
+      "depth": 32,
+      "wallMs": 2637,
+      "ticks": 36,
+      "uiFps": 42,
+      "capture": [
+        960,
+        540
+      ],
+      "images": 3168,
+      "updates": 36,
+      "medianMs": 22.299999982118607,
+      "p95Ms": 24.5,
+      "maxMs": 24.69999998807907
+    },
+    {
+      "quality": 0.125,
+      "depth": 8,
+      "wallMs": 2605,
+      "ticks": 36,
+      "uiFps": 60,
+      "capture": [
+        240,
+        135
+      ],
+      "images": 864,
+      "updates": 36,
+      "medianMs": 7,
+      "p95Ms": 7.600000023841858,
+      "maxMs": 7.700000017881393
+    },
+    {
+      "quality": 0.125,
+      "depth": 32,
+      "wallMs": 2635,
+      "ticks": 36,
+      "uiFps": 46,
+      "capture": [
+        240,
+        135
+      ],
+      "images": 3168,
+      "updates": 36,
+      "medianMs": 22.19999998807907,
+      "p95Ms": 23.899999976158142,
+      "maxMs": 23.900000005960464
+    }
+  ],
+  "errors": []
+}
