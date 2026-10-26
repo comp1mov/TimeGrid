@@ -1,0 +1,61 @@
+{
+  "url": "http://127.0.0.1:5197/drawing-lab.html?verifyPixels=1",
+  "checks": [
+    {
+      "name": "empty 96 frames allocate zero cache tiles",
+      "passed": true
+    },
+    {
+      "name": "cross-cell stroke, pixel (RGB tolerance 2) undo and redo",
+      "passed": true,
+      "details": {
+        "surfaces": 8,
+        "geometryReads": 1,
+        "moveSteps": 120
+      }
+    },
+    {
+      "name": "partial eraser and opacity restore within RGB tolerance 2",
+      "passed": true
+    },
+    {
+      "name": "real download, page destruction, open and pixel (RGB tolerance 2) roundtrip",
+      "passed": true
+    },
+    {
+      "name": "bad file leaves current document intact",
+      "passed": true
+    },
+    {
+      "name": "zoom and Clear/Undo preserve contours and pixels",
+      "passed": true
+    },
+    {
+      "name": "playback preserves drawings",
+      "passed": true
+    },
+    {
+      "name": "LRU eviction obeys budget and reconstructs exact tiles",
+      "passed": true,
+      "details": {
+        "exact": true,
+        "stats": {
+          "tiles": 4,
+          "bytes": 282880,
+          "budget": 300000,
+          "hits": 340,
+          "misses": 1251,
+          "evictions": 1160,
+          "pathCount": 97,
+          "rasterMs": 115.90000039339066
+        }
+      }
+    },
+    {
+      "name": "390px touch emulation draws, no horizontal overflow",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "date": "2026-10-26T19:12:12.080Z"
+}

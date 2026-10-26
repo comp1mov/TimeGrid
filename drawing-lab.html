@@ -7,16 +7,15 @@
       content="width=device-width,initial-scale=1,viewport-fit=cover"
     />
     <meta name="theme-color" content="#171820" />
-    <title>TimeGrid Drawing Lab 28.35.0-drawing.2</title>
+    <title>TimeGrid Drawing Lab 28.35.0-drawing.3</title>
     <link rel="stylesheet" href="./src/styles/drawing-lab.css" />
   </head>
   <body>
     <header>
       <div>
         <strong>TimeGrid <span class="accent">Drawing Lab</span></strong
-        ><small>28.35.0-drawing.2 · perfect-freehand prototype</small>
+        ><small>28.35.0-drawing.3 · perfect-freehand prototype</small>
       </div>
-      <a href="./index.html">TimeGrid drawing.2 app ↗</a>
     </header>
     <main>
       <section class="toolbar" aria-label="Drawing tools">
@@ -41,29 +40,46 @@
           </select></label
         >
         <label>Color<input id="color" type="color" value="#ff7799" /></label>
+
+        <label class="width-control"
+          >Width <output id="sizeOut">32</output>
+          <span class="width-inputs"
+            ><input
+              id="size"
+              aria-label="Brush width"
+              type="range"
+              min="2"
+              max="180"
+              value="32" />
+            <input
+              id="sizeNumber"
+              aria-label="Brush width in frame pixels"
+              type="number"
+              min="2"
+              max="180"
+              value="32"
+          /></span>
+        </label>
         <label
-          >Size <output id="sizeOut">18</output
-          ><input id="size" type="range" min="2" max="180" value="18"
+          >Opacity <output id="opacityOut">100</output
+          ><input id="opacity" type="range" min="5" max="100" value="100"
+        /></label>
+        <label title="Smooths the outline edge"
+          >Edge smoothing <output id="smoothOut">50</output
+          ><input id="smooth" type="range" min="0" max="100" value="50"
         /></label>
         <label
-          >Opacity<input
-            id="opacity"
-            type="range"
-            min="5"
-            max="100"
-            value="100"
-        /></label>
-        <label
-          >Smoothing<input
-            id="smooth"
-            type="range"
-            min="0"
-            max="100"
-            value="35"
+          title="Stabilizes the input trajectory. Higher values follow your hand more slowly."
+          >Stabilizer <output id="streamlineOut">50</output
+          ><input id="streamline" type="range" min="0" max="100" value="50"
         /></label>
         <label class="check"
           ><input id="pressure" type="checkbox" checked /> Pen pressure</label
         >
+        <label class="check"
+          ><input id="velocity" type="checkbox" /> Vary with speed</label
+        >
+        <small id="brushHint"></small>
       </section>
       <section class="actions" aria-label="Document and view">
         <button id="undo" disabled>Undo</button
@@ -96,20 +112,26 @@
       <details>
         <summary>What to test</summary>
         <p>
-          Draw across cells, try TPL, erase part of a line, Undo/Redo, then Save
-          → Open. Grid and Single are views of the same frame drawings. BG has
-          separate Grid/Single surfaces. Wheel or two fingers zoom; choose Pan
-          to move. Frame buttons and Play select the active frame. In Grid, the
-          frame number is highlighted.
+          Start in Single: change Width and Stabilizer, draw slow curves and
+          fast diagonals. Then draw across cells, try TPL, erase part of a line,
+          Undo/Redo, then Save → Open. Grid and Single are views of the same
+          frame drawings. BG has separate Grid/Single surfaces. Wheel or two
+          fingers zoom; choose Pan to move. Frame buttons and Play select the
+          active frame. In Grid, the frame number is highlighted.
         </p>
         <p>
-          This lab uses 96 generated test frames. It does not replace the
-          existing TimeGrid drawing tools, import old raster drawings, or save a
-          full media project. PNG exports the current view at 1536 × 1296 (Grid)
-          or 2048 × 1152 (Single), from saved contours. Undo history is
-          session-only, up to 100 gestures with a 16 MB geometry estimate budget
-          (the latest gesture is always retained). No uploads or cloud
-          processing. Browser closing requires Save first.
+          This lab uses 96 generated test frames. Drawing Lab has its own
+          version; this release updates only the lab. Each grid gesture keeps
+          one continuous contour shared by its affected frames. Width uses frame
+          pixels, so it looks smaller in Grid. It does not replace the existing
+          TimeGrid drawing tools, import old raster drawings, or save a full
+          media project. Files from Drawing Lab drawing.2 open with their
+          original contours. New files use schema 2 and need drawing.3 or newer.
+          PNG exports the current view at 1536 × 1296 (Grid) or 2048 × 1152
+          (Single), from saved contours. Undo history is session-only, up to 100
+          gestures with a 16 MB geometry estimate budget (the latest gesture is
+          always retained). No uploads or cloud processing. Browser closing
+          requires Save first.
         </p>
         <p>
           Benchmark runs in a separate temporary document, then downloads
@@ -118,6 +140,7 @@
           <a href="./licenses/perfect-freehand.txt"
             >perfect-freehand MIT license</a
           >
+          · <a href="./licenses/inter-OFL.txt">Inter font license</a>
         </p>
       </details>
     </main>

@@ -17,6 +17,11 @@
 - Documentation-only work gets a dated history entry and a plan revision where applicable; it must not pretend the unchanged stable application is a new release.
 - Before delivery, check version consistency, build the affected line, and run checks appropriate to the change. Report physical-device tests separately from emulation.
 
+## Independent Drawing Lab releases
+
+- Author clarification, 2026-10-26: lab-only changes must not release or renumber the ordinary application. Drawing Lab uses `drawing-lab.release.json`, its own HTML/APP_VERSION, README current-lab line and dated development-history entry. Root package/lock and ordinary HTML/APP_VERSION remain at the last ordinary-app release. Run `npm run build:lab`; publish only that artifact and licenses. Do not add an ordinary-app copy to a new lab URL.
+- Explain proposed changes before implementation. At delivery give one current test link, concrete checks, and the next step. Physical phone testing must be distinguished from emulation.
+
 ## Planning and audit evidence
 
 - Use `docs/DEVELOPMENT_PLAN_RU.md` as the current cross-line plan. Read the relevant audit sections and the latest development-history entry before implementation.

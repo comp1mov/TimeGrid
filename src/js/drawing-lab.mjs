@@ -1,7 +1,7 @@
 import {
   StrokeDocument,
   createStroke,
-  clipSegment,
+  renderInstances,
   surfaceSize,
   intersects,
   union,
@@ -9,7 +9,7 @@ import {
   LIMITS,
 } from './stroke-document.mjs';
 import { StrokeTileCache } from './stroke-cache.mjs';
-export const APP_VERSION = '28.35.0-drawing.2';
+export const APP_VERSION = '28.35.0-drawing.3';
 const $ = (id) => document.getElementById(id),
   canvas = $('canvas'),
   ctx = canvas.getContext('2d', {
@@ -91,6 +91,7 @@ function rects() {
     h: 576 * scale,
   }));
   $('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+  syncBrushControls();
 }
 function visible(r) {
   return intersects(r, { x: 0, y: 0, w: width, h: height });
@@ -124,7 +125,7 @@ function fixture(c, r) {
   c.lineWidth = r.id === activeFrame ? 2 : 1;
   c.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
   c.fillStyle = '#b7bdcf';
-  c.font = Math.max(8, Math.min(20, r.w * 0.12)) + 'px system-ui';
+  c.font = Math.max(8, Math.min(20, r.w * 0.12)) + 'px Inter, system-ui';
   c.fillText(
     String(r.id + 1).padStart(2, '0'),
     r.x + 5,
@@ -172,6 +173,9 @@ function drawScene(c, region, ratio = dpr, renderer = cache) {
   }
   c.restore();
 }
+function markStroke(s) {
+  for (const item of renderInstances(s)) markSurface(item.surface, item.box);
+}
 function refreshDrafts(last = false) {
   if (!gesture || gesture.mode !== 'draw') return;
   const changed = [];
@@ -186,7 +190,7 @@ function refreshDrafts(last = false) {
   }
   const old = cache.drafts;
   cache.setDrafts(gesture.segments.map((s) => s.stroke).filter(Boolean));
-  for (const s of [...old, ...changed]) markSurface(s.surface, s.box);
+  for (const s of [...old, ...changed]) markStroke(s);
 }
 function render(now) {
   scheduled = 0;
@@ -264,7 +268,11 @@ function point(e) {
   return [
     e.clientX - stageRect.left,
     e.clientY - stageRect.top,
-    e.pointerType === 'pen' ? Math.max(0.01, e.pressure) : 0.5,
+    e.pointerType === 'pen'
+      ? e.pressure > 0
+        ? e.pressure
+        : gesture?.lastPressure || 0.5
+      : 0.5,
   ];
 }
 function brush() {
@@ -275,81 +283,61 @@ function brush() {
     erase: $('tool').value === 'erase',
     pressure: $('pressure').checked,
     smoothing: Number($('smooth').value) / 100,
+    streamline: Number($('streamline').value) / 100,
+    simulatePressure: $('velocity').checked,
   };
 }
-function appendSegment(surface, cell, p) {
-  let s = gesture.segments.at(-1);
-  const last = s?.points.at(-1);
-  if (
-    !s ||
-    s.cell !== cell ||
-    s.surface !== surface ||
-    Math.hypot(last[0] - p[0], last[1] - p[1]) > 50
-  ) {
-    s = {
-      surface,
-      cell,
-      points: [],
-      options: { ...gesture.brush, id: doc.newId(), surface },
-      changed: true,
-    };
-    gesture.segments.push(s);
-  }
-  const prev = s.points.at(-1);
-  if (
-    !prev ||
-    Math.hypot(prev[0] - p[0], prev[1] - p[1]) > 0.2 ||
-    Math.abs(prev[2] - p[2]) > 0.005
-  ) {
-    if (s.points.length >= LIMITS.perStroke)
-      throw Error('Long-stroke limit reached. Start another stroke.');
-    s.points.push(p);
-    s.changed = true;
-  }
-  return s;
-}
+// A grid gesture is sampled in one stable sheet space. Only its completed
+// outline is placed into frames; cell borders never restart the brush.
 function feed(p) {
-  const previous = gesture.previous || p;
-  const target = gesture.target;
-  const placements = target === 'bg' ? [{ ...gridRect, id: 'bg' }] : layout;
-  const hits = [];
-  for (const r of placements) {
-    const clipped = clipSegment(previous, p, r);
-    if (clipped && clipped.a.every(Number.isFinite))
-      hits.push({ r, ...clipped });
-  }
-  hits.sort((a, b) => a.t - b.t);
-  for (const hit of hits) {
-    const surface =
-      target === 'bg'
-        ? 'bg-' + view
+  const g = gesture,
+    target = g.target;
+  const surface =
+    target === 'bg'
+      ? 'bg-' + g.view
+      : g.view === 'grid'
+        ? 'sheet'
         : target === 'tpl'
           ? 'tpl'
-          : 'frame-' + hit.r.id;
-    const ext = surfaceSize(surface);
-    const local = (q) => [
-      ((q[0] - hit.r.x) / hit.r.w) * ext.w,
-      ((q[1] - hit.r.y) / hit.r.h) * ext.h,
-      q[2],
-    ];
-    const a = local(hit.a),
-      b = local(hit.b);
-    const s = appendSegment(surface, hit.r.id, a);
-    const prev = s.points.at(-1);
-    if (
-      Math.hypot(prev[0] - b[0], prev[1] - b[1]) > 0.2 ||
-      Math.abs(prev[2] - b[2]) > 0.005
-    ) {
-      s.points.push(b);
-      s.changed = true;
-    }
+          : 'frame-' + activeFrame;
+  let segment = g.segments.at(-1);
+  if (!segment || segment.options.surface !== surface) {
+    segment = {
+      options: { ...g.brush, id: doc.newId(), surface, target },
+      points: [],
+      changed: true,
+    };
+    g.segments.push(segment);
   }
-  gesture.previous = p;
+  const ext = surfaceSize(surface),
+    q = [
+      Math.max(
+        -512,
+        Math.min(ext.w + 512, ((p[0] - g.rect.x) / g.rect.w) * ext.w),
+      ),
+      Math.max(
+        -512,
+        Math.min(ext.h + 512, ((p[1] - g.rect.y) / g.rect.h) * ext.h),
+      ),
+      p[2],
+    ];
+  const previous = segment.points.at(-1);
+  if (
+    !previous ||
+    Math.hypot(previous[0] - q[0], previous[1] - q[1]) > 0.2 ||
+    Math.abs(previous[2] - q[2]) > 0.005
+  ) {
+    if (segment.points.length >= LIMITS.perStroke)
+      throw Error('Long-stroke limit reached. Start another stroke.');
+    segment.points.push(q);
+    segment.changed = true;
+  }
+  g.lastPressure = p[2];
   metrics.samples++;
 }
 function cancelGesture() {
   if (gesture?.mode === 'draw') {
-    for (const s of cache.drafts) markSurface(s.surface, s.box);
+    for (const s of cache.drafts) markStroke(s);
     cache.setDrafts([]);
     schedule();
   }
@@ -363,7 +351,9 @@ function finish() {
   }
   try {
     refreshDrafts(true);
-    const strokes = gesture.segments.map((s) => s.stroke).filter(Boolean);
+    const strokes = gesture.segments
+      .map((s) => s.stroke)
+      .filter((s) => s && renderInstances(s).length);
     cache.setDrafts([]);
     gesture = null;
     doc.addGesture(strokes);
@@ -398,7 +388,14 @@ canvas.addEventListener('pointerdown', (e) => {
     mode: 'draw',
     segments: [],
     target: $('target').value,
-    brush: brush(),
+    brush: {
+      ...brush(),
+      pressure:
+        ($('pressure').checked && e.pointerType === 'pen') ||
+        $('velocity').checked,
+    },
+    view,
+    rect: { ...gridRect },
     previous: null,
     pointerId: e.pointerId,
   };
@@ -451,8 +448,14 @@ canvas.addEventListener('pointermove', (e) => {
 });
 canvas.addEventListener('pointerup', (e) => {
   if (gesture?.mode === 'draw' && e.pointerId === gesture.pointerId) {
-    feed(point(e));
-    finish();
+    try {
+      feed(point(e));
+      finish();
+    } catch (err) {
+      cancelGesture();
+      message = err.message;
+      schedule();
+    }
   } else if (pointers.size === 1) gesture = null;
   pointers.delete(e.pointerId);
   if (pointers.size < 2) nav = null;
@@ -515,9 +518,38 @@ $('view').onchange = () => {
   schedule();
 };
 for (const id of ['target', 'tool']) $(id).onchange = cancelGesture;
-$('size').oninput = () => {
-  $('sizeOut').value = $('size').value;
+function syncBrushControls(source) {
+  if (source === 'number') {
+    const n = Number($('sizeNumber').value);
+    if (n < 2 || n > 180) return;
+    $('size').value = String(n);
+  }
+  if (source !== 'number') $('sizeNumber').value = $('size').value;
+  for (const [id, out] of [
+    ['size', 'sizeOut'],
+    ['smooth', 'smoothOut'],
+    ['streamline', 'streamlineOut'],
+    ['opacity', 'opacityOut'],
+  ])
+    $(out).textContent = $(id).value;
+  const scale = layout[0]?.w / 1024 || 1;
+  $('brushHint').textContent =
+    'Width ' +
+    $('size').value +
+    ' frame px · ' +
+    (Number($('size').value) * scale).toFixed(1) +
+    ' px on screen';
+}
+$('size').oninput = () => syncBrushControls('range');
+$('sizeNumber').oninput = () => syncBrushControls('number');
+$('sizeNumber').onchange = () => {
+  $('size').value = String(
+    Math.max(2, Math.min(180, Number($('sizeNumber').value) || 2)),
+  );
+  syncBrushControls();
 };
+for (const id of ['smooth', 'streamline', 'opacity'])
+  $(id).oninput = () => syncBrushControls();
 $('undo').onclick = () => {
   cancelGesture();
   doc.undo();
@@ -792,6 +824,10 @@ $('bench').onclick = async () => {
     updateButtons();
   }
 };
+document.fonts.ready.then(() => {
+  fullDirty = true;
+  schedule();
+});
 setDocument(new StrokeDocument());
 new ResizeObserver(resize).observe($('stage'));
 window.addEventListener('scroll', measureRect, { passive: true });

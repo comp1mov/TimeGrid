@@ -1,10 +1,18 @@
+@font-face {
+  font-family: Inter;
+  src: url('../fonts/inter-latin.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 * {
   box-sizing: border-box;
 }
 :root {
   color-scheme: dark;
   font:
-    13px/1.4 system-ui,
+    13px/1.4 Inter,
+    system-ui,
     sans-serif;
   background: #111218;
   color: #e6e8ef;
@@ -58,7 +66,7 @@ input {
 }
 button,
 select,
-input[type="number"] {
+input[type='number'] {
   border: 1px solid #424653;
   background: #252833;
   color: #f0f1f5;
@@ -80,12 +88,12 @@ button.active {
   border-color: #ffa0b7;
   color: #ffa0b7;
 }
-input[type="range"] {
+input[type='range'] {
   width: 100px;
   height: 32px;
   accent-color: #ff8cab;
 }
-input[type="color"] {
+input[type='color'] {
   height: 38px;
   width: 44px;
   border: 0;
@@ -97,12 +105,12 @@ input[type="color"] {
   align-items: center;
   height: 38px;
 }
-input[type="checkbox"] {
+input[type='checkbox'] {
   width: 18px;
   height: 18px;
   accent-color: #ff8cab;
 }
-input[type="number"] {
+input[type='number'] {
   width: 65px;
 }
 .spacer {
@@ -180,11 +188,11 @@ output {
   }
   button,
   select,
-  input[type="number"] {
+  input[type='number'] {
     min-height: 42px;
     padding: 6px 8px;
   }
-  input[type="range"] {
+  input[type='range'] {
     width: 78px;
   }
   #stage {
@@ -200,4 +208,13 @@ output {
   .check {
     font-size: 10px;
   }
+}
+
+.width-inputs {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+#brushHint {
+  flex-basis: 100%;
 }

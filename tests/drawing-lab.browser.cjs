@@ -7,7 +7,7 @@ const url =
   "http://127.0.0.1:5194/drawing-lab.html?verifyPixels=1";
 const out =
   process.env.DRAWING_OUTPUT ||
-  "docs/drawing-evidence/2026-10-26-perfect-freehand";
+  "docs/drawing-evidence/2026-10-26-perfect-freehand-3";
 fs.mkdirSync(out, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ channel: "msedge", headless: true });
@@ -73,7 +73,8 @@ fs.mkdirSync(out, { recursive: true });
   await page.mouse.up();
   await flush();
   const after = await page.evaluate(() => JSON.parse(timegridLab.serialize()));
-  assert.equal(new Set(after.strokes.map((s) => s.surface)).size, 8);
+  assert.equal(after.strokes.length, 1);
+  assert.equal(new Set(after.strokes[0].placements.map((p) => p.surface)).size, 8);
   assert.equal(
     await page.evaluate(() => timegridLab.document().undoStack.length),
     1,

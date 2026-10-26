@@ -1,0 +1,164 @@
+{
+  "date": "2026-10-26T19:18:44.837Z",
+  "url": "http://127.0.0.1:5198/drawing-lab.html",
+  "browser": "156.0.4314.42",
+  "checks": [
+    {
+      "name": "assembled frames match an independent official SVG-path reference, including sparse diagonal and corner",
+      "passed": true,
+      "details": [
+        {
+          "placements": 48,
+          "maxAlphaDelta": 57,
+          "meanAlphaDeltaOnInk": 0.05365164046051352,
+          "pixelsOver8": 165,
+          "missingInk": 0,
+          "ink": 231307
+        },
+        {
+          "placements": 22,
+          "maxAlphaDelta": 67,
+          "meanAlphaDeltaOnInk": 0.4283152732277512,
+          "pixelsOver8": 1768,
+          "missingInk": 0,
+          "ink": 103174
+        },
+        {
+          "placements": 4,
+          "maxAlphaDelta": 38,
+          "meanAlphaDeltaOnInk": 0.35510791366906475,
+          "pixelsOver8": 44,
+          "missingInk": 0,
+          "ink": 3475
+        }
+      ]
+    },
+    {
+      "name": "Grid to Single keeps one correctly sized active frame and unchanged drawing",
+      "passed": true
+    },
+    {
+      "name": "numeric and slider width produce measured 12px and 96px strokes",
+      "passed": true,
+      "details": [
+        12,
+        96
+      ]
+    },
+    {
+      "name": "separate stabilization and edge smoothing reach the library without per-cell resets",
+      "passed": true
+    },
+    {
+      "name": "schema-1 drawings retain original linear tiled raster appearance",
+      "passed": true,
+      "details": {
+        "max": 0,
+        "renderer": "linear-v1"
+      }
+    },
+    {
+      "name": "no tile-grid alpha dips across 12 fractional scale and DPR combinations",
+      "passed": true,
+      "details": [
+        {
+          "ratio": 1,
+          "scale": 0.13,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 1,
+          "scale": 0.77,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 1,
+          "scale": 1.248,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 1,
+          "scale": 2.63,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 1.25,
+          "scale": 0.13,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 1.25,
+          "scale": 0.77,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 1.25,
+          "scale": 1.248,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 1.25,
+          "scale": 2.63,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 2,
+          "scale": 0.13,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 2,
+          "scale": 0.77,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 2,
+          "scale": 1.248,
+          "min": 115,
+          "max": 115
+        },
+        {
+          "ratio": 2,
+          "scale": 2.63,
+          "min": 115,
+          "max": 115
+        }
+      ]
+    },
+    {
+      "name": "one 960-point gesture addresses all 96 frames with one geometry asset",
+      "passed": true,
+      "details": {
+        "strokes": 1,
+        "placements": 96,
+        "points": 960,
+        "bytes": 81060,
+        "geometryMs": 4.099999964237213
+      }
+    },
+    {
+      "name": "synthetic pen preserves pressure and does not append a zero-pressure release tip",
+      "passed": true
+    },
+    {
+      "name": "390px emulated phone: continuous touch crosses cells, Single view, Undo/Redo preserve data",
+      "passed": true,
+      "details": {
+        "placements": 20,
+        "physicalDevice": false
+      }
+    }
+  ],
+  "errors": [],
+  "physicalPhone": false
+}

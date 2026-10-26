@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-26T19:18:39.324Z",
+  "checks": [
+    {
+      "name": "flat ink crosses tile seams with correct alpha; eraser leaves a transparent opening",
+      "details": {
+        "seamAlphas": [
+          115,
+          115,
+          115,
+          115,
+          115,
+          115,
+          115
+        ],
+        "erased": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "outside": 0
+      },
+      "passed": true
+    },
+    {
+      "name": "BG Grid and Single remain separate; TPL and FRM share stable frame addresses",
+      "passed": true
+    },
+    {
+      "name": "drawing during playback assigns segments to displayed frame",
+      "details": [
+        "frame-0",
+        "frame-1",
+        "frame-2",
+        "frame-3"
+      ],
+      "passed": true
+    },
+    {
+      "name": "default renderer interactive timing",
+      "details": {
+        "inputMs": {
+          "n": 90,
+          "p50": 0.09999996423721313,
+          "p95": 0.10000002384185791,
+          "p99": 0.19999998807907104,
+          "max": 0.19999998807907104
+        },
+        "geometryMs": {
+          "n": 96,
+          "p50": 0.09999996423721313,
+          "p95": 0.19999998807907104,
+          "p99": 0.2999999523162842,
+          "max": 0.2999999523162842
+        },
+        "renderMs": {
+          "n": 98,
+          "p50": 0.7000000476837158,
+          "p95": 1.100000023841858,
+          "p99": 3.900000035762787,
+          "max": 3.900000035762787
+        },
+        "eventToRenderEndMs": {
+          "n": 90,
+          "p50": 0.800000011920929,
+          "p95": 1.2000000476837158,
+          "p99": 16.400000035762787,
+          "max": 16.400000035762787
+        }
+      },
+      "passed": true
+    },
+    {
+      "name": "two-finger pinch cancels draft and preserves document",
+      "passed": true
+    },
+    {
+      "name": "interrupted gesture does not commit or join later strokes",
+      "passed": true
+    },
+    {
+      "name": "PNG export uses documented native output size",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "notes": "Mouse and CDP synthetic touch; not physical device or pen-to-photon latency."
+}

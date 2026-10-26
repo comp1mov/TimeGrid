@@ -1,0 +1,19 @@
+{
+  "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.3/drawing-lab.html",
+  "date": "2026-10-26T19:22:42.072Z",
+  "status": 200,
+  "localHash": "13f3e10c7f85ae29090f56c506f99959bcf4ab8223276ef1fa755d8262645f50",
+  "publishedHash": "13f3e10c7f85ae29090f56c506f99959bcf4ab8223276ef1fa755d8262645f50",
+  "version": true,
+  "noOrdinaryAppAtNewPath": true,
+  "licenses": [
+    {
+      "file": "perfect-freehand.txt",
+      "status": 200
+    },
+    {
+      "file": "inter-OFL.txt",
+      "status": 200
+    }
+  ]
+}

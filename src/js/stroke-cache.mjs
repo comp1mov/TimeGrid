@@ -3,6 +3,7 @@ import {
   surfaceSize,
   paintStroke,
   strokePath,
+  renderInstances,
 } from './stroke-document.mjs';
 const TILE = 256,
   BLEED = 2;
@@ -34,12 +35,14 @@ export class StrokeTileCache {
       after = new Map(next.map((s) => [s.id, s]));
     for (const s of [...this.drafts, ...next])
       if (before.get(s.id) !== after.get(s.id)) {
-        this.invalidate(s.surface, s.box);
+        for (const item of renderInstances(s))
+          this.invalidate(item.surface, item.box);
         this.paths.delete(s.id);
       }
     this.drafts = next;
   }
   path(s) {
+    s = s.stroke || s;
     let p = this.paths.get(s.id);
     if (p) {
       this.paths.delete(s.id);
@@ -96,9 +99,9 @@ export class StrokeTileCache {
     };
     const strokes = [
       ...this.doc.query(surface, box),
-      ...this.drafts.filter(
-        (s) => s.surface === surface && intersects(s.box, box),
-      ),
+      ...this.drafts
+        .flatMap(renderInstances)
+        .filter((s) => s.surface === surface && intersects(s.box, box)),
     ];
     if (!strokes.some((s) => !s.brush.erase)) return null;
     const start = performance.now(),
@@ -141,7 +144,15 @@ export class StrokeTileCache {
     const step = TILE / level;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(rect.x, rect.y, rect.w, rect.h);
+    // Adjacent tiles must own disjoint device pixels. Fractional drawImage
+    // edges blend twice with the background and expose a grid in thick ink.
+    const snap = (v) => Math.round(v * dpr) / dpr;
+    ctx.rect(
+      snap(rect.x),
+      snap(rect.y),
+      snap(rect.x + rect.w) - snap(rect.x),
+      snap(rect.y + rect.h) - snap(rect.y),
+    );
     ctx.clip();
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
@@ -165,16 +176,28 @@ export class StrokeTileCache {
       for (let tx = x0; tx < x1; tx++) {
         const tile = this.tile(surface, level, tx, ty);
         if (!tile) continue;
+        const left = snap(rect.x + (tile.x / size.w) * rect.w),
+          top = snap(rect.y + (tile.y / size.h) * rect.h),
+          right = snap(rect.x + ((tile.x + tile.w) / size.w) * rect.w),
+          bottom = snap(rect.y + ((tile.y + tile.h) / size.h) * rect.h);
+        if (right <= left || bottom <= top) continue;
+        // Sample the bleed at the corresponding logical coordinates, so pixel
+        // alignment changes ownership, not the shape or scale of the stroke.
+        const sx =
+            BLEED + (((left - rect.x) / rect.w) * size.w - tile.x) * level,
+          sy = BLEED + (((top - rect.y) / rect.h) * size.h - tile.y) * level,
+          sw = ((right - left) / rect.w) * size.w * level,
+          sh = ((bottom - top) / rect.h) * size.h * level;
         ctx.drawImage(
           tile.canvas,
-          BLEED,
-          BLEED,
-          tile.w * level,
-          tile.h * level,
-          rect.x + (tile.x / size.w) * rect.w,
-          rect.y + (tile.y / size.h) * rect.h,
-          (tile.w / size.w) * rect.w,
-          (tile.h / size.h) * rect.h,
+          sx,
+          sy,
+          sw,
+          sh,
+          left,
+          top,
+          right - left,
+          bottom - top,
         );
       }
     ctx.restore();

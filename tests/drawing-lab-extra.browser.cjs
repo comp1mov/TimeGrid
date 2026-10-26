@@ -186,7 +186,7 @@ const url = process.env.TEST_URL || 'http://127.0.0.1:5194/drawing-lab.html';
   const file = await downloadPromise;
   const out =
     process.env.DRAWING_OUTPUT ||
-    'docs/drawing-evidence/2026-10-26-perfect-freehand';
+    'docs/drawing-evidence/2026-10-26-perfect-freehand-3';
   await file.saveAs(out + '/export-single.png');
   const png = fs.readFileSync(out + '/export-single.png');
   assert.equal(png.readUInt32BE(16), 2048);

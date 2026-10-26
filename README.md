@@ -6,7 +6,9 @@ TimeGrid — экспериментальный браузерный инстр�
 
 Ветка `codex/drawing-engine`, база — стабильная 28.34. Cloud разрабатывается отдельно в `codex/timegrid-cloud`. Стабильный checkout и production не обновлены.
 
-План: [DEVELOPMENT_PLAN_RU.md](docs/DEVELOPMENT_PLAN_RU.md). Тестировать сейчас: [Drawing Lab 28.35.0-drawing.2](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.2/drawing-lab.html). [Архитектура и ограничения](docs/DRAWING_PROTOTYPE_RU.md), [измерения](docs/drawing-evidence/2026-10-26-perfect-freehand/README.md). Это стенд на 96 тестовых кадрах; новый движок ещё не заменяет старое рисование в TimeGrid.
+План: [DEVELOPMENT_PLAN_RU.md](docs/DEVELOPMENT_PLAN_RU.md). Тестировать сейчас: [Drawing Lab 28.35.0-drawing.3](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.3/drawing-lab.html). [Архитектура и ограничения](docs/DRAWING_PROTOTYPE_RU.md), [измерения](docs/drawing-evidence/2026-10-26-perfect-freehand-3/README.md). Это стенд на 96 тестовых кадрах; новый движок ещё не заменяет старое рисование в TimeGrid.
+
+Версия стенда: `Drawing Lab 28.35.0-drawing.3`. Самостоятельная сборка: `npm run build:lab`. Метаданные в `drawing-lab.release.json`. Обычный `npm run build` собирает только прежний TimeGrid; package/lock/APP_VERSION/HTML обычного приложения остаются drawing.2 по прямому указанию автора. Лаборатория больше не публикует рядом копию основного приложения.
 
 ## Для чего
 
