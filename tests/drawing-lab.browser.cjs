@@ -7,7 +7,7 @@ const url =
   "http://127.0.0.1:5194/drawing-lab.html?verifyPixels=1";
 const out =
   process.env.DRAWING_OUTPUT ||
-  "docs/drawing-evidence/2026-10-26-perfect-freehand-3";
+  "docs/drawing-evidence/2026-10-26-perfect-freehand-4";
 fs.mkdirSync(out, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ channel: "msedge", headless: true });

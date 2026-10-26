@@ -1,0 +1,55 @@
+
+> timegrid@28.35.0-drawing.2 pretest
+> node scripts/check-release.cjs
+
+Release metadata consistent: 28.35.0-drawing.2
+
+> timegrid@28.35.0-drawing.2 test
+> node --test tests/chrono-animation.test.mjs tests/chrono-compositing.test.mjs tests/drawing-geometry.test.mjs tests/stroke-document.test.mjs
+
+✔ default keys cover one loop and never duplicate short clips (0.9544ms)
+✔ key normalization sorts, clamps and resolves duplicates (0.1712ms)
+✔ interpolation uses source frame index, exact keys and held endpoints (0.7022ms)
+✔ disabled animation and empty table preserve static depth; zero really hides all copies (0.1305ms)
+✔ fractional copy fades in without changing full copies (0.1215ms)
+✔ cascade and mirror retain integer profiles and remain continuous at every depth boundary (1.8451ms)
+✔ large key tables resolve correctly without a key count limit (0.7755ms)
+✔ Exposure computes an equal average instead of an order-dependent opacity stack (0.7061ms)
+✔ static background stays constant at any depth or mix (1.5759ms)
+✔ Mix blends the averaged stack with the sharp original frame (0.1721ms)
+✔ Clean Loop null slots are excluded from normalization (0.7574ms)
+✔ Cascade provides normalized weights instead of reducing overall brightness (0.121ms)
+✔ fractional depth has a fractional sample weight and reaches the untouched frame at zero (0.1437ms)
+✔ existing blend modes retain their opacity behavior (0.1185ms)
+✔ regular, partial rows, seams and gaps match the legacy rule at edges and off-grid (55.2746ms)
+✔ irregular and hidden cells preserve DOM ordering and snapping (4.5323ms)
+✔ fractional transform rounding only broadens candidates, never changes the hit (3.7226ms)
+✔ one cross-frame gesture is one undo and redo transaction (2.2465ms)
+✔ clear is reversible and new drawing invalidates redo (1.3169ms)
+✔ 100 gestures, 50 undo and redo preserve ordered contours (12.3612ms)
+✔ ten save/open cycles preserve all data, pressure, alpha and erase order (6.779ms)
+✔ spatial query returns intersecting strokes in compositing order (1.0928ms)
+✔ untrusted files reject invalid engine, identity, coordinates, opacity and order (1.1438ms)
+✔ stored bounds are recomputed and imported contours stay immutable (0.3459ms)
+✔ atomic add rejects unordered or duplicate IDs without partial write (0.25ms)
+✔ fast segment crossing clips exact boundaries and interpolates pressure (0.2792ms)
+✔ grid keeps one library contour across all cell boundaries (3.4735ms)
+✔ thin diagonal indexes touched frames, not its entire sheet bounding box (3.3084ms)
+✔ TPL uses shared geometry with multiple ordered placements (0.645ms)
+✔ schema 1 imports fixed contours with its original linear renderer (0.5414ms)
+✔ placement and brush validation is atomic (0.5338ms)
+✔ Spray saves fixed particles, deterministic seed and immutable roundtrip geometry (5.7687ms)
+✔ stamp spatial queries preserve order and agree with full footprint filtering (1.6275ms)
+✔ soft round uses saved pressure-scaled dabs, no outline regeneration on Open (0.6214ms)
+✔ schema 2 opens its exact contour with original renderer and pressure flags (0.3511ms)
+✔ invalid particles and brush parameters are rejected atomically (6.7429ms)
+✔ speed response is fast-thick and independent of event frequency at constant velocity (0.2984ms)
+✔ stamp placement includes brush footprint across frame borders (0.2118ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 163.9867

@@ -6,7 +6,7 @@ const fs = require('node:fs'),
 const url = process.env.TEST_URL || 'http://127.0.0.1:5197/drawing-lab.html';
 const out =
   process.env.DRAWING_OUTPUT ||
-  'docs/drawing-evidence/2026-10-26-perfect-freehand-3/dev';
+  'docs/drawing-evidence/2026-10-26-perfect-freehand-4/dev';
 fs.mkdirSync(out, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ channel: 'msedge', headless: true });

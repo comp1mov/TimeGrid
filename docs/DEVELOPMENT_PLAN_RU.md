@@ -1,6 +1,6 @@
 # План развития TimeGrid
 
-> Статус 26 октября 2026: ниже сохранена историческая копия плана. Текущую очередь задаёт [единый план, редакция 4.5](D:/Antigravity/TimeGrid/docs/DEVELOPMENT_PLAN_RU.md). Ссылки и текущая задача находятся в [START_HERE](D:/Antigravity/TimeGrid/START_HERE.md).
+> Статус 26 октября 2026: ниже сохранена историческая копия плана. Текущую очередь задаёт [единый план, редакция 4.6](D:/Antigravity/TimeGrid/docs/DEVELOPMENT_PLAN_RU.md). Ссылки и текущая задача находятся в [START_HERE](D:/Antigravity/TimeGrid/START_HERE.md).
 
 Редакция 2, 19 октября 2026. Локальная база — TimeGrid 28.34, commit `3dfd4f0`. Cloud — отдельная экспериментальная линия `28.35.0-cloud.1`. Первая Drawing-итерация — `28.35.0-drawing.1`. Рисование и temporal effects остаются приоритетом; внешний вид интерфейса идёт после архитектуры.
 

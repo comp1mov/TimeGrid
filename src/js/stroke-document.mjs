@@ -1,7 +1,14 @@
 import { getStroke } from 'perfect-freehand';
+import {
+  makeStamps,
+  stampBounds,
+  circleTouches,
+  paintStamps,
+  MAX_STAMPS,
+} from './brush-geometry.mjs';
 
 export const STROKE_FORMAT = 'timegrid-strokes';
-export const STROKE_SCHEMA = 2;
+export const STROKE_SCHEMA = 3;
 export const ENGINE_VERSION = 'perfect-freehand@1.2.3';
 export const FRAME_W = 1024,
   FRAME_H = 576;
@@ -18,9 +25,14 @@ const storageCost = (s) =>
   1024 +
   s.points.length * 100 +
   s.outline.length * 70 +
+  (s.stamps?.length || 0) * 40 +
   s.placements.length * 128;
 const geometryCost = (s) =>
-  256 + s.points.length * 24 + s.outline.length * 16 + s.placements.length * 64;
+  256 +
+  s.points.length * 24 +
+  s.outline.length * 16 +
+  s.placements.length * 64 +
+  (s.stamps?.length || 0) * 24;
 export const intersects = (a, b) =>
   a.x <= b.x + b.w && a.x + a.w >= b.x && a.y <= b.y + b.h && a.y + a.h >= b.y;
 export const union = (a, b) =>
@@ -141,6 +153,38 @@ function touches(poly, r) {
   return pointInside(poly, r.x + r.w / 2, r.y + r.h / 2);
 }
 function gridPlacements(s, target) {
+  if (s.renderer === 'stamps-v1') {
+    const hit = new Set();
+    for (const p of s.stamps) {
+      const [x, y, r] = p;
+      for (
+        let row = Math.max(0, Math.floor((y - r - 0.5) / FRAME_H));
+        row <= Math.min(11, Math.floor((y + r + 0.5) / FRAME_H));
+        row++
+      )
+        for (
+          let col = Math.max(0, Math.floor((x - r - 0.5) / FRAME_W));
+          col <= Math.min(7, Math.floor((x + r + 0.5) / FRAME_W));
+          col++
+        )
+          if (
+            circleTouches(p, {
+              x: col * FRAME_W,
+              y: row * FRAME_H,
+              w: FRAME_W,
+              h: FRAME_H,
+            })
+          )
+            hit.add(row * 8 + col);
+    }
+    return [...hit]
+      .sort((a, b) => a - b)
+      .map((i) => ({
+        surface: target === 'tpl' ? 'tpl' : 'frame-' + i,
+        x: -(i % 8) * FRAME_W,
+        y: -Math.floor(i / 8) * FRAME_H,
+      }));
+  }
   const poly = flattenOutline(s),
     out = [];
   for (let i = 0; i < 96; i++) {
@@ -170,15 +214,21 @@ export function createStroke({
   simulatePressure = false,
   last = true,
   target = 'frm',
+  type = 'round',
+  softness = 0,
+  seed = 1,
 }) {
-  const outline = getStroke(points, {
-    size,
-    thinning: pressure ? 0.55 : 0,
-    smoothing,
-    streamline,
-    simulatePressure,
-    last,
-  });
+  const stamped = type === 'spray' || softness > 0;
+  const outline = stamped
+    ? []
+    : getStroke(points, {
+        size,
+        thinning: pressure ? 0.55 : 0,
+        smoothing,
+        streamline,
+        simulatePressure,
+        last,
+      });
   const s = {
     id,
     surface,
@@ -194,10 +244,18 @@ export function createStroke({
       smoothing,
       streamline,
       simulatePressure,
+      type,
+      softness,
+      seed,
     },
     engine: ENGINE_VERSION,
     renderer: 'quadratic-v1',
   };
+  if (stamped) {
+    s.renderer = 'stamps-v1';
+    s.stamps = makeStamps(points, s.brush, last);
+    s.box = stampBounds(s.stamps);
+  }
   s.placements =
     surface === 'sheet' ? gridPlacements(s, target) : [{ surface, x: 0, y: 0 }];
   return s;
@@ -231,7 +289,7 @@ export function renderInstances(s) {
   return out;
 }
 function freezeStroke(s) {
-  for (const a of [s.points, s.outline]) {
+  for (const a of [s.points, s.outline, ...(s.stamps ? [s.stamps] : [])]) {
     a.forEach(Object.freeze);
     Object.freeze(a);
   }
@@ -401,7 +459,7 @@ export class StrokeDocument {
     const data = JSON.parse(text);
     if (
       data?.format !== STROKE_FORMAT ||
-      ![1, 2].includes(data.schema) ||
+      ![1, 2, 3].includes(data.schema) ||
       data.engine !== ENGINE_VERSION
     )
       throw Error('Unsupported drawing format or engine version.');
@@ -434,6 +492,9 @@ export class StrokeDocument {
               smoothing: b.smoothing,
               streamline: data.schema === 1 ? 0.25 : b.streamline,
               simulatePressure: data.schema === 1 ? false : b.simulatePressure,
+              type: data.schema < 3 ? 'round' : b.type,
+              softness: data.schema < 3 ? 0 : b.softness,
+              seed: data.schema < 3 ? 1 : b.seed,
             }
           : null,
       };
@@ -453,10 +514,16 @@ export class StrokeDocument {
         surface: s.surface,
         points: s.points.map((p) => p.slice()),
         outline: s.outline.map((p) => p.slice()),
-        box: bounds(s.outline, 1),
+        box:
+          s.renderer === 'stamps-v1'
+            ? stampBounds(s.stamps)
+            : bounds(s.outline, 1),
         brush: s.brush,
         engine: ENGINE_VERSION,
         renderer: s.renderer,
+        ...(s.renderer === 'stamps-v1'
+          ? { stamps: s.stamps.map((p) => p.slice()) }
+          : {}),
         placements: s.placements.map((p) => ({
           surface: p.surface,
           x: p.x,
@@ -476,7 +543,7 @@ function validateStroke(s) {
     !/^s[1-9][0-9]{0,8}$/.test(s.id) ||
     !(validSurface(s.surface) || s.surface === 'sheet') ||
     s.engine !== ENGINE_VERSION ||
-    !['linear-v1', 'quadratic-v1'].includes(s.renderer)
+    !['linear-v1', 'quadratic-v1', 'stamps-v1'].includes(s.renderer)
   )
     throw Error('Invalid stroke identity.');
   if (
@@ -484,7 +551,7 @@ function validateStroke(s) {
     !s.points.length ||
     s.points.length > LIMITS.perStroke ||
     !Array.isArray(s.outline) ||
-    s.outline.length < 3 ||
+    (s.renderer !== 'stamps-v1' && s.outline.length < 3) ||
     s.outline.length > LIMITS.perStroke * 4 + 100
   )
     throw Error('Invalid stroke geometry.');
@@ -513,9 +580,39 @@ function validateStroke(s) {
       p[1] > extent.h + 2048
     )
       throw Error('Invalid outline.');
+  if (s.renderer === 'stamps-v1') {
+    if (
+      s.outline.length ||
+      !Array.isArray(s.stamps) ||
+      !s.stamps.length ||
+      s.stamps.length > MAX_STAMPS
+    )
+      throw Error('Invalid stamp geometry.');
+    for (const p of s.stamps) {
+      if (
+        !Array.isArray(p) ||
+        p.length !== 3 ||
+        !p.every((n) => finite(n) && n === Math.round(n * 10000) / 10000) ||
+        p[2] <= 0 ||
+        p[2] > 256 ||
+        p[0] < -2048 ||
+        p[1] < -2048 ||
+        p[0] > extent.w + 2048 ||
+        p[1] > extent.h + 2048
+      )
+        throw Error('Invalid stamp.');
+    }
+  } else if (s.stamps !== undefined) throw Error('Unexpected stamps.');
   const b = s.brush;
   if (
     !b ||
+    !['round', 'spray'].includes(b.type) ||
+    !finite(b.softness) ||
+    b.softness < 0 ||
+    b.softness > 1 ||
+    !Number.isInteger(b.seed) ||
+    b.seed < 0 ||
+    b.seed > 4294967295 ||
     !finite(b.size) ||
     b.size < 1 ||
     b.size > 256 ||
@@ -565,12 +662,13 @@ function validateStroke(s) {
   }
 }
 export function strokePath(value) {
-  const s = value.stroke || value,
-    p = new Path2D();
+  const s = value.stroke || value;
+  if (s.renderer === 'stamps-v1') return null;
+  const p = new Path2D();
   traceOutline(s, p);
   return p;
 }
-export function paintStroke(ctx, value, path = strokePath(value)) {
+export function paintStroke(ctx, value, path = strokePath(value), box) {
   const s = value.stroke || value,
     p = value.placement;
   ctx.save();
@@ -582,7 +680,13 @@ export function paintStroke(ctx, value, path = strokePath(value)) {
     : 'source-over';
   ctx.globalAlpha = s.brush.opacity;
   ctx.fillStyle = s.brush.color;
-  ctx.fill(path);
+  if (s.renderer === 'stamps-v1')
+    paintStamps(
+      ctx,
+      s,
+      box ? { ...box, x: box.x - (p?.x || 0), y: box.y - (p?.y || 0) } : null,
+    );
+  else ctx.fill(path);
   ctx.restore();
 }
 export function clipSegment(a, b, rect) {

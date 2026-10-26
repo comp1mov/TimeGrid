@@ -43,6 +43,7 @@ export class StrokeTileCache {
   }
   path(s) {
     s = s.stroke || s;
+    if (s.renderer === 'stamps-v1') return null;
     let p = this.paths.get(s.id);
     if (p) {
       this.paths.delete(s.id);
@@ -110,7 +111,7 @@ export class StrokeTileCache {
     canvas.height = Math.ceil(h * level) + 2 * BLEED;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.setTransform(level, 0, 0, level, BLEED - x * level, BLEED - y * level);
-    for (const s of strokes) paintStroke(ctx, s, this.path(s));
+    for (const s of strokes) paintStroke(ctx, s, this.path(s), box);
     tile = {
       canvas,
       surface,

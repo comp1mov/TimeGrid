@@ -1,0 +1,178 @@
+{
+  "date": "2026-10-26T22:26:20.283Z",
+  "url": "http://127.0.0.1:5197/drawing-lab.html",
+  "checks": [
+    {
+      "name": "UI Spray + soft eraser + Undo/Redo on frm",
+      "passed": true,
+      "details": {
+        "stamps": 3870
+      }
+    },
+    {
+      "name": "UI Spray + soft eraser + Undo/Redo on tpl",
+      "passed": true,
+      "details": {
+        "stamps": 3870
+      }
+    },
+    {
+      "name": "UI Spray + soft eraser + Undo/Redo on bg",
+      "passed": true,
+      "details": {
+        "stamps": 3870
+      }
+    },
+    {
+      "name": "saved stamps match independent raster, rebuild exactly, erase locally and respect layers",
+      "passed": true,
+      "details": [
+        {
+          "type": "spray",
+          "softness": 0,
+          "particles": 6210,
+          "parity": {
+            "meanAlpha": 0.001727634006076389,
+            "max": 9,
+            "missing": 0,
+            "ink": 148133
+          },
+          "reload": {
+            "meanAlpha": 0,
+            "max": 0,
+            "missing": 0,
+            "ink": 148132
+          },
+          "rebuild": {
+            "meanAlpha": 0,
+            "max": 0,
+            "missing": 0,
+            "ink": 148132
+          },
+          "remaining": 0,
+          "otherLayer": {
+            "meanAlpha": 0,
+            "max": 0,
+            "missing": 0,
+            "ink": 148132
+          }
+        },
+        {
+          "type": "spray",
+          "softness": 0.65,
+          "particles": 6210,
+          "parity": {
+            "meanAlpha": 0.00011528862847222222,
+            "max": 1,
+            "missing": 0,
+            "ink": 144350
+          },
+          "reload": {
+            "meanAlpha": 0,
+            "max": 0,
+            "missing": 0,
+            "ink": 144350
+          },
+          "rebuild": {
+            "meanAlpha": 0,
+            "max": 0,
+            "missing": 0,
+            "ink": 144350
+          },
+          "remaining": 0,
+          "otherLayer": {
+            "meanAlpha": 0,
+            "max": 0,
+            "missing": 0,
+            "ink": 144350
+          }
+        },
+        {
+          "type": "round",
+          "softness": 0.65,
+          "particles": 95,
+          "parity": {
+            "meanAlpha": 0.00006951226128472222,
+            "max": 1,
+            "missing": 0,
+            "ink": 76805
+          },
+          "reload": {
+            "meanAlpha": 0,
+            "max": 0,
+            "missing": 0,
+            "ink": 76805
+          },
+          "rebuild": {
+            "meanAlpha": 0,
+            "max": 0,
+            "missing": 0,
+            "ink": 76805
+          },
+          "remaining": 0,
+          "otherLayer": {
+            "meanAlpha": 0,
+            "max": 0,
+            "missing": 0,
+            "ink": 76805
+          }
+        }
+      ]
+    },
+    {
+      "name": "timed mouse fast-thick; physical pressure channel wins when both toggles are on",
+      "passed": true,
+      "details": [
+        {
+          "pressure": 0.34912553987727757,
+          "height": 68.72308593745481,
+          "simulate": false
+        },
+        {
+          "pressure": 1,
+          "height": 126,
+          "simulate": false
+        },
+        {
+          "pressure": 0.30000001192092896,
+          "height": 64.40000104904175,
+          "simulate": false
+        }
+      ]
+    },
+    {
+      "name": "actual Save/Open in fresh page preserves complete mixed-brush geometry and PNG",
+      "passed": true
+    },
+    {
+      "name": "96-frame Spray and soft brush resource measurements",
+      "passed": true,
+      "details": [
+        {
+          "type": "spray",
+          "frames": 96,
+          "strokes": 96,
+          "particles": 595968,
+          "geometryMs": 144.5,
+          "coldMs": 624.8999999761581,
+          "warmMs": 0.40000003576278687,
+          "openMs": 149.0999999642372,
+          "fileBytes": 15929695
+        },
+        {
+          "type": "round",
+          "frames": 96,
+          "strokes": 96,
+          "particles": 12768,
+          "geometryMs": 3.5,
+          "coldMs": 50.80000001192093,
+          "warmMs": 0.2999999523162842,
+          "openMs": 6.399999976158142,
+          "fileBytes": 333982
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "notes": "Headless Edge. CDP input is synthetic, not physical phone or pen."
+}

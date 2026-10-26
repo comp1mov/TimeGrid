@@ -8,8 +8,9 @@ import {
   paintStroke,
   LIMITS,
 } from './stroke-document.mjs';
+import { SpeedPressure } from './brush-geometry.mjs';
 import { StrokeTileCache } from './stroke-cache.mjs';
-export const APP_VERSION = '28.35.0-drawing.3';
+export const APP_VERSION = '28.35.0-drawing.4';
 const $ = (id) => document.getElementById(id),
   canvas = $('canvas'),
   ctx = canvas.getContext('2d', {
@@ -196,7 +197,12 @@ function render(now) {
   scheduled = 0;
   if (!gridRect) return;
   const start = performance.now();
-  refreshDrafts();
+  try {
+    refreshDrafts();
+  } catch (error) {
+    cancelGesture();
+    message = error.message;
+  }
   if (fullDirty) {
     fixtureContext.setTransform(dpr, 0, 0, dpr, 0, 0);
     fixtureContext.clearRect(0, 0, width, height);
@@ -284,14 +290,18 @@ function brush() {
     pressure: $('pressure').checked,
     smoothing: Number($('smooth').value) / 100,
     streamline: Number($('streamline').value) / 100,
-    simulatePressure: $('velocity').checked,
+    simulatePressure: false,
+    type: $('brushType').value,
+    softness: Number($('softness').value) / 100,
+    seed: crypto.getRandomValues(new Uint32Array(1))[0],
   };
 }
 // A grid gesture is sampled in one stable sheet space. Only its completed
 // outline is placed into frames; cell borders never restart the brush.
-function feed(p) {
+function feed(p, time) {
   const g = gesture,
     target = g.target;
+  if (g.speed) p = [p[0], p[1], g.speed.sample(p[0], p[1], time)];
   const surface =
     target === 'bg'
       ? 'bg-' + g.view
@@ -394,13 +404,18 @@ canvas.addEventListener('pointerdown', (e) => {
         ($('pressure').checked && e.pointerType === 'pen') ||
         $('velocity').checked,
     },
+    speed:
+      $('velocity').checked &&
+      !($('pressure').checked && e.pointerType === 'pen')
+        ? new SpeedPressure()
+        : null,
     view,
     rect: { ...gridRect },
     previous: null,
     pointerId: e.pointerId,
   };
   firstPendingInput = performance.now();
-  feed(point(e));
+  feed(point(e), e.timeStamp);
   schedule();
 });
 canvas.addEventListener('pointermove', (e) => {
@@ -436,7 +451,7 @@ canvas.addEventListener('pointermove', (e) => {
     for (const sample of e.getCoalescedEvents?.().length
       ? e.getCoalescedEvents()
       : [e])
-      feed(point(sample));
+      feed(point(sample), sample.timeStamp);
     if (!firstPendingInput) firstPendingInput = performance.now();
     schedule();
   } catch (err) {
@@ -449,7 +464,7 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerup', (e) => {
   if (gesture?.mode === 'draw' && e.pointerId === gesture.pointerId) {
     try {
-      feed(point(e));
+      feed(point(e), e.timeStamp);
       finish();
     } catch (err) {
       cancelGesture();
@@ -517,7 +532,8 @@ $('view').onchange = () => {
   fullDirty = true;
   schedule();
 };
-for (const id of ['target', 'tool']) $(id).onchange = cancelGesture;
+for (const id of ['target', 'tool', 'brushType'])
+  $(id).onchange = cancelGesture;
 function syncBrushControls(source) {
   if (source === 'number') {
     const n = Number($('sizeNumber').value);
@@ -530,6 +546,7 @@ function syncBrushControls(source) {
     ['smooth', 'smoothOut'],
     ['streamline', 'streamlineOut'],
     ['opacity', 'opacityOut'],
+    ['softness', 'softnessOut'],
   ])
     $(out).textContent = $(id).value;
   const scale = layout[0]?.w / 1024 || 1;
@@ -548,7 +565,7 @@ $('sizeNumber').onchange = () => {
   );
   syncBrushControls();
 };
-for (const id of ['smooth', 'streamline', 'opacity'])
+for (const id of ['smooth', 'streamline', 'opacity', 'softness'])
   $(id).oninput = () => syncBrushControls();
 $('undo').onclick = () => {
   cancelGesture();

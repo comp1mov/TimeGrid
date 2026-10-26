@@ -269,3 +269,117 @@ test('placement and brush validation is atomic', () => {
     assert.throws(() => StrokeDocument.parse(JSON.stringify(bad)));
   }
 });
+
+import { SpeedPressure, queryStamps } from '../src/js/brush-geometry.mjs';
+
+test('Spray saves fixed particles, deterministic seed and immutable roundtrip geometry', () => {
+  const d = new StrokeDocument(),
+    a = stroke(d, 'frame-0', { type: 'spray', seed: 410, size: 32 });
+  const b = stroke(d, 'frame-0', { type: 'spray', seed: 410, size: 32 });
+  assert.deepEqual(a.stamps, b.stamps);
+  assert.notDeepEqual(
+    a.stamps,
+    stroke(d, 'frame-0', { type: 'spray', seed: 411, size: 32 }).stamps,
+  );
+  d.addGesture([a]);
+  const json = d.serialize(),
+    restored = StrokeDocument.parse(json);
+  assert.equal(restored.serialize(), json);
+  assert.ok(Object.isFrozen(restored.strokes[0].stamps[0]));
+  d.undo();
+  d.redo();
+  assert.equal(d.serialize(), json);
+});
+test('stamp spatial queries preserve order and agree with full footprint filtering', () => {
+  const d = new StrokeDocument(),
+    s = stroke(d, 'frame-0', { type: 'spray', size: 90 });
+  const box = { x: 70, y: 20, w: 50, h: 50 };
+  const expected = s.stamps.filter(
+    ([x, y, r]) =>
+      Math.hypot(
+        x - Math.max(box.x, Math.min(box.x + box.w, x)),
+        y - Math.max(box.y, Math.min(box.y + box.h, y)),
+      ) <=
+      r + 0.5,
+  );
+  assert.deepEqual(queryStamps(s, box), expected);
+});
+test('soft round uses saved pressure-scaled dabs, no outline regeneration on Open', () => {
+  const d = new StrokeDocument(),
+    s = stroke(d, 'tpl', { softness: 0.7, pressure: true });
+  assert.equal(s.renderer, 'stamps-v1');
+  assert.equal(s.outline.length, 0);
+  assert.ok(s.stamps.length > 5);
+  assert.ok(new Set(s.stamps.map((p) => p[2])).size > 2);
+  d.addGesture([s]);
+  assert.equal(StrokeDocument.parse(d.serialize()).serialize(), d.serialize());
+});
+test('schema 2 opens its exact contour with original renderer and pressure flags', () => {
+  const d = new StrokeDocument();
+  d.addGesture([
+    stroke(d, 'frame-0', { pressure: true, simulatePressure: true }),
+  ]);
+  const data = JSON.parse(d.serialize());
+  data.schema = 2;
+  for (const s of data.strokes)
+    for (const k of ['type', 'softness', 'seed']) delete s.brush[k];
+  const loaded = StrokeDocument.parse(JSON.stringify(data)).strokes[0];
+  assert.deepEqual(loaded.outline, data.strokes[0].outline);
+  assert.equal(loaded.brush.simulatePressure, true);
+  assert.equal(loaded.renderer, 'quadratic-v1');
+});
+test('invalid particles and brush parameters are rejected atomically', () => {
+  const d = new StrokeDocument();
+  d.addGesture([stroke(d, 'frame-0', { type: 'spray' })]);
+  const data = JSON.parse(d.serialize());
+  for (const change of [
+    (s) => (s.stamps[0][2] = -1),
+    (s) => (s.stamps[0][2] = 10000),
+    (s) => (s.stamps[0][0] = null),
+    (s) => (s.stamps = []),
+    (s) => (s.brush.softness = 2),
+    (s) => (s.brush.seed = -1),
+    (s) => (s.brush.type = 'unknown'),
+    (s) =>
+      (s.outline = [
+        [1, 1],
+        [2, 2],
+        [3, 3],
+      ]),
+  ]) {
+    const copy = structuredClone(data);
+    change(copy.strokes[0]);
+    assert.throws(() => StrokeDocument.parse(JSON.stringify(copy)));
+  }
+});
+test('speed response is fast-thick and independent of event frequency at constant velocity', () => {
+  function run(velocity, dt) {
+    const s = new SpeedPressure();
+    s.sample(0, 0, 0);
+    for (let time = dt; time <= 1000; time += dt)
+      s.sample(time * velocity, 0, time);
+    return s;
+  }
+  const slow = run(0.05, 10),
+    fast = run(1.2, 10);
+  assert.ok(fast.pressure > slow.pressure * 3);
+  assert.ok(Math.abs(run(0.4, 5).pressure - run(0.4, 20).pressure) < 1e-6);
+  const pressure = fast.pressure;
+  assert.equal(fast.sample(1200, 0, 1100), pressure);
+});
+test('stamp placement includes brush footprint across frame borders', () => {
+  const d = new StrokeDocument();
+  const s = stroke(d, 'sheet', {
+    points: [
+      [1020, 288, 0.5],
+      [1021, 289, 0.5],
+    ],
+    type: 'spray',
+    size: 64,
+    seed: 1,
+  });
+  assert.deepEqual(
+    s.placements.map((p) => p.surface),
+    ['frame-0', 'frame-1'],
+  );
+});

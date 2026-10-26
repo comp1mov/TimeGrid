@@ -1,0 +1,176 @@
+import { getStrokePoints } from 'perfect-freehand';
+
+export const MAX_STAMPS = 120000;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// CSS pixels / millisecond, independent of zoom, DPR and pointer event count.
+// Real pen pressure is routed separately by the input controller.
+export class SpeedPressure {
+  constructor() {
+    this.previous = null;
+    this.velocity = 0;
+    this.pressure = 0.2;
+  }
+  sample(x, y, time) {
+    const previous = this.previous;
+    if (!previous) {
+      this.previous = [x, y, time];
+      return this.pressure;
+    }
+    const dt = time - previous[2],
+      distance = Math.hypot(x - previous[0], y - previous[1]);
+    if (dt <= 0 || distance < 0.01) return this.pressure;
+    this.previous = [x, y, time];
+    const velocity = Math.min(4, distance / dt);
+    this.velocity += (velocity - this.velocity) * (1 - Math.exp(-dt / 35));
+    this.pressure = 0.2 + 0.8 * clamp(this.velocity / 1.2, 0, 1);
+    return this.pressure;
+  }
+}
+function randomGenerator(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let n = state;
+    n = Math.imul(n ^ (n >>> 15), n | 1);
+    n ^= n + Math.imul(n ^ (n >>> 7), n | 61);
+    return ((n ^ (n >>> 14)) >>> 0) / 4294967296;
+  };
+}
+export function makeStamps(points, brush, last) {
+  const path = getStrokePoints(points, {
+      size: brush.size,
+      streamline: brush.streamline,
+      last,
+    }),
+    random = randomGenerator(brush.seed),
+    stamps = [],
+    spacing = Math.max(1, brush.size * (brush.type === 'spray' ? 0.22 : 0.16));
+  function dab(x, y, pressure) {
+    const scale = brush.pressure ? 0.45 + 1.1 * pressure : 1;
+    const size = brush.size * scale;
+    if (brush.type === 'spray') {
+      const count = clamp(Math.round(brush.size * 1.6), 10, 90);
+      if (stamps.length + count > MAX_STAMPS)
+        throw Error('Spray stroke limit reached. Start a shorter stroke.');
+      for (let i = 0; i < count; i++) {
+        const angle = random() * Math.PI * 2,
+          r = Math.sqrt(random()) * Math.max(2, size * 0.95),
+          radius = Math.max(0.9, size * 0.1) * (0.55 + random() * 0.45);
+        stamps.push([x + Math.cos(angle) * r, y + Math.sin(angle) * r, radius]);
+      }
+    } else {
+      if (stamps.length >= MAX_STAMPS)
+        throw Error('Soft stroke limit reached. Start a shorter stroke.');
+      stamps.push([x, y, size * 0.5]);
+    }
+  }
+  if (!path.length) return stamps;
+  dab(...path[0].point, path[0].pressure);
+  let remaining = spacing;
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1],
+      b = path[i],
+      length = Math.hypot(b.point[0] - a.point[0], b.point[1] - a.point[1]);
+    if (!length) continue;
+    for (let at = remaining; at <= length; at += spacing) {
+      const t = at / length;
+      dab(
+        a.point[0] + (b.point[0] - a.point[0]) * t,
+        a.point[1] + (b.point[1] - a.point[1]) * t,
+        a.pressure + (b.pressure - a.pressure) * t,
+      );
+    }
+    remaining = (((remaining - length) % spacing) + spacing) % spacing;
+    if (remaining < 1e-8) remaining = spacing;
+  }
+  // Fixed geometry precision: 0.0001 logical pixel; at max 4x raster LOD the
+  // largest quantization error is 0.0002 output pixel. Bounds are recomputed.
+  return stamps.map((p) => p.map((n) => Math.round(n * 10000) / 10000));
+}
+export function stampBounds(stamps) {
+  let x = Infinity,
+    y = Infinity,
+    right = -Infinity,
+    bottom = -Infinity;
+  for (const [cx, cy, r] of stamps) {
+    x = Math.min(x, cx - r);
+    y = Math.min(y, cy - r);
+    right = Math.max(right, cx + r);
+    bottom = Math.max(bottom, cy + r);
+  }
+  return { x: x - 1, y: y - 1, w: right - x + 2, h: bottom - y + 2 };
+}
+export function circleTouches([x, y, r], box) {
+  return (
+    Math.hypot(
+      x - clamp(x, box.x, box.x + box.w),
+      y - clamp(y, box.y, box.y + box.h),
+    ) <=
+    r + 0.5
+  );
+}
+const indexes = new WeakMap(),
+  BUCKET = 256;
+export function queryStamps(stroke, box) {
+  if (!box) return stroke.stamps;
+  let index = indexes.get(stroke);
+  if (!index) {
+    index = new Map();
+    stroke.stamps.forEach(([x, y, r], i) => {
+      for (
+        let row = Math.floor((y - r - 1) / BUCKET);
+        row <= Math.floor((y + r + 1) / BUCKET);
+        row++
+      )
+        for (
+          let col = Math.floor((x - r - 1) / BUCKET);
+          col <= Math.floor((x + r + 1) / BUCKET);
+          col++
+        ) {
+          const key = col + ',' + row;
+          if (!index.has(key)) index.set(key, []);
+          index.get(key).push(i);
+        }
+    });
+    indexes.set(stroke, index);
+  }
+  const ids = new Set();
+  for (
+    let row = Math.floor(box.y / BUCKET);
+    row <= Math.floor((box.y + box.h) / BUCKET);
+    row++
+  )
+    for (
+      let col = Math.floor(box.x / BUCKET);
+      col <= Math.floor((box.x + box.w) / BUCKET);
+      col++
+    )
+      for (const i of index.get(col + ',' + row) || []) ids.add(i);
+  return [...ids]
+    .sort((a, b) => a - b)
+    .map((i) => stroke.stamps[i])
+    .filter((p) => circleTouches(p, box));
+}
+export function paintStamps(ctx, s, box) {
+  const b = s.brush;
+  ctx.globalAlpha = b.opacity * (b.type === 'spray' && !b.erase ? 0.35 : 1);
+  for (const [x, y, r] of queryStamps(s, box)) {
+    if (b.softness > 0) {
+      const gradient = ctx.createRadialGradient(
+        x,
+        y,
+        r * (1 - b.softness),
+        x,
+        y,
+        r,
+      );
+      gradient.addColorStop(0, b.color);
+      gradient.addColorStop(1, b.color + '00');
+      ctx.fillStyle = gradient;
+    } else ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
