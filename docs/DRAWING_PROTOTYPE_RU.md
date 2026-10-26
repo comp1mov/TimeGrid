@@ -2,6 +2,8 @@
 
 26 октября 2026. Ветка `codex/drawing-engine`. [Текущий стенд](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.4/drawing-lab.html). [Проверки](drawing-evidence/2026-10-26-perfect-freehand-4/README.md). [История .3](drawing-evidence/2026-10-26-perfect-freehand-3/README.md).
 
+> Уточнение после авторского теста .4: live Spray заметно тормозит, BG не покрывает поля, старые scatter/dotScale не перенесены. Это открытые дефекты стенда. [Диагностика и предложенные исправления](drawing-evidence/2026-10-26-live-input-review/README.md). Следующая приоритетная работа пересмотрена в плане 4.7; текст архитектуры ниже описывает выпущенную .4, а не обещание полного соответствия TimeGrid.
+
 ## Граница выпуска
 
 Это продолжение одного Drawing Lab на 96 сгенерированных кадрах. Ordinary TimeGrid этой ветки остаётся drawing.2; stable 28.34 и Cloud не меняются. Grid/Single являются видами одного банка. Видеоматериал, legacy raster, полный ProjectDocument, 1F, layout/reorder, Long Stroke/Trail и Onion Skin ещё не интегрированы. Текущее переключение playback между frame-N не является готовым Long Stroke.
