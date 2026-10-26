@@ -13,4 +13,6 @@ for (const label of [`<title>TimeGrid ${version}</title>`,`id="fgLogoText">TimeG
   `class="dz-version">${version}</div>`,`class="about-version">${version}</div>`]) assert.ok(html.includes(label),label);
 assert.ok(read('README.md').includes('Текущая версия приложения: `TimeGrid '+version+'`'));
 assert.ok(read('docs/DEVELOPMENT_HISTORY.md').split('\n').some(line=>line.startsWith('## ')&&line.includes('TimeGrid '+version)));
+assert.ok(read('drawing-lab.html').includes(version));
+assert.ok(read('src/js/drawing-lab.mjs').includes("APP_VERSION = '"+version+"'"));
 console.log('Release metadata consistent: '+version);

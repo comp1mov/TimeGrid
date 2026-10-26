@@ -1,21 +1,23 @@
 {
   "name": "timegrid",
-  "version": "28.35.0-drawing.1",
+  "version": "28.35.0-drawing.2",
   "description": "An experimental spatial montage and frame-sampling browser application",
   "scripts": {
-    "test": "node --test tests/chrono-animation.test.mjs tests/chrono-compositing.test.mjs tests/drawing-geometry.test.mjs",
+    "test": "node --test tests/chrono-animation.test.mjs tests/chrono-compositing.test.mjs tests/drawing-geometry.test.mjs tests/stroke-document.test.mjs",
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-drawing-lab.cjs",
     "preview": "vite preview",
     "prebuild": "node scripts/check-release.cjs",
     "pretest": "node scripts/check-release.cjs",
-    "test:drawing": "node tests/drawing-engine.browser.cjs"
+    "test:drawing": "node tests/drawing-engine.browser.cjs",
+    "test:drawing-lab": "node tests/drawing-lab.browser.cjs"
   },
   "devDependencies": {
     "vite": "^5.2.0",
     "vite-plugin-singlefile": "^2.0.1"
   },
   "dependencies": {
-    "@vercel/analytics": "^2.0.1"
+    "@vercel/analytics": "^2.0.1",
+    "perfect-freehand": "1.2.3"
   }
 }

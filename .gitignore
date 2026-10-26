@@ -18,3 +18,5 @@ FrameGrid 313a0c4a812c8080aea8cf392b536cc6.md
 .vercel/
 .env.*
 !.env.example
+
+.drawing-lab-build/

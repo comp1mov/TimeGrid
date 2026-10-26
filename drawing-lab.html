@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#171820" />
+    <title>TimeGrid Drawing Lab 28.35.0-drawing.2</title>
+    <link rel="stylesheet" href="./src/styles/drawing-lab.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <strong>TimeGrid <span class="accent">Drawing Lab</span></strong
+        ><small>28.35.0-drawing.2 · perfect-freehand prototype</small>
+      </div>
+      <a href="./index.html">TimeGrid drawing.2 app ↗</a>
+    </header>
+    <main>
+      <section class="toolbar" aria-label="Drawing tools">
+        <label
+          >View<select id="view">
+            <option value="grid">Grid · 96 frames</option>
+            <option value="single">Single frame</option>
+          </select></label
+        >
+        <label
+          >Target<select id="target">
+            <option value="frm">FRM · this frame</option>
+            <option value="tpl">TPL · all frames</option>
+            <option value="bg">BG · background</option>
+          </select></label
+        >
+        <label
+          >Tool<select id="tool">
+            <option value="pen">Brush</option>
+            <option value="erase">Eraser</option>
+            <option value="pan">Pan</option>
+          </select></label
+        >
+        <label>Color<input id="color" type="color" value="#ff7799" /></label>
+        <label
+          >Size <output id="sizeOut">18</output
+          ><input id="size" type="range" min="2" max="180" value="18"
+        /></label>
+        <label
+          >Opacity<input
+            id="opacity"
+            type="range"
+            min="5"
+            max="100"
+            value="100"
+        /></label>
+        <label
+          >Smoothing<input
+            id="smooth"
+            type="range"
+            min="0"
+            max="100"
+            value="35"
+        /></label>
+        <label class="check"
+          ><input id="pressure" type="checkbox" checked /> Pen pressure</label
+        >
+      </section>
+      <section class="actions" aria-label="Document and view">
+        <button id="undo" disabled>Undo</button
+        ><button id="redo" disabled>Redo</button
+        ><button id="clear">Clear</button>
+        <button id="save">Save strokes</button
+        ><button id="open">Open strokes</button
+        ><input id="file" type="file" accept=".json,application/json" hidden />
+        <button id="png">Export PNG</button><span class="spacer"></span>
+        <button id="play">Play · 8 fps</button
+        ><button id="prev" aria-label="Previous frame">←</button
+        ><label
+          >Frame<input
+            id="frame"
+            type="number"
+            min="1"
+            max="96"
+            value="1" /></label
+        ><button id="next" aria-label="Next frame">→</button>
+        <button id="fit">Fit</button
+        ><button id="zoomOut" aria-label="Zoom out">−</button
+        ><button id="zoomIn" aria-label="Zoom in">+</button
+        ><button id="bench">Benchmark</button>
+      </section>
+      <div id="stage">
+        <canvas id="canvas" aria-label="96 frame drawing surface"></canvas>
+        <div id="zoomLabel">100%</div>
+      </div>
+      <div id="status" role="status">Ready</div>
+      <details>
+        <summary>What to test</summary>
+        <p>
+          Draw across cells, try TPL, erase part of a line, Undo/Redo, then Save
+          → Open. Grid and Single are views of the same frame drawings. BG has
+          separate Grid/Single surfaces. Wheel or two fingers zoom; choose Pan
+          to move. Frame buttons and Play select the active frame. In Grid, the
+          frame number is highlighted.
+        </p>
+        <p>
+          This lab uses 96 generated test frames. It does not replace the
+          existing TimeGrid drawing tools, import old raster drawings, or save a
+          full media project. PNG exports the current view at 1536 × 1296 (Grid)
+          or 2048 × 1152 (Single), from saved contours. Undo history is
+          session-only, up to 100 gestures with a 16 MB geometry estimate budget
+          (the latest gesture is always retained). No uploads or cloud
+          processing. Browser closing requires Save first.
+        </p>
+        <p>
+          Benchmark runs in a separate temporary document, then downloads
+          timings from your device. It does not change your drawing. Physical
+          pen and phone testing is still needed.
+          <a href="./licenses/perfect-freehand.txt"
+            >perfect-freehand MIT license</a
+          >
+        </p>
+      </details>
+    </main>
+    <script type="module" src="./src/js/drawing-lab.mjs"></script>
+  </body>
+</html>

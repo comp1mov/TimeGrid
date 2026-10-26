@@ -1,8 +1,35 @@
 # Development History
 
-Обновлено: 2026-10-19
+Обновлено: 2026-10-26
 
 Этот файл фиксирует не весь chat log, а важные архитектурные решения, баги и смысловые повороты, чтобы не терять контекст проекта.
+
+## 2026-10-26: TimeGrid 28.35.0-drawing.2
+
+Ветка `codex/drawing-engine`. Первый perfect-freehand 1.2.3 прототип опубликован отдельно: [Drawing Lab](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.2/drawing-lab.html). GitHub Pages использует ветку gh-pages и версионную папку. Stable 28.34 и Vercel production не обновлены. Cloud не участвовал.
+
+Что сделано:
+
+- Документ хранит logical points/pressure, параметры, фиксированный контур, порядок и адрес BG/TPL/FRM. Zoom и Open не пересчитывают старую форму.
+- Pointer stream, пересечение отрезков с ячейками, coalesced samples, rAF preview. Cross-cell жест является одним Undo. Есть partial eraser, Redo, Clear/Undo, pinch/pan, обработка прерываний.
+- Sparse tiles 256 px с полями, LOD, spatial index, LRU 24 MiB. Пустые кадры не выделяют backing. Два viewport buffers учитываются отдельно. PNG строит выходные плитки по исходному контуру через тот же renderer.
+- Save/Open рисунка в JSON, schema/engine/geometry validation, защита текущего документа при ошибке. История до 100 действий с бюджетом оценки 16 MiB, session-only. Файл ограничен 32 MiB с консервативным preflight.
+- 96 сгенерированных кадров, Grid/Single, отдельные BG Grid/Single, общий TPL и FRM по адресам кадров; live drawing по показанному кадру. Это отдельный стенд внутри Drawing-сборки. Старый UI/engine не заменён.
+- Зависимость закреплена, MIT notice включён, build выпускает основной index.html и drawing-lab.html. Все версии обновлены согласованно.
+- Добавлены подробная [архитектура/художественная проверка](DRAWING_PROTOTYPE_RU.md) и [сырые измерения](drawing-evidence/2026-10-26-perfect-freehand/README.md).
+
+Проверка: 26 unit tests, 9 основных browser checks на dev и production HTML, 7 дополнительных checks, прежний drawing-engine regression с 4 основными и расширенными сценариями, release check и production build прошли. Touch viewport 390 × 844 прошёл эмуляцию, физический телефон и перо не тестировались. Pixel roundtrip использует явный допуск RGB 2 для браузерного raster/readback; JSON совпадает строго, восстановление вытесненного кеша byte-identical. Исправлен ранний render до layout; static fixture buffer устраняет зависимость фонового сглаживания от частичного redraw. Vite watcher исключает browser evidence downloads, чтобы Windows file lock не завершал dev server.
+
+Замеры production: Windows, Edge 156.0.4314.42, Radeon 890M, 1440 × 1000. 96 кадров/1000 штрихов: файл 4 436 402 bytes, кеш 14 776 320 bytes, cold 36.5 ms, warm p95 0.4 ms, Undo document/index 0.5 ms, Open 29.9 ms. Пустой cache 0 bytes. Это JS submission, не FPS/VRAM/RSS/pen-to-photon. Cold превышает 16.7 ms. Старые результаты 28.34/Drawing.1 не переименованы в новый benchmark.
+
+Ограничения: старые raster assets, старые типы кистей/long stroke/trail/bake, реальный video sampling и все эффекты не подключены к новому документу. Нет полного ProjectDocument, autosave, восстановленной Undo-history после Open или проверки Safari/Android/Pencil. Активный длинный сегмент пересчитывается целиком; заполненная dirty tile переигрывает свою историю, Undo перестраивает индекс, Open синхронный. Следующая итерация после авторского/физического теста: устранить выявленные проблемы, затем адаптер реальных кадров и старого raster. Подробный план сохранён в основном checkout, редакция 4.3.
+
+
+## 2026-10-26: Ссылка на единый план
+
+Документационная запись, ветка codex/drawing-engine. Версия 28.35.0-drawing.1 и код приложения не изменены. Локальная копия плана отмечена как историческая; действующий общий план находится в D:/Antigravity/TimeGrid/docs/DEVELOPMENT_PLAN_RU.md, редакция 3. Карта ссылок находится в D:/Antigravity/TimeGrid/START_HERE.md. План задаёт один путь до Founders Edition, сначала рисунки и сохранение проекта; Cloud исключён из ближайшей очереди.
+
+Проверка: целевые документы существуют; изменены только указатель плана и эта запись. Новый build этой линии и новые измерения не выполнялись. Результаты прошлых проверок остаются привязаны к прежней итерации.
 
 ## 2026-10-19: TimeGrid 28.35.0-drawing.1
 
