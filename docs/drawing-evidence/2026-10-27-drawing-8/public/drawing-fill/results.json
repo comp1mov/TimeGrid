@@ -1,0 +1,92 @@
+{
+  "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.8/drawing-lab.html",
+  "checks": [
+    {
+      "name": "Fill is available through the real dark dropdown",
+      "pass": true
+    },
+    {
+      "name": "four separate strokes enclose a filled red interior; outside remains empty",
+      "pass": true,
+      "data": {
+        "runs": 726,
+        "pixels": [
+          230,
+          57,
+          46,
+          255
+        ]
+      }
+    },
+    {
+      "name": "one fill is one Undo/Redo; cache rebuild preserves exact PNG",
+      "pass": true
+    },
+    {
+      "name": "actual Save download and Open retain fill geometry and exact exported pixels",
+      "pass": true
+    },
+    {
+      "name": "2K/4K exports stay identical after document roundtrip",
+      "pass": true
+    },
+    {
+      "name": "S1/S2/S3 keep drawing data; L2 restores it with atomic Undo/Redo",
+      "pass": true
+    },
+    {
+      "name": "96-frame grid reflow and Single preserve frame fill identity",
+      "pass": true
+    },
+    {
+      "name": "open contours do not flood the frame",
+      "pass": true
+    },
+    {
+      "name": "erased gap opens the boundary and prevents fill",
+      "pass": true
+    },
+    {
+      "name": "frame border is not an artificial closing line",
+      "pass": true
+    },
+    {
+      "name": "continuous soft Round boundary encloses a fill",
+      "pass": true
+    },
+    {
+      "name": "sparse Spray dots are not treated as a closed boundary",
+      "pass": true
+    },
+    {
+      "name": "Clear cancels pending fill without resurrecting deleted work",
+      "pass": true
+    },
+    {
+      "name": "closed inner contour retains a hole",
+      "pass": true
+    },
+    {
+      "name": "TPL fill repeats; Apply TPL has bounded resampling differences; baked Save/Open is exact",
+      "pass": true,
+      "data": {
+        "mean": 0.00022733589520494972,
+        "changed": 409,
+        "max": 255
+      }
+    },
+    {
+      "name": "BG fill works outside composition and survives export/Open",
+      "pass": true
+    },
+    {
+      "name": "malformed fill payloads are rejected atomically",
+      "pass": true
+    },
+    {
+      "name": "touch taps fill on 390/320px layouts; 1F and six slot buttons remain accessible (emulation)",
+      "pass": true
+    }
+  ],
+  "errors": []
+}
