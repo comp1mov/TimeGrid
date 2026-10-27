@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-27T01:47:25.222Z",
+  "sourceCommit": "930c6d0",
+  "pagesCommit": "786e1e2",
+  "results": {
+    "current": {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.6/drawing-lab.html",
+      "status": 200,
+      "sha256": "1f88f08af866832491eb3e962411be8f386ed2151cd2460438aecc445323ca5e"
+    },
+    "previous": {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.5/drawing-lab.html",
+      "status": 200,
+      "sha256": "288082b662c2cc73fcf0a189ce7c62ef8804bdae445e5d4d3ccc4acab629f007"
+    },
+    "ordinaryIndex": {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.6/index.html",
+      "status": 404
+    },
+    "libraryLicense": {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.6/licenses/perfect-freehand.txt",
+      "status": 200
+    },
+    "fontLicense": {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.6/licenses/inter-OFL.txt",
+      "status": 200
+    }
+  },
+  "statuses": []
+}

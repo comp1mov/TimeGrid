@@ -75,11 +75,11 @@ D/P, palette/reference/slots и полный экспорт TimeGrid не под
 - Hard Round сохраняет points с эффективным pressure и законченный quadratic-v1 outline. На Open контур не генерируется заново.
 - Новые Spray/soft Round сохраняют небольшие immutable chunks stamps-v2. Один пользовательский жест может содержать сотни внутренних операций, но имеет один Undo.
 - Стабилизатор stamps является причинным фильтром: новый input добавляет только новые dabs; прошлый след не пересчитывается. Значение Stabilizer сохранено, художественное ощущение stamp-кисти может отличаться от .4.
-- Scatter150%, dot scale100%, density100% являются default .6. Dot scale был10% в .5, автор попросил заметнее. Density10…300% масштабирует число частиц. Seed фиксируется на начало жеста; новые частицы не генерируются заново при zoom/Save/Open.
+- Scatter 150%, dot scale100%, density 100% являются default .6. Dot scale был10% в .5, автор попросил заметнее. Density10…300% масштабирует число частиц. Seed фиксируется на начало жеста; новые частицы не генерируются заново при zoom/Save/Open.
 - Geometry space и placements {surface,x,y,visit} независимы от CSS. Layout/gaps задают перевод координат. Перестройка не ресэмплирует рисунок.
 - Apply TPL создаёт composite-v1: один сохранённый набор операций шаблона и до 96 placements. Его eraser применяется внутри изолированной группы, не к нижнему FRM. Группа растеризуется по запрошенным tiles. Один Undo восстанавливает оба слоя.
 - Schema1/2/3/4 поддерживаются. Schema5 не открывается прежними версиями. stamps-v1 сохраняет прежний gradient renderer. Настоящий файл .4 дал одинаковый SHA-256 PNG на старом и новом renderer.
-- В schema5 сохраняются layout/timing/view, 1F, Long/Trail, Onion/TPL visibility, BG order, Export BG и touch setting. Brush controls, zoom/pan и session Undo не являются настройками проекта в файле.
+- В schema 5 сохраняются layout/timing/view, 1F, Long/Trail, Onion/TPL visibility, BG order, Export BG и touch setting. Brush controls, zoom/pan и session Undo не являются настройками проекта в файле.
 - JSON имеет стабильный порядок ключей. Open валидирует до замены документа. При неверном файле текущая работа остаётся.
 
 ## Рендер и память
@@ -90,7 +90,7 @@ Sparse Canvas2D tiles: 256 raster px, bleed 2 px, LOD 1/32…4, LRU 24 MiB. Пу
 
 Мягкий dab использует повторно применяемый sprite 256×256. LRU до 16 sprites, максимум 4 MiB сверх tile cache. Новый renderer отличается от точного gradient .4, поэтому имеет отдельный version tag. Старые рисунки не переводятся на него.
 
-Hard Round пока пересчитывает outline активного сегмента и его tiles. В .6 p95 2.1ms на240samples; исторический .5 был3.0ms, .4 1.9ms. Layout изменился, это не строгий A/B. Bounding placements нового жеста консервативны и могут включать пустые участки внутри bounding box. Дальнейшее уменьшение объёма пересчёта Round остаётся задачей; разрезать принятую линию на куски с заметными швами нельзя.
+Hard Round пока пересчитывает outline активного сегмента и его tiles. В .6 p95 2.1 ms на240 samples; исторический .5 был3.0 ms, .4 1.9 ms. Layout изменился, это не строгий A/B. Bounding placements нового жеста консервативны и могут включать пустые участки внутри bounding box. Дальнейшее уменьшение объёма пересчёта Round остаётся задачей; разрезать принятую линию на куски с заметными швами нельзя.
 
 Undo: до 100 команд и оценки 16 MiB geometry, последняя команда сохраняется. Document guard 32 MiB, до 20 000 операций, 1 млн points, 30 000 input samples в жесте; stamps stream ограничен 120 000 частицами на сегмент, temporal placements до 2048 на операцию. На лимите ввода сохраняется накопленная валидная часть. При отказе транзакции storage текущий draft может не быть принят, ранее завершённые операции остаются. Это предохранители, не целевые размеры производительности. Parse/index/history пока синхронные.
 
