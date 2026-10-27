@@ -27,6 +27,8 @@ Edge 156.0.4314.42 headless, 240 rAF input samples, size80, 96frames, scatter/do
 
 Следующий шаг: одна новая Pages ссылка, проверка реальных устройств и авторского движения; затем заливка замкнутой нарисованной фигуры, legacy migration и отдельное согласование переноса в TimeGrid. Публичные старые version folders не заменяются.
 
+Публикация проверена: source commit b16cb74, Pages commit 059f3de. Новый URL HTTP 200, SHA-256 нормализованного HTML 288082b662c2cc73fcf0a189ce7c62ef8804bdae445e5d4d3ccc4acab629f007 совпал со сборкой. Публичные 28 temporal + 13 extended + 9 quality checks прошли повторно. Старый .4 HTML сохранил SHA, обычного index.html в новой папке нет (404). Vercel deploymentEnabled=false остаётся для drawing-engine/gh-pages; production deployment не запускался. Главная карта обновлена до плана 4.10. Проверки публикации: deployment.json и public/ в evidence.
+
 ## 2026-10-26: Полный разбор механики рисования и план 4.8
 
 Документационная итерация. Автор указал на потерю stationary hold в Single и потребовал изучить существующий модуль целиком, не придумывать заново его поведение. [Подробный аудит](DRAWING_BEHAVIOR_AUDIT_RU.md) содержит карту функций/документов, источники, художественный контракт, отличия Lab .4, выбранную модель и точный состав предлагаемого drawing.5.

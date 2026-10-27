@@ -52,3 +52,7 @@ Live: node tests/drawing-live-performance.cjs. Для длинного прох�
 ## Непокрытое
 
 Реальные устройства/драйверы, Safari и Pencil; длительные часы рисования; input limit recovery на каждом сочетании; весь source-media proxy/full export; old raster migration; полноценный project reopen с оригиналами. Автоматические проверки не заменяют авторскую оценку характера кисти. Fill отсутствует и следует отдельным этапом.
+
+## Публикация
+
+Source b16cb74, Pages059f3de. Public .5 HTTP200, нормализованный SHA совпадает с локальным HTML; старый .4 также совпадает со своим неизменным артефактом. Новый ordinary index404. deployment.json содержит hashes/statuses. Все50 browser checks повторены на публичном URL, результаты в public/. GitHub commit status не содержит Vercel checks; branch-specific deploymentEnabled=false сохранён. Vercel production не запускался.
