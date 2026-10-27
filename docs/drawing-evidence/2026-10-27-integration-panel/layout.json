@@ -1,0 +1,87 @@
+{
+  "type": "layout review only, no drawing engine integration",
+  "browser": "156.0.4314.42",
+  "cases": [
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 860
+      },
+      "panel": {
+        "x": 70,
+        "y": 85,
+        "width": 360,
+        "height": 180
+      },
+      "dragged": {
+        "x": 80,
+        "y": 55,
+        "width": 360,
+        "height": 180
+      },
+      "errors": [],
+      "checks": [
+        "panel fits viewport",
+        "dark tool menu contains Fill",
+        "target cycle control present",
+        "three quick colors",
+        "full settings always present",
+        "pointer drag layout only"
+      ]
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "panel": {
+        "x": 10,
+        "y": 607,
+        "width": 360,
+        "height": 192
+      },
+      "dragged": {
+        "x": 20,
+        "y": 577,
+        "width": 360,
+        "height": 192
+      },
+      "errors": [],
+      "checks": [
+        "panel fits viewport",
+        "dark tool menu contains Fill",
+        "target cycle control present",
+        "three quick colors",
+        "full settings always present",
+        "pointer drag layout only"
+      ]
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "panel": {
+        "x": 10,
+        "y": 331,
+        "width": 304,
+        "height": 192
+      },
+      "dragged": {
+        "x": 12,
+        "y": 301,
+        "width": 304,
+        "height": 192
+      },
+      "errors": [],
+      "checks": [
+        "panel fits viewport",
+        "dark tool menu contains Fill",
+        "target cycle control present",
+        "three quick colors",
+        "full settings always present",
+        "pointer drag layout only"
+      ]
+    }
+  ]
+}

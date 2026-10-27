@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 ╔════════════════════════════════════════════════════════════════╗
-║      TimeGrid 28.35.0-drawing.2                                         ║
+║      TimeGrid 28.35.0-drawing.9                                         ║
 ╚════════════════════════════════════════════════════════════════╝
 -->
 
@@ -20,7 +20,7 @@
     gtag('js', new Date());
     gtag('config', 'G-JG9JL2MG9E');
   </script>
-  <title>TimeGrid 28.35.0-drawing.2</title>
+  <title>TimeGrid 28.35.0-drawing.9</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
@@ -36,7 +36,7 @@
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell"></span>
             <span class="fg-logo-cell"></span><span class="fg-logo-cell"></span><span class="fg-logo-cell active2"></span>
           </span>
-          <span class="metadata-logo-text" id="fgLogoText">TimeGrid 28.35.0-drawing.2</span>
+          <span class="metadata-logo-text" id="fgLogoText">TimeGrid 28.35.0-drawing.9</span>
         </div>
         <div class="metadata-gap"></div>
         <div class="metadata-group">
@@ -93,96 +93,22 @@
 
       </div>
       
-      <!-- Floating Draw Palette - COMPACT -->
-      <div class="draw-palette" id="drawPalette">
-                <div class="draw-cols-wrapper">
-        <div class="draw-palette-col">
-            <!-- Row 1: Main tools -->
-            <div class="draw-palette-row draw-tools-row">
-              <button class="draw-btn draw-brush-btn active" data-brush="round" title="Round brush">●</button>
-              <button class="draw-btn draw-brush-btn" data-brush="spray" title="Spray">✦</button>
-              <button class="draw-btn" id="drawEraser" title="Eraser (3)">◯</button>
-              <button class="draw-btn" id="toggleTemplateVisibility" title="Toggle Template Visibility (T)">T</button>
-              <div class="draw-row-sep"></div>
-              <input type="color" id="drawColorInput" value="#ffffff" class="draw-color-input" style="width:28px;height:28px;border:2px solid rgba(255,255,255,0.3);padding:0;cursor:pointer;border-radius:2px;background:none;">
-              <button class="draw-btn" id="drawPaletteToggle" title="Hide palette (P)">▾</button>
-              <button class="draw-btn wide" id="drawBrushLock" title="Brush Off (A)">BRUSH OFF</button>
-            </div>
-
-            <!-- Row 2: Colors - Recent (circles) + Video palette (squares) -->
-            <div class="draw-palette-row" style="gap:3px;align-items:center;">
-              <div id="recentColorsRow" style="display:flex;gap:2px;"></div>
-              <div style="width:1px;height:16px;background:rgba(255,255,255,0.2);margin:0 2px;"></div>
-              <div id="videoPaletteRow" style="display:flex;gap:2px;"></div>
-              <button class="draw-btn" id="genVideoPalette" title="Regenerate video palette (Shift+V)">↻</button>
-            </div>
-
-            <!-- Row 5: Target buttons -->
-            <div class="draw-target-row">
-              <button class="draw-target-btn active" data-target="background" title="Background (Q)">BG</button>
-              <button class="draw-target-btn" data-target="template" title="Template (W)">TPL</button>
-              <button class="draw-target-btn" data-target="frame" title="Frame (E)">FRM</button>
-            </div>
-          </div>
-
-          <div class="draw-palette-col">
-            <!-- Row 3: Size slider -->
-            <div class="draw-palette-row draw-slider-row" style="gap:4px;">
-              <span class="draw-softness-label" title="Size">SIZE</span><span class="draw-value-label" id="drawSizeLabel" style="margin-left:4px;min-width:26px;">4</span>
-              <button class="menu-input-btn" id="drawSizeMinus">−</button>
-              <input type="range" class="draw-size-slider" id="drawSizeSlider" min="1" max="120" value="4" style="flex:1;">
-              <button class="menu-input-btn" id="drawSizePlus">+</button>
-            </div>
-
-            <!-- Row 4: Opacity slider with +/- -->
-            <div class="draw-palette-row draw-slider-row" style="gap:4px;">
-              <span class="draw-softness-label" title="Opacity">OPAC</span><span class="draw-value-label" id="drawOpacityLabel" style="margin-left:4px;min-width:32px;">100%</span>
-              <button class="menu-input-btn" id="drawOpacityMinus">−</button>
-              <input type="range" class="draw-size-slider" id="drawOpacitySlider" min="5" max="100" value="100" style="flex:1;">
-              <button class="menu-input-btn" id="drawOpacityPlus">+</button>
-            </div>
-
-            
-
-            <!-- Row 5: Edge Softness -->
-            <div class="draw-palette-row draw-slider-row" style="gap:4px;">
-              <span class="draw-softness-label" title="Edge Softness">EDGE</span><span class="draw-value-label" id="edgeSoftnessLabel" style="margin-left:4px;min-width:26px;">0%</span>
-              <button class="menu-input-btn" id="edgeSoftnessMinus">−</button>
-              <input type="range" class="draw-size-slider" id="edgeSoftnessSlider" min="0" max="100" value="0" style="flex:1;" title="Edge Softness">
-              <button class="menu-input-btn" id="edgeSoftnessPlus">+</button>
-            </div>
-
-          </div>
-        </div>
-      <!-- Row 6: Actions + Long Stroke with +/- -->
-      <div class="draw-palette-row draw-palette-full-row" style="gap:3px;align-items:center;flex-wrap:wrap;">
-        <button class="draw-btn" id="drawUndo" title="Undo (Z)">↶</button>
-        <button class="draw-btn" id="drawOnion" title="Onion Skin">◐</button>
-        <button class="draw-btn" id="drawClear" title="Clear (C)">✕</button>
-        <div class="draw-row-sep"></div>
-        <button class="draw-btn" id="savePointSave1" title="Save drawing to slot 1">S1</button>
-        <button class="draw-btn" id="savePointLoad1" title="Load drawing from slot 1" style="opacity:0.35">L1</button>
-        <button class="draw-btn" id="savePointSave2" title="Save drawing to slot 2">S2</button>
-        <button class="draw-btn" id="savePointLoad2" title="Load drawing from slot 2" style="opacity:0.35">L2</button>
-        <button class="draw-btn" id="savePointSave3" title="Save drawing to slot 3">S3</button>
-        <button class="draw-btn" id="savePointLoad3" title="Load drawing from slot 3" style="opacity:0.35">L3</button>
-        <button class="draw-btn wide" id="applyTemplateToFrames" title="Apply TEMPLATE layer into per-frame drawings">APLY TMPL</button>
-        <div class="draw-row-sep"></div>
-        <button class="draw-btn" id="drawOneFrameBtn" title="One Frame — no cross-frame bleed">1F</button>
-        <button class="draw-btn" id="drawLongStroke" title="Long Stroke (L)">⟿</button>
-        <button class="menu-input-btn" id="trailMinus">−</button>
-        <input type="number" class="menu-input menu-input-compact" id="longStrokeFade" value="8" min="0" max="100" title="Trail frames">
-        <button class="menu-input-btn" id="trailPlus">+</button>
-      </div>
-      </div>
-
-<!-- Hidden elements for compatibility -->
-      <div style="display:none;">
-        <button id="drawEyedropper"></button>
-<button id="drawToggle"></button>
-        <div id="drawSizePreview"><div id="drawSizeDot"></div></div>
-      </div>
-
+<!-- One drawing panel, desktop and mobile share state/commands. -->
+<div class="draw-palette integrated-draw" id="drawPalette">
+ <div id="drawDragHandle" aria-label="Drag drawing panel"></div>
+ <div class="ink-tools">
+  <select id="drawBrushType" aria-label="Drawing tool"><option value="round">Round</option><option value="spray">Spray</option><option value="fill">Fill</option></select>
+  <button type="button" class="draw-btn " id="drawEraser" title="Eraser" aria-label="Eraser"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m14 3 7 7-11 11H5l-4-4L14 3Z M7 11l7 7 M10 21h12"/></svg></button>
+  <button type="button" class="draw-btn " id="drawTargetCycle" title="Target: FRM / TPL / BG (E / W / Q)" aria-label="Target: FRM / TPL / BG (E / W / Q)">FRM</button><span></span>
+  <button type="button" data-quick-color="0" class="ink-color" aria-label="Quick color 1"></button><button type="button" data-quick-color="1" class="ink-color" aria-label="Quick color 2"></button><button type="button" data-quick-color="2" class="ink-color" aria-label="Quick color 3"></button>
+  <label class="ink-picker" title="Edit selected color"><input type="color" id="drawColorInput" value="#ffffff" aria-label="Edit selected color"><span aria-hidden="true">+</span></label>
+ </div>
+ <div class="ink-parameter"><select id="drawParameter" aria-label="Parameter"><option value="size">Size</option><option value="opacity">Opacity</option><option value="edge">Edge</option></select><button type="button" class="draw-btn " id="drawParameterMinus" title="Decrease parameter" aria-label="Decrease parameter">−</button><input id="drawParameterSlider" class="draw-size-slider" type="range" min="1" max="120" value="4" aria-label="Brush parameter"><button type="button" class="draw-btn " id="drawParameterPlus" title="Increase parameter" aria-label="Increase parameter">+</button><input id="drawParameterNumber" type="number" min="1" max="120" value="4" aria-label="Size"></div>
+ <div class="ink-actions"><button type="button" class="draw-btn " id="drawUndo" title="Undo (Z)" aria-label="Undo (Z)">↶</button><button type="button" class="draw-btn " id="drawRedo" title="Redo (Shift+Z)" aria-label="Redo (Shift+Z)">↷</button><button type="button" class="draw-btn " id="drawOneFrameBtn" title="Clip to one frame" aria-label="Clip to one frame">1F</button><button type="button" class="draw-btn " id="drawLongStroke" title="Long Stroke (L)" aria-label="Long Stroke (L)">Long</button><button type="button" class="draw-btn " id="drawSave" title="Save drawing" aria-label="Save drawing">Save</button><button type="button" class="draw-btn " id="drawClear" title="Clear target (C)" aria-label="Clear target (C)">Clear</button><button type="button" class="draw-btn " id="drawBrushLock" title="Brush on/off (A)" aria-label="Brush on/off (A)">Draw</button></div>
+ <div class="ink-slots-desktop"><div class="ink-slot-pair"><button type="button" class="draw-btn " id="savePointSave1" title="Save all drawings to slot 1" aria-label="Save all drawings to slot 1">S1</button><button type="button" class="draw-btn " id="savePointLoad1" title="Load slot 1" aria-label="Load slot 1">L1</button></div><div class="ink-slot-pair"><button type="button" class="draw-btn " id="savePointSave2" title="Save all drawings to slot 2" aria-label="Save all drawings to slot 2">S2</button><button type="button" class="draw-btn " id="savePointLoad2" title="Load slot 2" aria-label="Load slot 2">L2</button></div><div class="ink-slot-pair"><button type="button" class="draw-btn " id="savePointSave3" title="Save all drawings to slot 3" aria-label="Save all drawings to slot 3">S3</button><button type="button" class="draw-btn " id="savePointLoad3" title="Load slot 3" aria-label="Load slot 3">L3</button></div></div>
+ <div id="drawSavePopover" hidden><button class="draw-btn" id="drawSaveFile">Save drawing file</button><div class="ink-mobile-slots"><div class="ink-slot-pair"><button type="button" class="draw-btn " id="savePointMobileSave1" title="Save all drawings to slot 1" aria-label="Save all drawings to slot 1">S1</button><button type="button" class="draw-btn " id="savePointMobileLoad1" title="Load slot 1" aria-label="Load slot 1">L1</button></div><div class="ink-slot-pair"><button type="button" class="draw-btn " id="savePointMobileSave2" title="Save all drawings to slot 2" aria-label="Save all drawings to slot 2">S2</button><button type="button" class="draw-btn " id="savePointMobileLoad2" title="Load slot 2" aria-label="Load slot 2">L2</button></div><div class="ink-slot-pair"><button type="button" class="draw-btn " id="savePointMobileSave3" title="Save all drawings to slot 3" aria-label="Save all drawings to slot 3">S3</button><button type="button" class="draw-btn " id="savePointMobileLoad3" title="Load slot 3" aria-label="Load slot 3">L3</button></div></div></div>
+</div>
+<div id="drawingStatus" role="status" hidden></div>
       <!-- Template Frame Window (LIVE layer editor) -->
       <div class="template-frame" id="templateFrame" style="left:20px;top:20px;width:320px;height:200px;">
         <div class="template-frame-header" id="templateFrameHeader">
@@ -222,7 +148,7 @@
         </div>
         <div class="drop-zone-text">
           <div class="dz-title">TimeGrid</div>
-          <div class="dz-version">28.35.0-drawing.2</div>
+          <div class="dz-version">28.35.0-drawing.9</div>
           <div class="dz-subtitle"><div>Experimental <a class="drop-zone-support-link" href="https://grisha-tsvetkov.com/lab/timegrid" target="_blank" rel="noopener noreferrer">tool</a> for frame sampling and sequencing.</div><div>Sample, arrange, draw on, and export frames from video and images.</div></div>
 </div>
         <div class="drop-zone-btn-row">
@@ -768,36 +694,17 @@
           </div>
       </div>
 
-<div class="menu-section collapsed">
-        <div class="menu-section-title">Draw</div>
-        <div class="menu-section-content">
-<div class="menu-row">
-            <span class="menu-label">Spray Spread</span>
-            <div class="menu-slider-row">
-              <input type="range" class="menu-slider" id="sprayScatterSlider" min="5" max="300" value="150">
-              <span class="menu-slider-value" id="sprayScatterValue">150%</span>
-            </div>
-          </div>
-          <div class="menu-row">
-            <span class="menu-label">Spray Dot</span>
-            <div class="menu-slider-row">
-              <input type="range" class="menu-slider" id="sprayDotScaleSlider" min="5" max="300" value="10">
-              <span class="menu-slider-value" id="sprayDotScaleValue">10%</span>
-            </div>
-          </div>
-            
-          <div class="menu-row">
-            <span class="menu-label">Brush Panel</span>
-            <div class="menu-toggle-switch" id="toggleBrushPanel"></div>
-          </div>
-          <div class="menu-row">
-            <span class="menu-label">BG Draw Order</span>
-            <div class="menu-toggle-switch" id="toggleBgAboveDrawings"></div>
-          </div>
-
-        </div>
-      </div>
-
+<div class="menu-section collapsed" id="drawSettingsSection"><div class="menu-section-title">Draw</div><div class="menu-section-content">
+ <div class="menu-subtitle">Color</div><div class="menu-label">Recent · X / Shift+X</div><div id="recentColorsRow" class="ink-full-palette"></div>
+ <div class="menu-row"><span class="menu-label">Video palette · V</span><button class="menu-input-btn" id="genVideoPalette" title="Generate whole-video palette">↻</button></div><div id="videoPaletteRow" class="ink-full-palette"></div>
+ <div class="menu-row"><span class="menu-label">Current frame · Shift+V</span><button class="menu-input-btn" id="genFramePalette" title="Generate current-frame palette">↻</button></div>
+ <div class="menu-subtitle">Brush</div><div class="menu-row"><label class="menu-label" for="drawSizeSlider">Size</label><div class="menu-slider-row"><input class="menu-slider" id="drawSizeSlider" type="range" min="1" max="120" value="4"><span class="menu-slider-value" id="drawSizeSliderValue">4</span></div></div><div class="menu-row"><label class="menu-label" for="drawOpacitySlider">Opacity</label><div class="menu-slider-row"><input class="menu-slider" id="drawOpacitySlider" type="range" min="5" max="100" value="100"><span class="menu-slider-value" id="drawOpacitySliderValue">100%</span></div></div><div class="menu-row"><label class="menu-label" for="edgeSoftnessSlider">Edge</label><div class="menu-slider-row"><input class="menu-slider" id="edgeSoftnessSlider" type="range" min="0" max="100" value="0"><span class="menu-slider-value" id="edgeSoftnessSliderValue">0%</span></div></div><div class="menu-row"><label class="menu-label" for="drawStabilizer">Stabilizer</label><div class="menu-slider-row"><input class="menu-slider" id="drawStabilizer" type="range" min="0" max="100" value="50"><span class="menu-slider-value" id="drawStabilizerValue">50%</span></div></div><div class="menu-row"><label class="menu-label" for="drawSmoothing">Smoothing</label><div class="menu-slider-row"><input class="menu-slider" id="drawSmoothing" type="range" min="0" max="100" value="50"><span class="menu-slider-value" id="drawSmoothingValue">50%</span></div></div>
+ <div class="menu-row"><span class="menu-label">Pen pressure</span><button type="button" class="menu-toggle-switch active" id="drawPressure" aria-label="Pen pressure" aria-pressed="true"></button></div><div class="menu-row"><span class="menu-label">Speed · fast = thick</span><button type="button" class="menu-toggle-switch " id="drawSpeed" aria-label="Speed · fast = thick" aria-pressed="false"></button></div><div class="menu-row"><span class="menu-label">Draw with finger</span><button type="button" class="menu-toggle-switch active" id="drawWithFinger" aria-label="Draw with finger" aria-pressed="true"></button></div>
+ <div class="menu-subtitle">Spray</div><div class="menu-row"><label class="menu-label" for="sprayScatterSlider">Spread</label><div class="menu-slider-row"><input class="menu-slider" id="sprayScatterSlider" type="range" min="5" max="300" value="150"><span class="menu-slider-value" id="sprayScatterSliderValue">150%</span></div></div><div class="menu-row"><label class="menu-label" for="sprayDotScaleSlider">Dot size</label><div class="menu-slider-row"><input class="menu-slider" id="sprayDotScaleSlider" type="range" min="5" max="300" value="50"><span class="menu-slider-value" id="sprayDotScaleSliderValue">50%</span></div></div><div class="menu-row"><label class="menu-label" for="sprayDensitySlider">Density</label><div class="menu-slider-row"><input class="menu-slider" id="sprayDensitySlider" type="range" min="10" max="300" value="100"><span class="menu-slider-value" id="sprayDensitySliderValue">100%</span></div></div>
+ <div class="menu-subtitle">Drawing</div><div class="menu-row"><label class="menu-label" for="longStrokeFade">Long · Trail frames</label><input type="number" class="menu-input" id="longStrokeFade" value="8" min="0" max="100"></div>
+ <div class="menu-row"><span class="menu-label">Onion skin</span><button type="button" class="menu-toggle-switch " id="drawOnion" aria-label="Onion skin" aria-pressed="false"></button></div><div class="menu-row"><span class="menu-label">Show TPL · T</span><button type="button" class="menu-toggle-switch active" id="toggleTemplateVisibility" aria-label="Show TPL · T" aria-pressed="true"></button></div><div class="menu-row"><span class="menu-label">Apply TPL to frames</span><button class="menu-input-btn ink-menu-action" id="applyTemplateToFrames">Apply</button></div><div class="menu-row"><span class="menu-label">BG above frames</span><button type="button" class="menu-toggle-switch active" id="toggleBgAboveDrawings" aria-label="BG above frames" aria-pressed="true"></button></div><div class="menu-row"><span class="menu-label">Brush panel · P</span><button type="button" class="menu-toggle-switch " id="toggleBrushPanel" aria-label="Brush panel · P" aria-pressed="false"></button></div>
+ <div class="menu-row"><span class="menu-label">Drawing file</span><button class="menu-input-btn ink-menu-action" id="drawOpen">Open</button><input type="file" accept=".json,application/json" id="drawOpenFile" hidden></div>
+ </div></div>
 
       <!-- CHRONOPHOTO -->
             <div class="menu-section collapsed" id="colorCorrSection">
@@ -1656,7 +1563,7 @@
           <div class="about-toggle"></div>
         </div>
         <div class="about-content">
-          <div class="about-version">28.35.0-drawing.2</div>
+          <div class="about-version">28.35.0-drawing.9</div>
           <div class="about-description">Video frame extraction tool for contact sheets, storyboards, and AI analysis.</div>
           
                     <div class="menu-row" style="margin-bottom: 12px; justify-content: space-between; padding-right: 4px;">
@@ -1771,6 +1678,6 @@
   </svg>
 
 
-<a href="./drawing-lab.html" style="position:fixed;right:12px;bottom:12px;z-index:100000;background:#222;color:#ffa0b7;padding:8px 12px;border:1px solid #666;border-radius:6px;font:12px sans-serif">Drawing Lab · perfect-freehand ↗</a>
+
 </body>
 </html>

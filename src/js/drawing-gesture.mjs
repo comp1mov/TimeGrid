@@ -1,5 +1,6 @@
 import {
   createStroke,
+  LEGACY_GEOMETRY,
   renderInstances,
   intersects,
   FRAME_W,
@@ -11,9 +12,7 @@ import {
   BG_COORD_LIMIT,
 } from './stroke-document.mjs';
 import { StampStream, stampBounds } from './brush-geometry.mjs';
-const W = FRAME_W,
-  H = FRAME_H,
-  copy = (p) => p.slice(),
+const copy = (p) => p.slice(),
   unique = (ps) => {
     const seen = new Set();
     return ps.filter((p) => {
@@ -36,9 +35,11 @@ export class DrawingGesture {
     trail = 8,
     tick = 0,
     playing = false,
+    frameSize = document.size('tpl'),
   }) {
     Object.assign(this, {
       document,
+      frameSize,
       brush: { ...brush },
       target,
       view,
@@ -75,6 +76,7 @@ export class DrawingGesture {
     return best && distance <= Math.min(12, best.w * 0.5) ? best : null;
   }
   mapping(p) {
+    const { w: W, h: H } = this.frameSize;
     const c = this.composition;
     if (
       this.target !== 'bg' &&
@@ -83,7 +85,7 @@ export class DrawingGesture {
       return null;
     if (this.target === 'bg') {
       const r = this.composition,
-        ext = surfaceSize('bg-' + this.view);
+        ext = this.document.size('bg-' + this.view);
       const q = [
         ((p[0] - r.x) / r.w) * ext.w,
         ((p[1] - r.y) / r.h) * ext.h,
@@ -125,6 +127,7 @@ export class DrawingGesture {
     };
   }
   placements(stroke, mapping, visit = this.visits) {
+    const { w: W, h: H } = this.frameSize;
     if (this.target === 'bg') return [{ surface: stroke.surface, x: 0, y: 0 }];
     const origin = mapping.origin,
       scale = origin.w / W;
@@ -161,6 +164,14 @@ export class DrawingGesture {
         surface: m.surface,
         placements: [],
         space: m.space,
+        ...(this.document.geometry !== LEGACY_GEOMETRY
+          ? {
+              coordinateFrame:
+                this.target === 'bg'
+                  ? this.document.size(m.surface)
+                  : this.frameSize,
+            }
+          : {}),
         ...(this.target === 'bg' ? { overflow: true } : {}),
       },
       mapping: m,
@@ -217,6 +228,14 @@ export class DrawingGesture {
           engine: ENGINE_VERSION,
           renderer: 'stamps-v2',
           space: m.space,
+          ...(this.document.geometry !== LEGACY_GEOMETRY
+            ? {
+                coordinateFrame:
+                  this.target === 'bg'
+                    ? this.document.size(m.surface)
+                    : this.frameSize,
+              }
+            : {}),
           ...(this.target === 'bg' ? { overflow: true } : {}),
         };
         stroke.placements = this.placements(stroke, m);
@@ -278,7 +297,7 @@ export class DrawingGesture {
           ...part.stroke.placements,
           ...this.placements(part.stroke, mapping),
         ]);
-        if (placements.length > 2048)
+        if (placements.length > Math.max(2048, this.document.geometry.count))
           throw Error('Temporal gesture limit reached. Release to continue.');
         const extra = (placements.length - part.stroke.placements.length) * 128;
         if (
@@ -294,6 +313,6 @@ export class DrawingGesture {
     this.seal();
     return this.parts
       .map((p) => p.stroke)
-      .filter((s) => renderInstances(s).length);
+      .filter((s) => this.document.instancesFor(s).length);
   }
 }

@@ -36,7 +36,7 @@ export class StrokeTileCache {
     if (append) {
       // Existing cached tiles already contain the prefix. Paint each new operation once.
       for (const s of next.slice(this.drafts.length))
-        for (const item of renderInstances(s)) {
+        for (const item of this.doc.instancesFor(s)) {
           for (const tile of this.tiles.values())
             if (
               tile.surface === item.surface &&
@@ -51,13 +51,13 @@ export class StrokeTileCache {
         after = new Map(next.map((s) => [s.id, s]));
       for (const s of [...this.drafts, ...next])
         if (before.get(s.id) !== after.get(s.id)) {
-          for (const item of renderInstances(s))
+          for (const item of this.doc.instancesFor(s))
             this.invalidate(item.surface, item.box);
           this.paths.delete(s.id);
         }
     }
     this.drafts = next;
-    this.draftInstances = next.flatMap(renderInstances);
+    this.draftInstances = next.flatMap((s) => this.doc.instancesFor(s));
   }
   commitDrafts(strokes) {
     this.promoting = true;
@@ -120,7 +120,7 @@ export class StrokeTileCache {
       this.hits++;
       return tile;
     }
-    const size = surfaceSize(surface),
+    const size = this.doc.size(surface),
       step = TILE / level;
     const x = tx * step,
       y = ty * step,
@@ -170,12 +170,12 @@ export class StrokeTileCache {
     return tile;
   }
   draw(ctx, surface, rect, dpr = 1, clip = rect) {
-    const size = surfaceSize(surface),
+    const size = this.doc.size(surface),
       extended = this.extended(surface);
     const level = Math.max(
       1 / 32,
       Math.min(
-        4,
+        16,
         2 ** Math.ceil(Math.log2(Math.max(0.001, (rect.w / size.w) * dpr))),
       ),
     );

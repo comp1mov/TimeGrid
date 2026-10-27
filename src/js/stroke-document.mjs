@@ -67,13 +67,43 @@ export function bounds(points, pad = 0) {
     h: bottom - y + pad * 2,
   };
 }
-export function surfaceSize(id) {
-  return id === 'bg-grid' || id === 'sheet'
-    ? { w: 8 * FRAME_W, h: 12 * FRAME_H }
-    : { w: FRAME_W, h: FRAME_H };
+export const LEGACY_GEOMETRY = Object.freeze({
+  width: FRAME_W,
+  height: FRAME_H,
+  count: 96,
+  gridWidth: 8 * FRAME_W,
+  gridHeight: 12 * FRAME_H,
+});
+export function documentGeometry(raw = LEGACY_GEOMETRY) {
+  const g = {
+    width: raw.width,
+    height: raw.height,
+    count: raw.count,
+    gridWidth: raw.gridWidth ?? raw.width * 8,
+    gridHeight: raw.gridHeight ?? raw.height * Math.ceil(raw.count / 8),
+  };
+  if (
+    ![g.width, g.height, g.gridWidth, g.gridHeight].every(
+      (n) => finite(n) && n >= 1 && n <= 131072,
+    ) ||
+    !Number.isInteger(g.count) ||
+    g.count < 1 ||
+    g.count > 10000
+  )
+    throw Error('Invalid document geometry.');
+  return Object.freeze(g);
 }
-export function validSurface(id) {
-  return /^(tpl|bg-grid|bg-single|frame-(?:[0-9]|[1-8][0-9]|9[0-5]))$/.test(id);
+export function surfaceSize(id, geometry = LEGACY_GEOMETRY) {
+  return id === 'bg-grid' || id === 'sheet'
+    ? { w: geometry.gridWidth, h: geometry.gridHeight }
+    : { w: geometry.width, h: geometry.height };
+}
+export function validSurface(id, geometry = LEGACY_GEOMETRY) {
+  if (/^(tpl|bg-grid|bg-single)$/.test(id)) return true;
+  return (
+    /^frame-(0|[1-9][0-9]{0,4})$/.test(id) &&
+    Number(id.slice(6)) < geometry.count
+  );
 }
 function cells(box) {
   const out = [];
@@ -227,6 +257,7 @@ export function createStroke({
   placements,
   space,
   overflow,
+  coordinateFrame,
 }) {
   const stamped = type === 'spray' || softness > 0;
   const outline = stamped
@@ -240,6 +271,7 @@ export function createStroke({
         last,
       });
   const s = {
+    ...(coordinateFrame ? { coordinateFrame: { ...coordinateFrame } } : {}),
     id,
     surface,
     points: points.map((p) => [...p]),
@@ -280,12 +312,17 @@ export function createStroke({
 const instanceMemo = new WeakMap();
 // Instances reference one immutable geometry. Crossing 96 frames never copies
 // the points or restarts pressure, caps, streamline, or edge smoothing.
-export function renderInstances(s) {
-  let out = instanceMemo.get(s);
+export function renderInstances(s, geometry = LEGACY_GEOMETRY) {
+  let memo = instanceMemo.get(s);
+  if (!memo) instanceMemo.set(s, (memo = new WeakMap()));
+  let out = memo.get(geometry);
   if (out) return out;
   out = s.placements
     .map((p, order) => {
-      const extent = surfaceSize(p.surface),
+      const destination = surfaceSize(p.surface, geometry),
+        extent = s.coordinateFrame || destination,
+        sx = destination.w / extent.w,
+        sy = destination.h / extent.h,
         x = s.overflow ? s.box.x + p.x : Math.max(0, s.box.x + p.x),
         y = s.overflow ? s.box.y + p.y : Math.max(0, s.box.y + p.y),
         right = s.overflow
@@ -299,14 +336,21 @@ export function renderInstances(s) {
         key: s.id + '@' + order,
         surface: p.surface,
         stroke: s,
+        geometry,
+        transform: { sx, sy },
         placement: p,
         brush: s.brush,
         order,
-        box: { x, y, w: Math.max(0, right - x), h: Math.max(0, bottom - y) },
+        box: {
+          x: x * sx,
+          y: y * sy,
+          w: Math.max(0, right - x) * sx,
+          h: Math.max(0, bottom - y) * sy,
+        },
       };
     })
     .filter((i) => i.box.w > 0 && i.box.h > 0);
-  instanceMemo.set(s, out);
+  memo.set(geometry, out);
   return out;
 }
 function freezeStroke(s) {
@@ -326,12 +370,16 @@ function freezeStroke(s) {
   s.placements.forEach(Object.freeze);
   Object.freeze(s.placements);
   if (s.space) Object.freeze(s.space);
+  if (s.coordinateFrame) Object.freeze(s.coordinateFrame);
   Object.freeze(s.brush);
   Object.freeze(s.box);
   return Object.freeze(s);
 }
 export class StrokeDocument {
-  constructor() {
+  constructor(geometry = LEGACY_GEOMETRY) {
+    this.geometry =
+      geometry === LEGACY_GEOMETRY ? geometry : documentGeometry(geometry);
+    this.bindings = [];
     this.strokes = [];
     this.byId = new Map();
     this.instances = new Map();
@@ -346,6 +394,12 @@ export class StrokeDocument {
     this.totalPoints = 0;
     this.storageEstimate = 0;
   }
+  size(surface) {
+    return surfaceSize(surface, this.geometry);
+  }
+  instancesFor(stroke) {
+    return renderInstances(stroke, this.geometry);
+  }
   onChange(fn) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -356,7 +410,7 @@ export class StrokeDocument {
   _index(s) {
     this.byId.set(s.id, s);
     if (s.overflow) this.extendedSurfaces.add(s.surface);
-    for (const item of renderInstances(s)) {
+    for (const item of this.instancesFor(s)) {
       this.instances.set(item.key, item);
       let grid = this.index.get(item.surface);
       if (!grid) this.index.set(item.surface, (grid = new Map()));
@@ -384,7 +438,7 @@ export class StrokeDocument {
     this.revision++;
     const dirty = new Map();
     for (const s of changed)
-      for (const item of renderInstances(s))
+      for (const item of this.instancesFor(s))
         dirty.set(item.surface, union(dirty.get(item.surface), item.box));
     for (const fn of this.listeners) fn({ dirty, revision: this.revision });
   }
@@ -396,8 +450,8 @@ export class StrokeDocument {
     const seen = new Set();
     for (let i = this.undoStack.length - 1; i >= 0; i--) {
       for (const s of this.undoStack[i].items)
-        if (!seen.has(s.id)) {
-          seen.add(s.id);
+        if (!seen.has(s)) {
+          seen.add(s);
           cost += geometryCost(s);
         }
       if (keep >= 100 || (cost > HISTORY_BUDGET && keep > 0)) break;
@@ -417,7 +471,7 @@ export class StrokeDocument {
       );
     let last = Number(this.strokes.at(-1)?.id.slice(1) || 0);
     for (const s of strokes) {
-      validateStroke(s);
+      validateStroke(s, this.geometry);
       const n = Number(s.id.slice(1));
       if (n <= last) throw Error('Stroke IDs must preserve paint order.');
       last = n;
@@ -429,7 +483,7 @@ export class StrokeDocument {
       );
     const items = strokes.map(freezeStroke);
     this.storageEstimate += extra;
-    this.strokes.push(...items);
+    this.strokes = [...this.strokes, ...items];
     for (const s of items) {
       this._index(s);
       this.totalPoints += s.points.length;
@@ -461,7 +515,7 @@ export class StrokeDocument {
       .filter(Boolean);
     let last = Number(kept.at(-1)?.id.slice(1) || 0);
     for (const s of additions) {
-      validateStroke(s);
+      validateStroke(s, this.geometry);
       const n = Number(s.id.slice(1));
       if (n <= last) throw Error('Stroke IDs must preserve paint order.');
       last = n;
@@ -485,10 +539,39 @@ export class StrokeDocument {
     });
     this._emit([...before, ...after]);
   }
+  replaceDocument(other) {
+    const snapshot = (d) => ({
+      geometry: d.geometry,
+      bindings: d.bindings.slice(),
+      settings: structuredClone(d.settings),
+      strokes: d.strokes.slice(),
+      nextId: d.nextId,
+    });
+    const before = snapshot(this),
+      after = snapshot(other);
+    this._restoreDocument(after);
+    this._record({
+      kind: 'document',
+      before,
+      after,
+      items: [...before.strokes, ...after.strokes],
+    });
+    this._emit([...before.strokes, ...after.strokes]);
+  }
+  _restoreDocument(snapshot) {
+    Object.assign(this, {
+      ...snapshot,
+      strokes: snapshot.strokes.slice(),
+      bindings: snapshot.bindings.slice(),
+      settings: structuredClone(snapshot.settings),
+    });
+    this._reindex();
+  }
   undo() {
     const c = this.undoStack.pop();
     if (!c) return false;
-    if (c.kind === 'replace') this.strokes = c.before;
+    if (c.kind === 'document') this._restoreDocument(c.before);
+    else if (c.kind === 'replace') this.strokes = c.before;
     else if (c.kind === 'add')
       this.strokes = this.strokes.slice(0, -c.items.length);
     else this.strokes = [...c.items];
@@ -500,8 +583,9 @@ export class StrokeDocument {
   redo() {
     const c = this.redoStack.pop();
     if (!c) return false;
-    if (c.kind === 'replace') this.strokes = c.after;
-    else if (c.kind === 'add') this.strokes.push(...c.items);
+    if (c.kind === 'document') this._restoreDocument(c.after);
+    else if (c.kind === 'replace') this.strokes = c.after;
+    else if (c.kind === 'add') this.strokes = [...this.strokes, ...c.items];
     else this.strokes = [];
     this._reindex();
     this.undoStack.push(c);
@@ -525,9 +609,15 @@ export class StrokeDocument {
     return JSON.stringify(
       {
         format: STROKE_FORMAT,
-        schema: STROKE_SCHEMA,
+        schema: this.geometry === LEGACY_GEOMETRY ? STROKE_SCHEMA : 7,
         engine: ENGINE_VERSION,
-        frame: { width: FRAME_W, height: FRAME_H, count: 96 },
+        frame:
+          this.geometry === LEGACY_GEOMETRY
+            ? { width: FRAME_W, height: FRAME_H, count: 96 }
+            : this.geometry,
+        ...(this.geometry !== LEGACY_GEOMETRY
+          ? { bindings: this.bindings }
+          : {}),
         settings: this.settings,
         strokes: this.strokes,
       },
@@ -547,19 +637,31 @@ export class StrokeDocument {
     const data = JSON.parse(text);
     if (
       data?.format !== STROKE_FORMAT ||
-      ![1, 2, 3, 4, 5, 6].includes(data.schema) ||
+      ![1, 2, 3, 4, 5, 6, 7].includes(data.schema) ||
       data.engine !== ENGINE_VERSION
     )
       throw Error('Unsupported drawing format or engine version.');
     if (
-      data.frame?.width !== FRAME_W ||
-      data.frame?.height !== FRAME_H ||
-      data.frame?.count !== 96
+      data.schema < 7 &&
+      (data.frame?.width !== FRAME_W ||
+        data.frame?.height !== FRAME_H ||
+        data.frame?.count !== 96)
     )
       throw Error('Unsupported frame geometry.');
     if (!Array.isArray(data.strokes) || data.strokes.length > LIMITS.strokes)
       throw Error('Invalid stroke list.');
-    const doc = new StrokeDocument();
+    const doc = new StrokeDocument(
+      data.schema === 7 ? documentGeometry(data.frame) : LEGACY_GEOMETRY,
+    );
+    if (data.schema === 7) {
+      if (
+        !Array.isArray(data.bindings) ||
+        data.bindings.length > doc.geometry.count ||
+        data.bindings.some((k) => typeof k !== 'string' || k.length > 512)
+      )
+        throw Error('Invalid frame bindings.');
+      doc.bindings = data.bindings.slice();
+    }
     if (data.schema >= 4) doc.settings = validateSettings(data.settings || {});
     let last = 0;
     for (const raw of data.strokes) {
@@ -567,6 +669,11 @@ export class StrokeDocument {
         throw Error('Extended BG requires schema 5.');
       if (data.schema < 6 && (raw?.fill || raw?.children?.some((c) => c.fill)))
         throw Error('Fill requires schema 6.');
+      if (
+        data.schema < 7 &&
+        (raw?.coordinateFrame || raw?.children?.some((c) => c.coordinateFrame))
+      )
+        throw Error('Reference geometry requires schema 7.');
       const b = raw?.brush;
       const s = {
         ...raw,
@@ -594,7 +701,7 @@ export class StrokeDocument {
             }
           : null,
       };
-      validateStroke(s);
+      validateStroke(s, doc.geometry);
       const id = Number(s.id.slice(1));
       if (id <= last) throw Error('Stroke order or ID is invalid.');
       last = id;
@@ -620,6 +727,9 @@ export class StrokeDocument {
           ? { fill: { ...s.fill, runs: s.fill.runs.map((r) => r.slice()) } }
           : {}),
         ...(s.space ? { space: { ...s.space } } : {}),
+        ...(s.coordinateFrame
+          ? { coordinateFrame: { ...s.coordinateFrame } }
+          : {}),
         ...(s.overflow ? { overflow: true } : {}),
         ...(s.renderer.startsWith('stamps-')
           ? { stamps: s.stamps.map((p) => p.slice()) }
@@ -645,6 +755,9 @@ export class StrokeDocument {
                     : {}),
                   placements: child.placements.map((p) => ({ ...p })),
                   ...(child.space ? { space: { ...child.space } } : {}),
+                  ...(child.coordinateFrame
+                    ? { coordinateFrame: { ...child.coordinateFrame } }
+                    : {}),
                   ...(child.stamps
                     ? { stamps: child.stamps.map((p) => p.slice()) }
                     : {}),
@@ -668,7 +781,17 @@ export class StrokeDocument {
     return doc;
   }
 }
-function validateStroke(s) {
+function validateStroke(s, geometry = LEGACY_GEOMETRY) {
+  if (
+    s?.coordinateFrame &&
+    (!finite(s.coordinateFrame.w) ||
+      !finite(s.coordinateFrame.h) ||
+      s.coordinateFrame.w < 1 ||
+      s.coordinateFrame.h < 1 ||
+      s.coordinateFrame.w > 131072 ||
+      s.coordinateFrame.h > 131072)
+  )
+    throw Error('Invalid stroke reference geometry.');
   if (s?.renderer === 'composite-v1') {
     if (
       !Array.isArray(s.children) ||
@@ -685,14 +808,14 @@ function validateStroke(s) {
         child.placements?.some((p) => p.surface !== 'tpl')
       )
         throw Error('Invalid composite child.');
-      validateStroke(child);
+      validateStroke(child, geometry);
     }
   } else if (s?.children !== undefined)
     throw Error('Unexpected composite children.');
   if (
     !s ||
     !/^s[1-9][0-9]{0,8}$/.test(s.id) ||
-    !(validSurface(s.surface) || s.surface === 'sheet') ||
+    !(validSurface(s.surface, geometry) || s.surface === 'sheet') ||
     s.engine !== ENGINE_VERSION ||
     ![
       'linear-v1',
@@ -735,7 +858,7 @@ function validateStroke(s) {
     throw Error('Invalid extended background.');
   const extent = s.overflow
     ? { w: BG_COORD_LIMIT, h: BG_COORD_LIMIT }
-    : s.space || surfaceSize(s.surface);
+    : s.space || surfaceSize(s.surface, geometry);
   const inputMin = s.overflow ? -BG_COORD_LIMIT : -1024;
   const geometryMin = s.overflow ? -BG_COORD_LIMIT - 4096 : -4096;
   for (const p of s.points)
@@ -776,7 +899,7 @@ function validateStroke(s) {
         p.length !== 3 ||
         !p.every((n) => finite(n) && n === Math.round(n * 10000) / 10000) ||
         p[2] <= 0 ||
-        p[2] > 256 ||
+        p[2] > (geometry === LEGACY_GEOMETRY ? 256 : 2048) ||
         p[0] < geometryMin ||
         p[1] < geometryMin ||
         p[0] > extent.w + 4096 ||
@@ -853,7 +976,7 @@ function validateStroke(s) {
     b.seed > 4294967295 ||
     !finite(b.size) ||
     b.size < 1 ||
-    b.size > 256 ||
+    b.size > (geometry === LEGACY_GEOMETRY ? 256 : 2048) ||
     !/^#[0-9a-f]{6}$/i.test(b.color) ||
     !finite(b.opacity) ||
     b.opacity < 0 ||
@@ -869,13 +992,16 @@ function validateStroke(s) {
     b.streamline > 1
   )
     throw Error('Invalid brush.');
-  if (!Array.isArray(s.placements) || s.placements.length > 2048)
+  if (
+    !Array.isArray(s.placements) ||
+    s.placements.length > Math.max(2048, geometry.count)
+  )
     throw Error('Invalid placements.');
   const seen = new Set();
   for (const p of s.placements) {
     if (
       !p ||
-      !validSurface(p.surface) ||
+      !validSurface(p.surface, geometry) ||
       !finite(p.x) ||
       !finite(p.y) ||
       Math.abs(p.x) > 131072 ||
@@ -928,13 +1054,16 @@ export function paintStroke(
 ) {
   const s = value.stroke || value,
     p = value.placement;
+  const { sx = 1, sy = 1 } = value.transform || {};
+  if (box) box = { x: box.x / sx, y: box.y / sy, w: box.w / sx, h: box.h / sy };
   ctx.save();
+  ctx.scale(sx, sy);
   // The destination clips each surface. Keep raster bleed outside its bounds
   // for bilinear sampling at fractional display scales.
   if (p) ctx.translate(p.x, p.y);
   // Old files keep their original composition crop even alongside new exterior ink.
   if (extendedBG && /^bg-/.test(s.surface) && !s.overflow) {
-    const extent = surfaceSize(s.surface);
+    const extent = surfaceSize(s.surface, value.geometry);
     ctx.beginPath();
     ctx.rect(0, 0, extent.w, extent.h);
     ctx.clip();
@@ -949,6 +1078,7 @@ export function paintStroke(
       ctx,
       s,
       box ? { ...box, x: box.x - (p?.x || 0), y: box.y - (p?.y || 0) } : s.box,
+      value.geometry,
     );
   else if (s.renderer.startsWith('stamps-'))
     paintStamps(
@@ -1055,6 +1185,7 @@ export function validateSettings(raw) {
 }
 
 export function makeComposite(doc, source, destinations) {
+  const { w: W, h: H } = doc.size(source);
   const children = doc.strokes
     .filter((s) => s.placements.some((p) => p.surface === source))
     .map((s) => ({
@@ -1065,10 +1196,10 @@ export function makeComposite(doc, source, destinations) {
   const group = createStroke({
     id: doc.newId(),
     surface: 'sheet',
-    space: { w: FRAME_W, h: FRAME_H },
+    space: { w: W, h: H },
     points: [
       [0, 0, 0.5],
-      [FRAME_W, FRAME_H, 0.5],
+      [W, H, 0.5],
     ],
     size: 1,
     placements: destinations.map((surface) => ({ surface, x: 0, y: 0 })),
@@ -1077,21 +1208,25 @@ export function makeComposite(doc, source, destinations) {
   group.children = children;
   group.outline = [
     [0, 0],
-    [FRAME_W, 0],
-    [FRAME_W, FRAME_H],
-    [0, FRAME_H],
+    [W, 0],
+    [W, H],
+    [0, H],
   ];
   group.box = bounds(group.outline, 1);
   return group;
 }
 const compositePaths = new WeakMap();
-function paintComposite(ctx, s, region) {
+function paintComposite(ctx, s, region, geometry = LEGACY_GEOMETRY) {
+  const { w: W, h: H } = surfaceSize('tpl', geometry);
   const tr = ctx.getTransform(),
-    scale = Math.max(0.03125, Math.min(4, Math.hypot(tr.a, tr.b)));
+    scale = Math.max(
+      0.03125,
+      Math.min(16, Math.max(Math.hypot(tr.a, tr.b), Math.hypot(tr.c, tr.d))),
+    );
   const x = Math.max(-2 / scale, region.x),
     y = Math.max(-2 / scale, region.y);
-  const right = Math.min(FRAME_W + 2 / scale, region.x + region.w),
-    bottom = Math.min(FRAME_H + 2 / scale, region.y + region.h);
+  const right = Math.min(W + 2 / scale, region.x + region.w),
+    bottom = Math.min(H + 2 / scale, region.y + region.h);
   if (right <= x || bottom <= y) return;
   const off = document.createElement('canvas');
   off.width = Math.ceil((right - x) * scale);
@@ -1104,7 +1239,7 @@ function paintComposite(ctx, s, region) {
       path = strokePath(child);
       compositePaths.set(child, path);
     }
-    for (const instance of renderInstances(child))
+    for (const instance of renderInstances(child, geometry))
       if (intersects(instance.box, region))
         paintStroke(c, instance, path, region);
   }

@@ -1,0 +1,68 @@
+{
+  "browser": "156.0.4314.42",
+  "results": [
+    {
+      "portrait": {
+        "count": 128,
+        "width": 576,
+        "height": 1024,
+        "surface": "frame-127",
+        "pixels": 363,
+        "roundtrip": true
+      }
+    },
+    {
+      "video": {
+        "n": 128,
+        "width": 498,
+        "height": 270,
+        "duration": 0.142847,
+        "bindings": 256
+      }
+    },
+    {
+      "performance": {
+        "rectReads": 2,
+        "renders": 191,
+        "p50": 5,
+        "p95": 9.399999976158142,
+        "max": 19.399999976158142,
+        "cache": {
+          "tiles": 96,
+          "bytes": 3852288,
+          "budget": 25165824,
+          "hits": 0,
+          "misses": 10524,
+          "evictions": 0,
+          "pathCount": 1,
+          "rasterMs": 413.0999992489815
+        },
+        "canvas": [
+          1280,
+          812
+        ],
+        "strokeBytes": 57826,
+        "touched": 96
+      }
+    },
+    {
+      "phone": {
+        "viewport": 390,
+        "x": 16,
+        "y": 644,
+        "width": 360,
+        "height": 152
+      }
+    },
+    {
+      "phone": {
+        "viewport": 320,
+        "x": 12,
+        "y": 644,
+        "width": 304,
+        "height": 152
+      }
+    }
+  ],
+  "errors": []
+}

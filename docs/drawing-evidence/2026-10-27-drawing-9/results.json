@@ -1,0 +1,106 @@
+{
+  "results": [
+    {
+      "name": "real import, 96 frame bank, pointer stroke"
+    },
+    {
+      "name": "Undo/Redo hotkeys"
+    },
+    {
+      "name": "S1/Clear/L1"
+    },
+    {
+      "name": "file Save/Open exact roundtrip"
+    },
+    {
+      "name": "columns/spacing preserve stroke data"
+    },
+    {
+      "name": "Single stationary hold across animation frames",
+      "surfaces": [
+        "frame-0",
+        "frame-1",
+        "frame-2",
+        "frame-3",
+        "frame-4",
+        "frame-5"
+      ]
+    },
+    {
+      "name": "closed figure Fill"
+    },
+    {
+      "name": "single PNG download"
+    },
+    {
+      "name": "BG exterior and export bounds toggle",
+      "b": {
+        "x": -37.97777777777775,
+        "y": 163.32883681047792,
+        "w": 19.06666666666667,
+        "h": 249.3920960915803
+      },
+      "yes": {
+        "canvasW": 498,
+        "canvasH": 270,
+        "bodyW": 498,
+        "bodyH": 270,
+        "dx": 18,
+        "dy": 0
+      },
+      "no": {
+        "canvasW": 480,
+        "canvasH": 270,
+        "bodyW": 480,
+        "bodyH": 270,
+        "dx": 0,
+        "dy": 0
+      }
+    },
+    {
+      "name": "Spray full original size range"
+    },
+    {
+      "name": "synthetic pen pressure and palm rejection",
+      "added": 1,
+      "pressure": true,
+      "points": [
+        0.20000000298023224,
+        0.800000011920929
+      ]
+    },
+    {
+      "name": "synthetic single-finger drawing"
+    },
+    {
+      "name": "TPL window and Apply to all 96 source frames"
+    },
+    {
+      "name": "96-frame PNG sequence ZIP with sparse BG"
+    },
+    {
+      "name": "single MP4 download with drawing/BG"
+    },
+    {
+      "name": "grid PNG with current Spacing"
+    },
+    {
+      "name": "square frame Fill stays within mask budget",
+      "step": 1,
+      "roundtrip": true
+    },
+    {
+      "name": "phone three rows and Save slots",
+      "mobile": {
+        "x": 8,
+        "y": 620,
+        "width": 360,
+        "height": 152
+      }
+    },
+    {
+      "name": "no uncaught browser errors"
+    }
+  ],
+  "errors": []
+}

@@ -20,8 +20,8 @@ export async function createFill({
   cancelled = () => false,
 }) {
   const bg = surface.startsWith('bg-');
-  const step = bg ? 1 : 0.5;
-  const extent = surfaceSize(surface);
+  let step = bg ? 1 : 0.5;
+  const extent = doc.size(surface);
   let area = bg ? null : { x: -2, y: -2, w: extent.w + 4, h: extent.h + 4 };
   if (bg) {
     for (const item of doc.instances.values())
@@ -41,6 +41,9 @@ export async function createFill({
     );
     area = { x: left, y: top, w: right - left, h: bottom - top };
   }
+  // Square/custom frames also respect the temporary-mask budget.
+  if (!bg && Math.ceil(area.w / step) * Math.ceil(area.h / step) > MAX_PIXELS)
+    step = 1;
   const w = Math.ceil(area.w / step),
     h = Math.ceil(area.h / step);
   if (
@@ -164,6 +167,7 @@ export async function createFill({
       opacity,
       size: 1,
       overflow: bg,
+      space: extent,
     });
     s.renderer = 'fill-runs-v1';
     s.fill = f;

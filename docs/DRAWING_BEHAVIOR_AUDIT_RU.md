@@ -212,3 +212,101 @@ Live preview должен дополнять новые stamps и обновля
 ## 7. Что сейчас изменено
 
 Добавлены этот аудит, raw browser evidence, диагностический сценарий и обновление плана/истории. App source, зависимости, версии приложений и публичные deployment этим проходом не изменены. Текущий публичный lab остаётся drawing.4. Реализация исправленного стенда следует после согласования перечисленного состава, как ранее потребовал автор.
+
+
+## 8. Интеграция в обычный TimeGrid: согласованный план 27 октября 2026
+
+Статус: работа начата, выпуска интегрированного приложения ещё нет. Источник карты: ordinary app drawing.2 и Lab drawing.8, HEAD 18be376. Старые разделы 1–7 описывают прежний аудит, их измерения не являются тестами новой интеграции. Текущий межлинейный план находится в D:/Antigravity/TimeGrid/docs/DEVELOPMENT_PLAN_RU.md.
+
+Автор утвердил порядок: согласовать панель в настоящем интерфейсе → карта всех подключений → рабочая цепочка реальный материал / рисунок / playback / save / export → удалить заменённый старый код. Stable и Cloud не меняются. Новых режимов импорта, видов материала, пресетов сетки или часов воспроизведения не добавлять. Grid и Single остаются видами одной работы. Новое рисование читает существующие значения Spacing, aspect, frame identity, pattern, direction, loop, phases.
+
+### 8.1. Решения автора и размещение
+
+- Desktop: принята показанная четырёхстрочная перетаскиваемая панель. Шрифт, accent и оформление настоящего TimeGrid. Не переносить визуальную оболочку Lab.
+- Phone: первый макет высотой192px отклонён как слишком большой. Приняты три строки; Save раскрывает сохранение файла и пары S1/L1–S3/L3. Свободное перетаскивание сохраняется и на телефоне. Отдельный постоянный ряд слотов остаётся только desktop.
+- Строка1: Round/Spray/Fill, ластик, одна циклическая FRM/TPL/BG, три быстрых цвета и picker выбранного цвета.
+- Строка2: одна ручка с выбором Size/Opacity/Edge. Значения независимы; смена выбранного параметра не изменяет кисть.
+- Строка3: Undo, Redo, 1F, Long, Save, Clear, Draw/Off. Desktop строка4: три визуально разделённые пары S/L.
+- Боковой Draw: полные Recent и Video palettes, обновление палитры всего видео и текущего кадра; подробные Size/Opacity/Edge, Stabilizer/Smoothing, Pressure/Speed, Draw with finger; Spray Spread/Dot/Density; Trail, Onion, Show TPL, Apply TPL, BG above frames, Brush Panel, Open drawing.
+- Все параметры Draw постоянно доступны при открытом разделе. Выбор Round/Spray/Fill или FRM/TPL/BG не скрывает параметры и не сбрасывает их. Общая оптимизация остальных разделов меню отложена по словам автора.
+- Spray Dot default50% явно выбран автором. Spread150%, density100%. Не подменять default10% старого приложения значением100% стенда.
+- BG above frames defaultON уже есть в ordinary app и сохраняется. Export BG остаётся отдельным существующим флагом.
+- Size сохраняет смысл CSS pixels при масштабе1 (default4), а не значение32 logicalpx из Lab. Opacity100%, Edge0%; новые Stabilizer/Smoothing50%, pressureON, speedOFF являются настройками принятой кисти Lab. Сохранённые strokes используют собственные параметры.
+- Автор не нуждается в миграции старых растровых рисунков. Читатели выпущенных файлов Lab сохраняются. Save drawing не выдаётся за полный медиапроект.
+
+Локальные макеты и фактические размеры: [evidence](drawing-evidence/2026-10-27-integration-panel/README.md). Первый mobile screenshot сохранён как отклонённый вариант, не как утверждённая реализация.
+
+### 8.2. Карта подключений
+
+Номера строк относятся к проверенному main.js drawing.2 на18be376. Имена служат ориентиром после правок. Будущее назначение описывает работу, а не заявляет её выполненной.
+
+| Зона / текущая точка | Существующее поведение | Подключение нового документа / приёмка |
+| --- | --- | --- |
+| state drawing, main.js169+ | BG/TPL/FRM raster, кисть и видимость | Один StrokeDocument; настройки приложения остаются источником команд; не хранить raster atlas рядом |
+| handleFile727, handleVideoFile740, handleImageFiles803 | Текущие video/image/loop/Slice import | Сохранить интерфейс и обработку материала, добавить только привязки рисунков к результату банка |
+| generateFrames1278 | Сразу hardClearAllDrawingsAndUndo; новая выборка | Устранить безусловную потерю рисунка. Новый банк не должен случайно получить старой frame-index рисунок. Совпавшие исходные адреса восстанавливаются; несовпавшие данные не удаляются автоматически |
+| getExportScaledGap267, applySpacing | Spacing в preview CSSpx, export пропорционален frameW/previewCellW | Одна геометрия текущих ячеек для input/preview/export; не копировать Lab Gap1024px или отдельный Margins в UI |
+| setViewMode3582, renderGrid, updateGridColsOnly6743 | Grid/Single/колонки и тот же банк | Менять transform/layout, не пересэмплировать strokes; BG Grid и Single независимы |
+| getDrawingGeometry7082, getFrameAtPoint8043 | Кеш геометрии, dataset.frameIdx читается при hit | Получать текущие rects и реальные frame addresses; не читать DOM96раз на каждую точку |
+| updateAllCells6401/6485 | Обновление dataset.frameIdx, stationary hold, Long | После настоящего frame transition передать layout/tick в DrawingGesture; старый hold/Long удалить после замены |
+| canvasArea nav3055+ | Wheel/pan/touch навигация | Сохранить app navigation, исключить double input; mouse, touch и pen через один drawing coordinator; pinch не рисует |
+| drawCanvas8375–9570 | Три разных mouse/touch/pen ветки | Удалить дублирующие handlers; pointer capture/coalesced points/pressure, cancel/blur сохраняют принятую часть |
+| drawPalette7383/7407 | Drag mouse/touch | Сохранить drag на обоих устройствах, ограничить доступность панели границами viewport; input/select не запускают drag |
+| toggleDrawMode7443, setDrawTarget9951 | D; Q/W/E; FRM при включении; TPL окно | Те же команды, одна кнопка target; Draw mode не останавливает playback |
+| brushLocked7432, qDraw9960+, togglePalette14375 | A отдельно от D; P скрывает только панель | Один command path для кнопок и клавиш, блокировка работает для всех pointer types |
+| setDrawSize6979 / opacity / softness | CSS size1…120, opacity5…100, edge0…100 | Перевод в logical coordinates один раз при начале gesture; сохранять параметры stroke; UI зеркала синхронны |
+| setDrawColor9580; palettes9653/9679/9739/9931 | Recent circles, Video squares, two palette generators | Переместить существующие действия в Draw, сохранить X/ShiftX/V/ShiftV; quick3 и picker являются представлением цвета |
+| Round/Spray/eraser | Старые stamp paths внутри main | PF hard Round; принятые deterministic stamps-v2 для Spray/soft; eraser удаляет только выбранную поверхность |
+| Fill | Нет в ordinary app; createFill вLab.8 | Вызвать принятый flood fill документа на выбранной поверхности, сохранить fixed runs, cancellation/revision guard |
+| 1F / drawOneFrameBtn | Изоляция кисти текущим кадром | Clip реальной ячейки, не atlas-соседа; мышь/перо/touch одинаково; 1Foff сохраняет след на соседях через gap |
+| Long / Trail | Несколько legacy paths/snapshots | DrawingGesture transition/carry; обычное удержание ставит точку на каждом кадре; Trail0=накопление, положительный=окно; один Undo |
+| updateOnionForItem6213 | Два соседних FRM .35, без wrap | Cache.draw соседних logical surfaces; preview only, не сохранять и не экспортировать Onion |
+| compositeAllLayers7850+ | BG/ref/TPL/FRM/ref, BGabove рисуется дважды | Единый порядок и один BG pass; committed+draft tiles, transient viewport canvas; рисунок виден при DrawOFF |
+| TPL window7600–7718,10500–10633 | Отдельное свободное live окно | Тот же TPL document и stroke coordinator, общий Undo; сохранить drag/resize/close/follow окна |
+| Apply TPL10366 | Raster copy во все frames, затем ClearTPL | makeComposite с isolated children, shared geometry/placements; Undo возвращает TPL и прежние FRM |
+| Show TPL10034 | Previewhide, export сейчас игнорирует | Один visibility flag preview/export; исправить известное несовпадение, не вводить новый режим |
+| Reference10152+/drawExportRefFrame12416 | Изображение/transform/opacity/order/export | Сохранить вне stroke document; корректное размещение до/после drawing, followFrameTransform |
+| Clear10320+, Undo10400+ | Targetclear; FRMundo сломан;8raster snapshots | StrokeDocument target transaction, Undo/Redo; ClearFRM всех привязанных кадров, TPL один, BG текущего вида |
+| savePoint/loadPoint15984/16009 | PNG atlas и BG/TPL snapshots; slots session | Immutable document snapshots с бюджетом, пустые слои тоже восстанавливаются; load обратим; один набор3слотов для обеих панелей |
+| Save/Open | LabJSON, в ordinary такого файла нет | Скачать/прочитать stroke document и метаданные привязки; валидация до замены; плохой файл не разрушает текущую работу |
+| resizeDrawCanvas7505, ensureFrameSheet7786 | Пересоздание/масштабирование raster | Только resize viewport cache; удалить atlas, ImageData snapshots, raster resample originals |
+| resetMemoryBtn16108 | Clear + rebuild/revoke; отдельное явное подтверждение | Явный reset по-прежнему очищает через единый command; не путать его с автоматической перестройкой |
+| drawExportDrawings11724 | TPL+FRM atlas per frame | Рендер документа в целевой размер, не растягивать preview-cache в full export |
+| drawExportBgLayer11695 | ФлагBG, отдельные Grid/Single crops | Signed BG bounds, union с композицией при ExportBGon; OFF возвращает исходную область |
+| renderMp4GridFrame11513, renderMp4SingleFrame12466 | Grid/Single frames для video pipeline | Те же media/effects/audio/time inputs; shared drawing render, BG crop/frame placement на каждом tick |
+| exportImage13481 / exportSingleStill13884 | PNG/JPEG, metadata, guides, padding, background | Общий drawing recipe, сохранить scale/header/padding и flag semantics; actual downloaded pixel comparison |
+| exportPngSeqDrawings12743; calls12920/12932 | Отдельный PNG sequence/alpha слой | Каждый frame по адресу, proper TPLvisibility; PNG alpha и erase сохраняются |
+| export flags10638–10731 | Draw, BG, alpha, guides, metadata отдельны | Не объединять флаги и не менять UI экспорта. Backgroundpattern не равен нарисованному BG |
+
+### 8.3. Хоткеи и конфликты
+
+Карта main.js14440+: D draw mode; A brush lock; P palette; Q/W/E BG/TPL/FRM; Z иCtrl/CmdZ Undo; новый ShiftZ/CtrlShiftZ Redo; C clear; L Long; T TPLvisibility. X recent cycle, ShiftX current/previous; V video palette, ShiftV generate palette current frame. [ ] size±4; Shift[ ] edge±5%; Ctrl/Cmd[ ] opacity±10%.
+
+Не перехватывать остальные функции: Space playback, G Grid/Single, F Fit, M menu, N sections, B timecode frames,1–4 viewpresets, Alt+digit save preset,0 MP4,9 JPEG, arrows frame/pattern/columns/phases/direction, ±FPS, Home/End. В старом tooltip Eraser(3) ошибка:3 уже занят preset. Не назначать3ластику иBкисти. Escape закрывает popup, затем сохраняет поведение выхода из Draw. Русская раскладка через event.code. В текстовом/числовом поле Undo иклавиши редактирования принадлежат полю; Space после кнопки не должен случайно активировать её вместе с playback (связано с TG-B018, его общий фикс отдельно).
+
+### 8.4. Ограничения ядра, которые необходимо убрать до включения
+
+1. Lab фиксирует96frames/1024×576 в surfaceSize, validSurface, parser, renderInstances, DrawingGesture, cache, Fill и makeComposite. Ordinary поддерживает произвольный aspect и count, inputcount до3000, плюсcountPlus до10000. Это несогласованность старых контролов, не повод менять их лимиты при переносе рисования. Нельзя просто заменить regex96 на10000, оставив старую геометрию.
+2. Document geometry должна быть явной и сохраняемой; существующие Lab-файлы получают прежнюю геометрию при чтении. Изменение zoom/DPR/preview quality меняет transform/cache, а не исходные points/stamps/fill.
+3. Instance memo и spatial index должны учитывать геометрию поверхности; случайное изменение глобального FRAME_H ломает открытые документы и snapshots.
+4. Stable frame identity не равен номеру ячейки, экспортному tick или индексу нового банка. Нельзя переносить fixture clock ++frame%96. При смене выборки несовпавшие strokes не рисовать на случайном новом кадре и не терять.
+5. Наружный BG: signed sparse tiles, расширение export crop; нужен общий layout расчёт для grid/single/stills/video, включая padding и metadata. Ограничения encoder size/even dimensions сохраняются и должны быть видимыми, не молча отрезать BG.
+6. Full project/proxy source decoding не входят в эту интеграцию. Независимый от preview документ рисунка подготавливает workflow, но не делает весь media pipeline full-resolution автоматически.
+
+### 8.5. Порядок выполнения и критерии удаления legacy
+
+A. Зафиксировать утверждённую панель и карту. Desktop принят. Phone3строки со слотами черезSave принят. Общая переработка меню отложена.
+B. Обобщить геометрию и сохранение ядра; проверить landscape/portrait/square, количество>96, старыеLabreaders и отсутствие пустого atlas. Затем единый adapter к реальной геометрии/времени приложения.
+C. Подключить real import → Round/erase/Fill → hold/Long/playback → Undo/slots/Save/Open → PNG/sequence/video. Перевести TPLwindow/Onion/Reference/order и exportflags. Подключить меню и хоткеи к тем же командам.
+D. Удалить заменённые handlers, old brush renderers, atlas allocation, snapshots, stale state/пустые compatibility ветви. Проверить отсутствие внешних consumers каждого удалённого имени. Два постоянно действующих движка недопустимы.
+E. Один законченный ordinary drawing prerelease со своей версией/логом и отдельной Pagesссылкой. Lab.8 иstable не перезаписывать. Не публиковать частично подключённое приложение как завершённую интеграцию.
+
+Художественная приёмка: тот же низкий FPS/ритм, точка при stationary hold на каждом кадре, непрерывный характер жеста через сетку,1F клип только по выбору автора, мягкость и случайные particles не меняются при reflow/Save/Open, Long накапливает или обрезает временное окно, BG позволяет жест за краями. Замеры latency отдельно от оценки характера штриха.
+
+Техническая приёмка: реальные fileinputs video/sequence/Slice и прямоугольные/вертикальные источники;96и>96frames; Grid/Single иSpacing0/12/большой; mouse/pen/touch browser events; pointercancel/pinch/focus; одинUndo/Redo; все targetclear/slots/Save/Open; TPL/Onion/Reference; PNG/JPEG/sequence/MP4 с flags иmetadata; положительный иотрицательный внешнийBGcrop; бюджет tiles/history, длинныйlivegesture. Физические phone/Pencil/Wacom остаются отдельной проверкой. Старые результаты.8 не переименовывать в результаты integration.
+
+## 9. Результат интеграции 28.35.0-drawing.9
+
+Все перечисленные в8.2 потребители используют единый adapter src/js/timegrid-drawing.mjs; панель src/js/timegrid-drawing-panel.mjs. Старый atlas и его input/history удалены. Геометрия/адреса schema7 хранятся отдельно от viewport, per-stroke coordinateFrame позволяет менять формат без перезаписи оригинала. Банк привязан к метаданным источников; несовпавшие кадры сохраняются в документе и не показываются на новых. Это не полныйproject, см. ограничения.
+
+Desktop4строки, phone3строки152px; слоты черезSave наphone. Подробные параметры всегдаDraw. Общая оптимизацияменю не выполнена и не подменяет эту интеграцию. [Полная проверка, художественная приёмка и ограничения](drawing-evidence/2026-10-27-drawing-9/README.md). [Открыть .9](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.9/index.html).

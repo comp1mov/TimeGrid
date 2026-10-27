@@ -1,15 +1,15 @@
 {
   "name": "timegrid",
-  "version": "28.35.0-drawing.2",
+  "version": "28.35.0-drawing.9",
   "description": "An experimental spatial montage and frame-sampling browser application",
   "scripts": {
-    "test": "node --test tests/chrono-animation.test.mjs tests/chrono-compositing.test.mjs tests/drawing-geometry.test.mjs tests/stroke-document.test.mjs tests/drawing-temporal.test.mjs",
+    "test": "node --test tests/chrono-animation.test.mjs tests/chrono-compositing.test.mjs tests/drawing-geometry.test.mjs tests/stroke-document.test.mjs tests/drawing-temporal.test.mjs tests/drawing-integration.test.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "prebuild": "node scripts/check-release.cjs",
     "pretest": "node scripts/check-release.cjs",
-    "test:drawing": "node tests/drawing-engine.browser.cjs",
+    "test:drawing": "node tests/drawing-integration.browser.cjs && node tests/drawing-integration-extra.browser.cjs",
     "test:drawing-lab": "node tests/drawing-lab.browser.cjs",
     "build:lab": "node scripts/check-drawing-lab-release.cjs && node scripts/build-drawing-lab.cjs",
     "test:drawing-quality": "node tests/drawing-lab-quality.browser.cjs"

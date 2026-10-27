@@ -1,6 +1,6 @@
 // Dark, keyboard-accessible presentation for the existing select controls.
 // Native values/change events stay the single source of truth.
-export function createDarkSelects() {
+export function createDarkSelects(root = document) {
   const entries = [];
   let open = null;
   const popup = document.createElement('div');
@@ -56,7 +56,7 @@ export function createDarkSelects() {
       popup.querySelector('[aria-selected="true"]') || popup.firstElementChild
     )?.focus();
   }
-  for (const select of document.querySelectorAll('select')) {
+  for (const select of root.querySelectorAll('select')) {
     if (select.closest('[hidden]')) continue;
     const wrapper = document.createElement('span');
     wrapper.className = 'dark-select';
