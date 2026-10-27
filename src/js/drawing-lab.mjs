@@ -1,3 +1,4 @@
+import { createFill } from './drawing-fill.mjs';
 import { createDrawingPanel } from './drawing-panel.mjs';
 import { DrawingGesture } from './drawing-gesture.mjs';
 import { createFrameTiming } from './drawing-time.mjs';
@@ -14,8 +15,10 @@ import {
 } from './stroke-document.mjs';
 import { SpeedPressure } from './brush-geometry.mjs';
 import { StrokeTileCache } from './stroke-cache.mjs';
-export const APP_VERSION = '28.35.0-drawing.7';
+export const APP_VERSION = '28.35.0-drawing.8';
 let drawingPanel;
+let fillSequence = 0,
+  fillBusy = false;
 const $ = (id) => document.getElementById(id),
   canvas = $('canvas'),
   ctx = canvas.getContext('2d', {
@@ -66,6 +69,8 @@ function measureRect() {
   metrics.rectReads++;
 }
 function setDocument(next) {
+  fillSequence++;
+  fillBusy = false;
   unsubscribe?.();
   cache?.dispose();
   doc = next;
@@ -292,11 +297,13 @@ function updateButtons() {
       ' · ' +
       ($('brushOff').checked
         ? 'Brush off'
-        : $('tool').value === 'erase'
-          ? 'Eraser'
-          : $('brushType').value === 'spray'
-            ? 'Spray'
-            : 'Round') +
+        : $('tool').value === 'fill'
+          ? 'Fill'
+          : $('tool').value === 'erase'
+            ? 'Eraser'
+            : $('brushType').value === 'spray'
+              ? 'Spray'
+              : 'Round') +
       ($('oneFrame').checked ? ' · 1F' : '') +
       ($('onion').checked ? ' · Onion' : '') +
       ($('longStroke').checked ? ' · Long ' + $('trail').value : '');
@@ -351,7 +358,7 @@ function brush() {
     smoothing: Number($('smooth').value) / 100,
     streamline: Number($('streamline').value) / 100,
     simulatePressure: false,
-    type: $('brushType').value,
+    type: $('brushType').value === 'fill' ? 'round' : $('brushType').value,
     softness: Number($('softness').value) / 100,
     seed: crypto.getRandomValues(new Uint32Array(1))[0],
     scatter: Number($('scatter').value) / 100,
@@ -384,6 +391,8 @@ function cancelGesture() {
   schedule();
 }
 function finish() {
+  fillSequence++;
+  fillBusy = false;
   if (gesture?.mode !== 'draw') {
     gesture = null;
     return;
@@ -416,6 +425,11 @@ function startNavigation() {
 }
 canvas.addEventListener('pointerdown', (e) => {
   if (![0, 1, 2, 5].includes(e.button)) return;
+  if (fillBusy) {
+    fillSequence++;
+    fillBusy = false;
+    message = '';
+  }
   if (
     e.pointerType === 'touch' &&
     (penActive !== null || performance.now() - lastPenTime < 350)
@@ -447,6 +461,7 @@ canvas.addEventListener('pointerdown', (e) => {
         cancelGesture();
       else finish();
     }
+    if (gesture?.mode === 'fill') cancelGesture();
     suppressTouch = true;
     startNavigation();
     return;
@@ -461,6 +476,40 @@ canvas.addEventListener('pointerdown', (e) => {
     (e.pointerType === 'touch' && !$('touchDraw').checked)
   ) {
     gesture = { mode: 'pan', previous: p, pointerId: e.pointerId };
+    return;
+  }
+  if ($('tool').value === 'fill' && !penEraser) {
+    const target = $('target').value;
+    const r =
+      target === 'bg'
+        ? compositionRect
+        : layout.find(
+            (r) =>
+              p[0] >= r.x &&
+              p[0] <= r.x + r.w &&
+              p[1] >= r.y &&
+              p[1] <= r.y + r.h,
+          );
+    if (!r) return;
+    const surface =
+      target === 'bg'
+        ? 'bg-' + view
+        : target === 'tpl'
+          ? 'tpl'
+          : 'frame-' + r.id;
+    const extent = surfaceSize(surface);
+    gesture = {
+      mode: 'fill',
+      pointerId: e.pointerId,
+      anchor: p,
+      args: {
+        surface,
+        x: ((p[0] - r.x) / r.w) * extent.w,
+        y: ((p[1] - r.y) / r.h) * extent.h,
+        color: $('color').value,
+        opacity: Number($('opacity').value) / 100,
+      },
+    };
     return;
   }
   const b = {
@@ -525,6 +574,11 @@ canvas.addEventListener('pointermove', (e) => {
     return;
   }
   if (!gesture || gesture.pointerId !== e.pointerId) return;
+  if (gesture.mode === 'fill') {
+    if (Math.hypot(p[0] - gesture.anchor[0], p[1] - gesture.anchor[1]) > 8)
+      cancelGesture();
+    return;
+  }
   if (gesture.mode === 'pan') {
     pan.x += p[0] - gesture.previous[0];
     pan.y += p[1] - gesture.previous[1];
@@ -548,7 +602,40 @@ canvas.addEventListener('pointermove', (e) => {
   }
   metrics.inputMs.push(performance.now() - started);
 });
+async function fillAt(args) {
+  const token = ++fillSequence,
+    drawing = doc,
+    revision = doc.revision;
+  fillBusy = true;
+  message = 'Filling…';
+  schedule();
+  try {
+    const stroke = await createFill({
+      ...args,
+      document: drawing,
+      cancelled: () =>
+        token !== fillSequence || doc !== drawing || doc.revision !== revision,
+    });
+    if (token !== fillSequence || doc !== drawing || doc.revision !== revision)
+      return;
+    doc.addGesture([stroke]);
+    message = 'Filled. Undo restores the previous drawing.';
+  } catch (error) {
+    if (token === fillSequence) message = error.message;
+  } finally {
+    if (token === fillSequence) {
+      fillBusy = false;
+      schedule();
+    }
+  }
+}
 function endPointer(e, includePoint = false) {
+  const fill =
+    includePoint &&
+    gesture?.pointerId === e.pointerId &&
+    gesture.mode === 'fill'
+      ? gesture.args
+      : null;
   if (gesture?.pointerId === e.pointerId) {
     if (gesture.mode === 'draw' && includePoint) {
       try {
@@ -559,6 +646,7 @@ function endPointer(e, includePoint = false) {
     }
     finish();
   }
+  if (fill) void fillAt(fill);
   pointers.delete(e.pointerId);
   if (penActive === e.pointerId) penActive = null;
   if ([...pointers.values()].filter((p) => p.type === 'touch').length < 2)
@@ -632,6 +720,13 @@ $('view').onchange = () => {
 for (const id of ['target', 'tool', 'brushType'])
   $(id).onchange = () => {
     finish();
+    if (id === 'brushType') {
+      if ($('brushType').value === 'fill') {
+        $('tool').value = 'fill';
+        $('parameter').value = 'opacity';
+        $('brushOff').checked = false;
+      } else if ($('tool').value === 'fill') $('tool').value = 'pen';
+    }
     syncBrushControls();
     fullDirty = true;
     schedule();
@@ -780,6 +875,47 @@ for (const id of [
     fullDirty = true;
     schedule();
   });
+}
+const drawingSlots = [null, null, null];
+const allDrawingSurfaces = [
+  'tpl',
+  'bg-grid',
+  'bg-single',
+  ...Array.from({ length: 96 }, (_, i) => 'frame-' + i),
+];
+for (let i = 0; i < 3; i++) {
+  $('savePointSave' + (i + 1)).onclick = () => {
+    finish();
+    const bytes = doc.storageEstimate;
+    if (
+      bytes +
+        drawingSlots.reduce(
+          (n, slot, j) => n + (j === i ? 0 : slot?.bytes || 0),
+          0,
+        ) >
+      LIMITS.bytes
+    ) {
+      message = 'Slot memory limit reached. Use Save to download this drawing.';
+      schedule();
+      return;
+    }
+    drawingSlots[i] = { strokes: doc.strokes.slice(), bytes };
+    $('savePointLoad' + (i + 1)).disabled = false;
+    message = 'S' + (i + 1) + ': all drawing layers saved in this session.';
+    schedule();
+  };
+  $('savePointLoad' + (i + 1)).onclick = () => {
+    finish();
+    const slot = drawingSlots[i];
+    if (!slot) return;
+    try {
+      doc.replaceSurfaces(allDrawingSurfaces, slot.strokes);
+      message = 'L' + (i + 1) + ': drawing restored. Undo is available.';
+    } catch (error) {
+      message = error.message;
+    }
+    schedule();
+  };
 }
 $('bake').onclick = () => {
   finish();
@@ -1245,6 +1381,7 @@ setDocument(new StrokeDocument());
 new ResizeObserver(resize).observe($('stage'));
 window.addEventListener('scroll', measureRect, { passive: true });
 window.timegridLab = {
+  fillBusy: () => fillBusy,
   version: APP_VERSION,
   serialize: () => doc.serialize(),
   load: (text) => {

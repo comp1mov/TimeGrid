@@ -8,7 +8,7 @@ import {
 } from './brush-geometry.mjs';
 
 export const STROKE_FORMAT = 'timegrid-strokes';
-export const STROKE_SCHEMA = 5;
+export const STROKE_SCHEMA = 6;
 export const ENGINE_VERSION = 'perfect-freehand@1.2.3';
 export const BG_COORD_LIMIT = 32768;
 export const FRAME_W = 1024,
@@ -27,6 +27,7 @@ const storageCost = (s) =>
   s.points.length * 100 +
   s.outline.length * 70 +
   (s.stamps?.length || 0) * 40 +
+  (s.fill?.runs.length || 0) * 80 +
   s.placements.length * 128 +
   (s.children || []).reduce((n, c) => n + storageCost(c), 0);
 const geometryCost = (s) =>
@@ -35,6 +36,7 @@ const geometryCost = (s) =>
   s.outline.length * 16 +
   s.placements.length * 64 +
   (s.stamps?.length || 0) * 24 +
+  (s.fill?.runs.length || 0) * 32 +
   (s.children || []).reduce((n, c) => n + geometryCost(c), 0);
 export const intersects = (a, b) =>
   a.x <= b.x + b.w && a.x + a.w >= b.x && a.y <= b.y + b.h && a.y + a.h >= b.y;
@@ -308,6 +310,11 @@ export function renderInstances(s) {
   return out;
 }
 function freezeStroke(s) {
+  if (s.fill) {
+    s.fill.runs.forEach(Object.freeze);
+    Object.freeze(s.fill.runs);
+    Object.freeze(s.fill);
+  }
   if (s.children) {
     s.children.forEach(freezeStroke);
     Object.freeze(s.children);
@@ -540,7 +547,7 @@ export class StrokeDocument {
     const data = JSON.parse(text);
     if (
       data?.format !== STROKE_FORMAT ||
-      ![1, 2, 3, 4, 5].includes(data.schema) ||
+      ![1, 2, 3, 4, 5, 6].includes(data.schema) ||
       data.engine !== ENGINE_VERSION
     )
       throw Error('Unsupported drawing format or engine version.');
@@ -558,6 +565,8 @@ export class StrokeDocument {
     for (const raw of data.strokes) {
       if (data.schema < 5 && raw?.overflow !== undefined)
         throw Error('Extended BG requires schema 5.');
+      if (data.schema < 6 && (raw?.fill || raw?.children?.some((c) => c.fill)))
+        throw Error('Fill requires schema 6.');
       const b = raw?.brush;
       const s = {
         ...raw,
@@ -607,6 +616,9 @@ export class StrokeDocument {
         brush: s.brush,
         engine: ENGINE_VERSION,
         renderer: s.renderer,
+        ...(s.fill
+          ? { fill: { ...s.fill, runs: s.fill.runs.map((r) => r.slice()) } }
+          : {}),
         ...(s.space ? { space: { ...s.space } } : {}),
         ...(s.overflow ? { overflow: true } : {}),
         ...(s.renderer.startsWith('stamps-')
@@ -623,6 +635,14 @@ export class StrokeDocument {
                   brush: { ...child.brush },
                   engine: ENGINE_VERSION,
                   renderer: child.renderer,
+                  ...(child.fill
+                    ? {
+                        fill: {
+                          ...child.fill,
+                          runs: child.fill.runs.map((r) => r.slice()),
+                        },
+                      }
+                    : {}),
                   placements: child.placements.map((p) => ({ ...p })),
                   ...(child.space ? { space: { ...child.space } } : {}),
                   ...(child.stamps
@@ -680,6 +700,7 @@ function validateStroke(s) {
       'stamps-v1',
       'stamps-v2',
       'composite-v1',
+      'fill-runs-v1',
     ].includes(s.renderer)
   )
     throw Error('Invalid stroke identity.');
@@ -764,6 +785,56 @@ function validateStroke(s) {
         throw Error('Invalid stamp.');
     }
   } else if (s.stamps !== undefined) throw Error('Unexpected stamps.');
+  if (s.renderer === 'fill-runs-v1') {
+    const f = s.fill;
+    if (
+      !f ||
+      ![0.5, 1].includes(f.step) ||
+      !Number.isInteger(f.x / f.step) ||
+      !Number.isInteger(f.y / f.step) ||
+      !Number.isInteger(f.width) ||
+      !Number.isInteger(f.height) ||
+      f.width < 1 ||
+      f.height < 1 ||
+      f.width * f.height > 4194304 ||
+      !Array.isArray(f.runs) ||
+      !f.runs.length ||
+      f.runs.length > 100000 ||
+      f.x < geometryMin ||
+      f.y < geometryMin ||
+      f.x + f.width * f.step > extent.w + 4096 ||
+      f.y + f.height * f.step > extent.h + 4096 ||
+      s.brush.erase ||
+      s.outline.length !== 4 ||
+      JSON.stringify(s.outline) !==
+        JSON.stringify([
+          [f.x, f.y],
+          [f.x + f.width * f.step, f.y],
+          [f.x + f.width * f.step, f.y + f.height * f.step],
+          [f.x, f.y + f.height * f.step],
+        ])
+    )
+      throw Error('Invalid fill geometry.');
+    let row = -1,
+      end = -1;
+    for (const r of f.runs) {
+      if (
+        !Array.isArray(r) ||
+        r.length !== 3 ||
+        !r.every(Number.isInteger) ||
+        r[0] < 0 ||
+        r[0] >= f.height ||
+        r[1] < 0 ||
+        r[2] < 1 ||
+        r[1] + r[2] > f.width ||
+        r[0] < row ||
+        (r[0] === row && r[1] <= end)
+      )
+        throw Error('Invalid fill runs.');
+      row = r[0];
+      end = r[1] + r[2];
+    }
+  } else if (s.fill !== undefined) throw Error('Unexpected fill data.');
   const b = s.brush;
   if (
     !b ||
@@ -841,7 +912,11 @@ export function strokePath(value) {
   if (s.renderer.startsWith('stamps-') || s.renderer === 'composite-v1')
     return null;
   const p = new Path2D();
-  traceOutline(s, p);
+  if (s.renderer === 'fill-runs-v1') {
+    const f = s.fill;
+    for (const [y, x, n] of f.runs)
+      p.rect(f.x + x * f.step, f.y + y * f.step, n * f.step, f.step);
+  } else traceOutline(s, p);
   return p;
 }
 export function paintStroke(

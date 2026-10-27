@@ -7,14 +7,14 @@
       content="width=device-width,initial-scale=1,viewport-fit=cover"
     />
     <meta name="theme-color" content="#000000" />
-    <title>TimeGrid Drawing Lab 28.35.0-drawing.7</title>
+    <title>TimeGrid Drawing Lab 28.35.0-drawing.8</title>
     <link rel="stylesheet" href="./src/styles/drawing-lab.css" />
   </head>
   <body>
     <header class="app-header">
       <div class="brand">
         <strong>TimeGrid</strong
-        ><span>DRAWING LAB <small>28.35.0-drawing.7</small></span>
+        ><span>DRAWING LAB <small>28.35.0-drawing.8</small></span>
       </div>
       <button
         id="settingsToggle"
@@ -63,6 +63,7 @@
                 ><select id="brushType">
                   <option value="round">Round</option>
                   <option value="spray">Spray</option>
+                  <option value="fill">Fill</option>
                 </select></label
               >
               <button
@@ -189,7 +190,14 @@
               >
                 ↷
               </button>
-              <button id="save">Save</button>
+              <label
+                class="toggle compact-toggle"
+                title="1F: keep the brush inside its starting frame"
+                ><input id="oneFrame" type="checkbox" /><span>1F</span></label
+              >
+              <button id="save" title="Download current drawing as a file">
+                Save
+              </button>
               <button id="clear">Clear</button>
               <label class="toggle compact-toggle" title="Long Stroke (L)"
                 ><input id="longStroke" type="checkbox" /><span id="longLabel"
@@ -202,6 +210,48 @@
                 title="Enable drawing / navigate (A)"
               >
                 Draw
+              </button>
+            </div>
+            <div
+              class="palette-slots"
+              role="group"
+              aria-label="Drawing save slots"
+            >
+              <button
+                id="savePointSave1"
+                title="Save all drawing layers to session slot 1"
+              >
+                S1</button
+              ><button
+                id="savePointLoad1"
+                disabled
+                title="Restore drawing slot 1"
+              >
+                L1
+              </button>
+              <button
+                id="savePointSave2"
+                title="Save all drawing layers to session slot 2"
+              >
+                S2</button
+              ><button
+                id="savePointLoad2"
+                disabled
+                title="Restore drawing slot 2"
+              >
+                L2
+              </button>
+              <button
+                id="savePointSave3"
+                title="Save all drawing layers to session slot 3"
+              >
+                S3</button
+              ><button
+                id="savePointLoad3"
+                disabled
+                title="Restore drawing slot 3"
+              >
+                L3
               </button>
             </div>
           </section>
@@ -271,10 +321,6 @@
       <section class="panel" aria-label="Draw">
         <h2>DRAW</h2>
         <div class="menu-fields">
-          <label class="check"
-            ><input id="oneFrame" type="checkbox" />1F · clip at cell
-            edge</label
-          >
           <label class="check"
             ><input id="onion" type="checkbox" />Onion Skin</label
           >
@@ -432,7 +478,7 @@
           a segment to 45° directions.
         </p>
         <p>
-          Save stores stroke geometry and layout/timing settings, with schema 5.
+          Save stores stroke geometry and layout/timing settings, with schema 6.
           Older lab drawings retain their saved geometry. Images loaded with
           Preview image sequence are temporary session references, ordered by
           filename, repeating across 96 slots; they are not saved in the drawing
@@ -465,6 +511,7 @@
         <option value="bg">BG · background</option></select
       ><select id="tool">
         <option value="pen">Brush</option>
+        <option value="fill">Fill</option>
         <option value="erase">Eraser</option>
         <option value="pan">Pan</option></select
       ><output id="sizeOut"></output><output id="opacityOut"></output

@@ -418,7 +418,7 @@ const out =
   const saved = JSON.parse(
     fs.readFileSync(out + '/exterior-bg.timegrid-drawing.json', 'utf8'),
   );
-  assert.equal(saved.schema, 5);
+  assert.equal(saved.schema, 6);
   assert.equal(saved.settings.exportBg, false);
   assert.ok(saved.strokes.some((s) => s.overflow));
   await fresh();

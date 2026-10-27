@@ -651,3 +651,98 @@ input {
     width: 75px;
   }
 }
+
+/* These popups render in the app, so the OS cannot turn them white. */
+.dark-select {
+  display: inline-flex;
+  position: relative;
+  max-width: 100%;
+}
+.select-source {
+  position: absolute;
+  width: 1px !important;
+  height: 1px;
+  min-height: 1px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.select-trigger {
+  white-space: nowrap;
+  text-align: left;
+}
+.brush-select .select-trigger {
+  width: 78px;
+  font-size: 11px;
+}
+#parameter-trigger {
+  width: 87px;
+  font-size: 10px;
+  min-height: 32px;
+  background: transparent;
+  border-color: transparent;
+}
+.select-popup {
+  position: fixed;
+  z-index: 100;
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid #ffffff40;
+  border-radius: 7px;
+  background: #151515;
+  box-shadow: 0 6px 24px #000b;
+}
+.select-popup button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  min-height: 38px;
+}
+.select-popup button[aria-selected='true'] {
+  color: #35f2a3;
+  background: #35f2a318;
+}
+.select-popup button:hover,
+.select-popup button:focus-visible {
+  background: #333;
+}
+.palette-slots {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+.palette-slots button {
+  min-width: 0;
+  min-height: 30px;
+  font-size: 11px;
+  padding: 3px;
+}
+.palette-slots button:nth-child(2n) {
+  margin-right: 4px;
+}
+@media (max-width: 420px) {
+  .palette-actions {
+    gap: 3px;
+  }
+  #undo,
+  #redo {
+    flex-basis: 28px;
+  }
+}
+@media (max-width: 350px) {
+  .brush-select .select-trigger {
+    width: 75px;
+  }
+  .palette-actions button,
+  .palette-actions .toggle {
+    font-size: 9px;
+  }
+}
+@media (pointer: coarse) {
+  .palette-slots button {
+    min-height: 36px;
+  }
+}

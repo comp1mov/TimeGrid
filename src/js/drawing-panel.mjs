@@ -1,7 +1,9 @@
+import { createDarkSelects } from './drawing-select.mjs';
 // Presentation only. Existing drawing controls remain the source of truth.
 export function createDrawingPanel({ change, finish }) {
   const $ = (id) => document.getElementById(id);
   const targets = ['frm', 'tpl', 'bg'];
+  const selects = createDarkSelects();
   const swatches = [...document.querySelectorAll('[data-color-slot]')];
   const colors = [$('color').value, '#e6392e', '#111111'];
   let selectedColor = 0;
@@ -31,12 +33,15 @@ export function createDrawingPanel({ change, finish }) {
       targets[(targets.indexOf($('target').value) + 1) % targets.length],
     );
   $('eraserToggle').onclick = () => {
+    if ($('brushType').value === 'fill') change('brushType', 'round');
     change('brushOff', false);
     change('tool', $('tool').value === 'erase' ? 'pen' : 'erase');
   };
   $('drawEnabled').onclick = () => {
+    const off = $('brushOff').checked || $('tool').value === 'pan';
+    if ($('brushType').value === 'fill') change('brushType', 'round');
     change('tool', 'pen');
-    change('brushOff', !$('brushOff').checked);
+    change('brushOff', !off);
   };
   $('parameter').onchange = sync;
   for (const id of ['opacity', 'softness']) {
@@ -69,6 +74,7 @@ export function createDrawingPanel({ change, finish }) {
     sync();
   });
   function sync() {
+    selects.sync();
     const state =
       [
         'target',
