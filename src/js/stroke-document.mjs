@@ -8,7 +8,7 @@ import {
 } from './brush-geometry.mjs';
 
 export const STROKE_FORMAT = 'timegrid-strokes';
-export const STROKE_SCHEMA = 3;
+export const STROKE_SCHEMA = 4;
 export const ENGINE_VERSION = 'perfect-freehand@1.2.3';
 export const FRAME_W = 1024,
   FRAME_H = 576;
@@ -26,13 +26,15 @@ const storageCost = (s) =>
   s.points.length * 100 +
   s.outline.length * 70 +
   (s.stamps?.length || 0) * 40 +
-  s.placements.length * 128;
+  s.placements.length * 128 +
+  (s.children || []).reduce((n, c) => n + storageCost(c), 0);
 const geometryCost = (s) =>
   256 +
   s.points.length * 24 +
   s.outline.length * 16 +
   s.placements.length * 64 +
-  (s.stamps?.length || 0) * 24;
+  (s.stamps?.length || 0) * 24 +
+  (s.children || []).reduce((n, c) => n + geometryCost(c), 0);
 export const intersects = (a, b) =>
   a.x <= b.x + b.w && a.x + a.w >= b.x && a.y <= b.y + b.h && a.y + a.h >= b.y;
 export const union = (a, b) =>
@@ -153,7 +155,7 @@ function touches(poly, r) {
   return pointInside(poly, r.x + r.w / 2, r.y + r.h / 2);
 }
 function gridPlacements(s, target) {
-  if (s.renderer === 'stamps-v1') {
+  if (s.renderer.startsWith('stamps-')) {
     const hit = new Set();
     for (const p of s.stamps) {
       const [x, y, r] = p;
@@ -217,6 +219,10 @@ export function createStroke({
   type = 'round',
   softness = 0,
   seed = 1,
+  scatter = 1,
+  dotScale = 1,
+  placements,
+  space,
 }) {
   const stamped = type === 'spray' || softness > 0;
   const outline = stamped
@@ -247,9 +253,12 @@ export function createStroke({
       type,
       softness,
       seed,
+      scatter,
+      dotScale,
     },
     engine: ENGINE_VERSION,
     renderer: 'quadratic-v1',
+    ...(space ? { space } : {}),
   };
   if (stamped) {
     s.renderer = 'stamps-v1';
@@ -257,7 +266,10 @@ export function createStroke({
     s.box = stampBounds(s.stamps);
   }
   s.placements =
-    surface === 'sheet' ? gridPlacements(s, target) : [{ surface, x: 0, y: 0 }];
+    placements ??
+    (surface === 'sheet'
+      ? gridPlacements(s, target)
+      : [{ surface, x: 0, y: 0 }]);
   return s;
 }
 const instanceMemo = new WeakMap();
@@ -289,12 +301,17 @@ export function renderInstances(s) {
   return out;
 }
 function freezeStroke(s) {
+  if (s.children) {
+    s.children.forEach(freezeStroke);
+    Object.freeze(s.children);
+  }
   for (const a of [s.points, s.outline, ...(s.stamps ? [s.stamps] : [])]) {
     a.forEach(Object.freeze);
     Object.freeze(a);
   }
   s.placements.forEach(Object.freeze);
   Object.freeze(s.placements);
+  if (s.space) Object.freeze(s.space);
   Object.freeze(s.brush);
   Object.freeze(s.box);
   return Object.freeze(s);
@@ -310,6 +327,7 @@ export class StrokeDocument {
     this.listeners = new Set();
     this.revision = 0;
     this.nextId = 1;
+    this.settings = {};
     this.totalPoints = 0;
     this.storageEstimate = 0;
   }
@@ -411,10 +429,51 @@ export class StrokeDocument {
     this._record({ kind: 'clear', items });
     this._emit(items);
   }
+  replaceSurfaces(surfaces, additions = []) {
+    const selected = new Set(surfaces),
+      before = this.strokes;
+    const kept = before
+      .map((s) => {
+        const placements = s.placements.filter((p) => !selected.has(p.surface));
+        return placements.length === s.placements.length
+          ? s
+          : placements.length
+            ? freezeStroke({ ...s, placements })
+            : null;
+      })
+      .filter(Boolean);
+    let last = Number(kept.at(-1)?.id.slice(1) || 0);
+    for (const s of additions) {
+      validateStroke(s);
+      const n = Number(s.id.slice(1));
+      if (n <= last) throw Error('Stroke IDs must preserve paint order.');
+      last = n;
+    }
+    const after = [...kept, ...additions];
+    if (
+      after.length > LIMITS.strokes ||
+      after.reduce((n, s) => n + s.points.length, 0) > LIMITS.points ||
+      after.reduce((n, s) => n + storageCost(s), 0) > LIMITS.bytes - 4096
+    )
+      throw Error('Drawing storage limit reached.');
+    additions.forEach(freezeStroke);
+    this.nextId = Math.max(this.nextId, last + 1);
+    this.strokes = after;
+    this._reindex();
+    this._record({
+      kind: 'replace',
+      before,
+      after,
+      items: [...before, ...additions],
+    });
+    this._emit([...before, ...after]);
+  }
   undo() {
     const c = this.undoStack.pop();
     if (!c) return false;
-    if (c.kind === 'add') this.strokes = this.strokes.slice(0, -c.items.length);
+    if (c.kind === 'replace') this.strokes = c.before;
+    else if (c.kind === 'add')
+      this.strokes = this.strokes.slice(0, -c.items.length);
     else this.strokes = [...c.items];
     this._reindex();
     this.redoStack.push(c);
@@ -424,7 +483,8 @@ export class StrokeDocument {
   redo() {
     const c = this.redoStack.pop();
     if (!c) return false;
-    if (c.kind === 'add') this.strokes.push(...c.items);
+    if (c.kind === 'replace') this.strokes = c.after;
+    else if (c.kind === 'add') this.strokes.push(...c.items);
     else this.strokes = [];
     this._reindex();
     this.undoStack.push(c);
@@ -445,13 +505,24 @@ export class StrokeDocument {
       );
   }
   serialize() {
-    return JSON.stringify({
-      format: STROKE_FORMAT,
-      schema: STROKE_SCHEMA,
-      engine: ENGINE_VERSION,
-      frame: { width: FRAME_W, height: FRAME_H, count: 96 },
-      strokes: this.strokes,
-    });
+    return JSON.stringify(
+      {
+        format: STROKE_FORMAT,
+        schema: STROKE_SCHEMA,
+        engine: ENGINE_VERSION,
+        frame: { width: FRAME_W, height: FRAME_H, count: 96 },
+        settings: this.settings,
+        strokes: this.strokes,
+      },
+      (key, value) =>
+        value && typeof value === 'object' && !Array.isArray(value)
+          ? Object.fromEntries(
+              Object.keys(value)
+                .sort()
+                .map((k) => [k, value[k]]),
+            )
+          : value,
+    );
   }
   static parse(text) {
     if (typeof text !== 'string' || text.length > LIMITS.bytes)
@@ -459,7 +530,7 @@ export class StrokeDocument {
     const data = JSON.parse(text);
     if (
       data?.format !== STROKE_FORMAT ||
-      ![1, 2, 3].includes(data.schema) ||
+      ![1, 2, 3, 4].includes(data.schema) ||
       data.engine !== ENGINE_VERSION
     )
       throw Error('Unsupported drawing format or engine version.');
@@ -472,6 +543,7 @@ export class StrokeDocument {
     if (!Array.isArray(data.strokes) || data.strokes.length > LIMITS.strokes)
       throw Error('Invalid stroke list.');
     const doc = new StrokeDocument();
+    if (data.schema >= 4) doc.settings = validateSettings(data.settings || {});
     let last = 0;
     for (const raw of data.strokes) {
       const b = raw?.brush;
@@ -495,6 +567,8 @@ export class StrokeDocument {
               type: data.schema < 3 ? 'round' : b.type,
               softness: data.schema < 3 ? 0 : b.softness,
               seed: data.schema < 3 ? 1 : b.seed,
+              ...(b.scatter !== undefined ? { scatter: b.scatter } : {}),
+              ...(b.dotScale !== undefined ? { dotScale: b.dotScale } : {}),
             }
           : null,
       };
@@ -514,20 +588,43 @@ export class StrokeDocument {
         surface: s.surface,
         points: s.points.map((p) => p.slice()),
         outline: s.outline.map((p) => p.slice()),
-        box:
-          s.renderer === 'stamps-v1'
-            ? stampBounds(s.stamps)
-            : bounds(s.outline, 1),
+        box: s.renderer.startsWith('stamps-')
+          ? stampBounds(s.stamps)
+          : bounds(s.outline, 1),
         brush: s.brush,
         engine: ENGINE_VERSION,
         renderer: s.renderer,
-        ...(s.renderer === 'stamps-v1'
+        ...(s.space ? { space: { ...s.space } } : {}),
+        ...(s.renderer.startsWith('stamps-')
           ? { stamps: s.stamps.map((p) => p.slice()) }
+          : {}),
+        ...(s.children
+          ? {
+              children: s.children.map((child) => {
+                const c = {
+                  id: child.id,
+                  surface: child.surface,
+                  points: child.points.map((p) => p.slice()),
+                  outline: child.outline.map((p) => p.slice()),
+                  brush: { ...child.brush },
+                  engine: ENGINE_VERSION,
+                  renderer: child.renderer,
+                  placements: child.placements.map((p) => ({ ...p })),
+                  ...(child.space ? { space: { ...child.space } } : {}),
+                  ...(child.stamps
+                    ? { stamps: child.stamps.map((p) => p.slice()) }
+                    : {}),
+                };
+                c.box = c.stamps ? stampBounds(c.stamps) : bounds(c.outline, 1);
+                return c;
+              }),
+            }
           : {}),
         placements: s.placements.map((p) => ({
           surface: p.surface,
           x: p.x,
           y: p.y,
+          ...(p.visit !== undefined ? { visit: p.visit } : {}),
         })),
       };
       doc.strokes.push(freezeStroke(clean));
@@ -538,12 +635,38 @@ export class StrokeDocument {
   }
 }
 function validateStroke(s) {
+  if (s?.renderer === 'composite-v1') {
+    if (
+      !Array.isArray(s.children) ||
+      !s.children.length ||
+      s.children.length > LIMITS.strokes ||
+      s.brush?.erase ||
+      s.brush?.opacity !== 1
+    )
+      throw Error('Invalid composite.');
+    for (const child of s.children) {
+      if (
+        child.renderer === 'composite-v1' ||
+        child.children ||
+        child.placements?.some((p) => p.surface !== 'tpl')
+      )
+        throw Error('Invalid composite child.');
+      validateStroke(child);
+    }
+  } else if (s?.children !== undefined)
+    throw Error('Unexpected composite children.');
   if (
     !s ||
     !/^s[1-9][0-9]{0,8}$/.test(s.id) ||
     !(validSurface(s.surface) || s.surface === 'sheet') ||
     s.engine !== ENGINE_VERSION ||
-    !['linear-v1', 'quadratic-v1', 'stamps-v1'].includes(s.renderer)
+    ![
+      'linear-v1',
+      'quadratic-v1',
+      'stamps-v1',
+      'stamps-v2',
+      'composite-v1',
+    ].includes(s.renderer)
   )
     throw Error('Invalid stroke identity.');
   if (
@@ -551,11 +674,21 @@ function validateStroke(s) {
     !s.points.length ||
     s.points.length > LIMITS.perStroke ||
     !Array.isArray(s.outline) ||
-    (s.renderer !== 'stamps-v1' && s.outline.length < 3) ||
+    (!s.renderer.startsWith('stamps-') && s.outline.length < 3) ||
     s.outline.length > LIMITS.perStroke * 4 + 100
   )
     throw Error('Invalid stroke geometry.');
-  const extent = surfaceSize(s.surface);
+  if (
+    s.space &&
+    (!finite(s.space.w) ||
+      !finite(s.space.h) ||
+      s.space.w < 1 ||
+      s.space.h < 1 ||
+      s.space.w > 131072 ||
+      s.space.h > 131072)
+  )
+    throw Error('Invalid stroke coordinate space.');
+  const extent = s.space || surfaceSize(s.surface);
   for (const p of s.points)
     if (
       !Array.isArray(p) ||
@@ -574,13 +707,13 @@ function validateStroke(s) {
       !Array.isArray(p) ||
       p.length !== 2 ||
       !p.every(finite) ||
-      p[0] < -2048 ||
-      p[1] < -2048 ||
-      p[0] > extent.w + 2048 ||
-      p[1] > extent.h + 2048
+      p[0] < -4096 ||
+      p[1] < -4096 ||
+      p[0] > extent.w + 4096 ||
+      p[1] > extent.h + 4096
     )
       throw Error('Invalid outline.');
-  if (s.renderer === 'stamps-v1') {
+  if (s.renderer.startsWith('stamps-')) {
     if (
       s.outline.length ||
       !Array.isArray(s.stamps) ||
@@ -595,10 +728,10 @@ function validateStroke(s) {
         !p.every((n) => finite(n) && n === Math.round(n * 10000) / 10000) ||
         p[2] <= 0 ||
         p[2] > 256 ||
-        p[0] < -2048 ||
-        p[1] < -2048 ||
-        p[0] > extent.w + 2048 ||
-        p[1] > extent.h + 2048
+        p[0] < -4096 ||
+        p[1] < -4096 ||
+        p[0] > extent.w + 4096 ||
+        p[1] > extent.h + 4096
       )
         throw Error('Invalid stamp.');
     }
@@ -607,6 +740,10 @@ function validateStroke(s) {
   if (
     !b ||
     !['round', 'spray'].includes(b.type) ||
+    (b.scatter !== undefined &&
+      (!finite(b.scatter) || b.scatter < 0.05 || b.scatter > 3)) ||
+    (b.dotScale !== undefined &&
+      (!finite(b.dotScale) || b.dotScale < 0.05 || b.dotScale > 3)) ||
     !finite(b.softness) ||
     b.softness < 0 ||
     b.softness > 1 ||
@@ -631,7 +768,7 @@ function validateStroke(s) {
     b.streamline > 1
   )
     throw Error('Invalid brush.');
-  if (!Array.isArray(s.placements) || s.placements.length > 96)
+  if (!Array.isArray(s.placements) || s.placements.length > 2048)
     throw Error('Invalid placements.');
   const seen = new Set();
   for (const p of s.placements) {
@@ -640,30 +777,39 @@ function validateStroke(s) {
       !validSurface(p.surface) ||
       !finite(p.x) ||
       !finite(p.y) ||
-      p.x > 0 ||
-      p.x < -7 * FRAME_W ||
-      p.y > 0 ||
-      p.y < -11 * FRAME_H
+      Math.abs(p.x) > 131072 ||
+      Math.abs(p.y) > 131072
     )
       throw Error('Invalid placement.');
     if (
+      !s.space &&
       s.surface !== 'sheet' &&
       (p.surface !== s.surface || p.x !== 0 || p.y !== 0)
     )
       throw Error('Invalid local placement.');
     if (
+      !s.space &&
       s.surface === 'sheet' &&
       (!/^(tpl|frame-\d+)$/.test(p.surface) || p.x % FRAME_W || p.y % FRAME_H)
     )
       throw Error('Invalid grid placement.');
-    const key = p.surface + '|' + p.x + '|' + p.y;
+    if (
+      p.visit !== undefined &&
+      (!s.space ||
+        !Number.isInteger(p.visit) ||
+        p.visit < 0 ||
+        p.visit > 10000000)
+    )
+      throw Error('Invalid placement visit.');
+    const key = p.surface + '|' + p.x + '|' + p.y + '|' + (p.visit || 0);
     if (seen.has(key)) throw Error('Duplicate placement.');
     seen.add(key);
   }
 }
 export function strokePath(value) {
   const s = value.stroke || value;
-  if (s.renderer === 'stamps-v1') return null;
+  if (s.renderer.startsWith('stamps-') || s.renderer === 'composite-v1')
+    return null;
   const p = new Path2D();
   traceOutline(s, p);
   return p;
@@ -680,7 +826,13 @@ export function paintStroke(ctx, value, path = strokePath(value), box) {
     : 'source-over';
   ctx.globalAlpha = s.brush.opacity;
   ctx.fillStyle = s.brush.color;
-  if (s.renderer === 'stamps-v1')
+  if (s.renderer === 'composite-v1')
+    paintComposite(
+      ctx,
+      s,
+      box ? { ...box, x: box.x - (p?.x || 0), y: box.y - (p?.y || 0) } : s.box,
+    );
+  else if (s.renderer.startsWith('stamps-'))
     paintStamps(
       ctx,
       s,
@@ -713,4 +865,130 @@ export function clipSegment(a, b, rect) {
   }
   const point = (t) => [a[0] + dx * t, a[1] + dy * t, a[2] + (b[2] - a[2]) * t];
   return { a: point(lo), b: point(hi), t: lo };
+}
+
+export function validateSettings(raw) {
+  const settings = {};
+  for (const [key, min, max] of [
+    ['columns', 1, 16],
+    ['gap', 0, 256],
+    ['margin', 0, 512],
+    ['fps', 1, 60],
+    ['tick', 0, 10000000],
+    ['loop', 0, 96],
+    ['loopOffset', 0, 95],
+    ['phases', 1, 96],
+    ['trail', 0, 50],
+  ]) {
+    if (raw[key] !== undefined) {
+      if (!Number.isInteger(raw[key]) || raw[key] < min || raw[key] > max)
+        throw Error('Invalid ' + key);
+      settings[key] = raw[key];
+    }
+  }
+  for (const key of [
+    'oneFrame',
+    'longStroke',
+    'onion',
+    'templateVisible',
+    'bgAbove',
+    'touchDraw',
+  ])
+    if (raw[key] !== undefined) {
+      if (typeof raw[key] !== 'boolean') throw Error('Invalid ' + key);
+      settings[key] = raw[key];
+    }
+  for (const [key, values] of [
+    [
+      'direction',
+      [
+        'forward',
+        'backward',
+        'pingpong',
+        'bounce-offset',
+        'sync',
+        'stutter',
+        'holdskip',
+        'random',
+        'shuffleloop',
+      ],
+    ],
+    [
+      'pattern',
+      [
+        'sequential',
+        'snake',
+        'vertical',
+        'vertical-snake',
+        'checkerboard',
+        'center',
+        'spiral',
+        'random',
+      ],
+    ],
+    ['view', ['grid', 'single']],
+  ])
+    if (raw[key] !== undefined) {
+      if (!values.includes(raw[key])) throw Error('Invalid ' + key);
+      settings[key] = raw[key];
+    }
+  return settings;
+}
+
+export function makeComposite(doc, source, destinations) {
+  const children = doc.strokes
+    .filter((s) => s.placements.some((p) => p.surface === source))
+    .map((s) => ({
+      ...s,
+      placements: s.placements.filter((p) => p.surface === source),
+    }));
+  if (!children.length) return null;
+  const group = createStroke({
+    id: doc.newId(),
+    surface: 'sheet',
+    space: { w: FRAME_W, h: FRAME_H },
+    points: [
+      [0, 0, 0.5],
+      [FRAME_W, FRAME_H, 0.5],
+    ],
+    size: 1,
+    placements: destinations.map((surface) => ({ surface, x: 0, y: 0 })),
+  });
+  group.renderer = 'composite-v1';
+  group.children = children;
+  group.outline = [
+    [0, 0],
+    [FRAME_W, 0],
+    [FRAME_W, FRAME_H],
+    [0, FRAME_H],
+  ];
+  group.box = bounds(group.outline, 1);
+  return group;
+}
+const compositePaths = new WeakMap();
+function paintComposite(ctx, s, region) {
+  const tr = ctx.getTransform(),
+    scale = Math.max(0.03125, Math.min(4, Math.hypot(tr.a, tr.b)));
+  const x = Math.max(-2 / scale, region.x),
+    y = Math.max(-2 / scale, region.y);
+  const right = Math.min(FRAME_W + 2 / scale, region.x + region.w),
+    bottom = Math.min(FRAME_H + 2 / scale, region.y + region.h);
+  if (right <= x || bottom <= y) return;
+  const off = document.createElement('canvas');
+  off.width = Math.ceil((right - x) * scale);
+  off.height = Math.ceil((bottom - y) * scale);
+  const c = off.getContext('2d');
+  c.setTransform(scale, 0, 0, scale, -x * scale, -y * scale);
+  for (const child of s.children) {
+    let path = compositePaths.get(child);
+    if (path === undefined) {
+      path = strokePath(child);
+      compositePaths.set(child, path);
+    }
+    for (const instance of renderInstances(child))
+      if (intersects(instance.box, region))
+        paintStroke(c, instance, path, region);
+  }
+  ctx.drawImage(off, x, y, off.width / scale, off.height / scale);
+  off.width = off.height = 0;
 }

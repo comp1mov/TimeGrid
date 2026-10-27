@@ -1,5 +1,8 @@
+import { DrawingGesture } from './drawing-gesture.mjs';
+import { createFrameTiming } from './drawing-time.mjs';
 import {
   StrokeDocument,
+  makeComposite,
   createStroke,
   renderInstances,
   surfaceSize,
@@ -10,7 +13,7 @@ import {
 } from './stroke-document.mjs';
 import { SpeedPressure } from './brush-geometry.mjs';
 import { StrokeTileCache } from './stroke-cache.mjs';
-export const APP_VERSION = '28.35.0-drawing.4';
+export const APP_VERSION = '28.35.0-drawing.5';
 const $ = (id) => document.getElementById(id),
   canvas = $('canvas'),
   ctx = canvas.getContext('2d', {
@@ -34,6 +37,9 @@ let doc,
   stageRect;
 let layout = [],
   gridRect,
+  compositionRect,
+  timing,
+  timelineTick = 0,
   scheduled = 0,
   fullDirty = true,
   dirty = [],
@@ -44,6 +50,7 @@ let layout = [],
   playing = false,
   lastTick = 0,
   message = '';
+let previewImages = [];
 const metrics = {
   rectReads: 0,
   inputMs: [],
@@ -71,26 +78,45 @@ function setDocument(next) {
   schedule();
 }
 function rects() {
-  const cols = view === 'grid' ? 8 : 1,
-    rows = view === 'grid' ? 12 : 1;
-  const base = Math.min(
-    (width - 24) / (cols * 1024),
-    (height - 24) / (rows * 576),
-  );
-  const scale = base * zoom;
-  gridRect = {
-    x: (width - cols * 1024 * scale) / 2 + pan.x,
-    y: (height - rows * 576 * scale) / 2 + pan.y,
-    w: cols * 1024 * scale,
-    h: rows * 576 * scale,
+  const cols = view === 'grid' ? Number($('columns').value) : 1,
+    count = view === 'grid' ? 96 : 1,
+    rows = Math.ceil(count / cols);
+  const gap = view === 'grid' ? Number($('gap').value) : 0,
+    margin = Number($('margin').value);
+  const logicalW = cols * 1024 + (cols - 1) * gap + 2 * margin,
+    logicalH = rows * 576 + (rows - 1) * gap + 2 * margin;
+  const scale =
+    Math.min((width - 24) / logicalW, (height - 24) / logicalH) * zoom;
+  compositionRect = {
+    x: (width - logicalW * scale) / 2 + pan.x,
+    y: (height - logicalH * scale) / 2 + pan.y,
+    w: logicalW * scale,
+    h: logicalH * scale,
   };
-  layout = Array.from({ length: view === 'grid' ? 96 : 1 }, (_, i) => ({
-    id: view === 'grid' ? i : activeFrame,
-    x: gridRect.x + (i % cols) * 1024 * scale,
-    y: gridRect.y + Math.floor(i / cols) * 576 * scale,
+  gridRect = {
+    x: compositionRect.x + margin * scale,
+    y: compositionRect.y + margin * scale,
+    w: (logicalW - 2 * margin) * scale,
+    h: (logicalH - 2 * margin) * scale,
+  };
+  timing = createFrameTiming({
+    gridCols: Number($('columns').value),
+    animDirection: $('direction').value,
+    animPattern: $('pattern').value,
+    loopAfterN: Number($('loop').value),
+    loopOffset: Number($('loopOffset').value),
+    gridLoops: Number($('phases').value),
+  });
+  layout = Array.from({ length: count }, (_, i) => ({
+    cell: i,
+    id: timing.frame(i, timelineTick, view),
+    x: gridRect.x + (i % cols) * (1024 + gap) * scale,
+    y: gridRect.y + Math.floor(i / cols) * (576 + gap) * scale,
     w: 1024 * scale,
     h: 576 * scale,
   }));
+  activeFrame = layout[0].id;
+  $('frame').value = timelineTick + 1;
   $('zoomLabel').textContent = Math.round(zoom * 100) + '%';
   syncBrushControls();
 }
@@ -101,10 +127,18 @@ function markSurface(surface, box) {
   const ext = surfaceSize(surface);
   const placements =
     surface === 'bg-' + view
-      ? [gridRect]
+      ? [compositionRect]
       : surface === 'tpl'
         ? layout
-        : layout.filter((r) => surface === 'frame-' + r.id);
+        : layout.filter(
+            (r) =>
+              surface === 'frame-' + r.id ||
+              ($('onion').checked &&
+                $('target').value === 'frm' &&
+                [r.id - 1, r.id + 1].some(
+                  (id) => id >= 0 && id < 96 && surface === 'frame-' + id,
+                )),
+          );
   for (const r of placements) {
     const b = {
       x: r.x + (box.x / ext.w) * r.w - 3,
@@ -119,6 +153,10 @@ function schedule() {
   if (!scheduled) scheduled = requestAnimationFrame(render);
 }
 function fixture(c, r) {
+  if (previewImages.length) {
+    c.drawImage(previewImages[r.id % previewImages.length], r.x, r.y, r.w, r.h);
+    return;
+  }
   c.save();
   c.fillStyle = 'hsla(' + ((r.id * 31) % 360) + ',30%,32%,.28)';
   c.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
@@ -165,33 +203,40 @@ function drawScene(c, region, ratio = dpr, renderer = cache) {
   c.clip();
   c.fillStyle = '#1a1c25';
   c.fillRect(region.x, region.y, region.w, region.h);
-  renderer.draw(c, 'bg-' + view, gridRect, ratio, region);
+  if (!$('bgAbove').checked)
+    renderer.draw(c, 'bg-' + view, compositionRect, ratio, region);
   c.drawImage(fixtureCanvas, 0, 0, width, height);
   for (const r of layout) {
     if (!intersects(r, region)) continue;
-    renderer.draw(c, 'tpl', r, ratio, region);
+    if ($('onion').checked && $('target').value === 'frm') {
+      c.save();
+      c.globalAlpha = 0.35;
+      for (const id of [r.id - 1, r.id + 1])
+        if (id >= 0 && id < 96)
+          renderer.draw(c, 'frame-' + id, r, ratio, region);
+      c.restore();
+    }
+    if ($('templateVisible').checked) renderer.draw(c, 'tpl', r, ratio, region);
     renderer.draw(c, 'frame-' + r.id, r, ratio, region);
   }
+  if ($('bgAbove').checked)
+    renderer.draw(c, 'bg-' + view, compositionRect, ratio, region);
   c.restore();
 }
 function markStroke(s) {
   for (const item of renderInstances(s)) markSurface(item.surface, item.box);
 }
 function refreshDrafts(last = false) {
-  if (!gesture || gesture.mode !== 'draw') return;
-  const changed = [];
-  for (const s of gesture.segments) {
-    if (s.changed || last) {
-      const t = performance.now();
-      s.stroke = createStroke({ ...s.options, points: s.points, last });
-      metrics.geometryMs.push(performance.now() - t);
-      s.changed = false;
-      changed.push(s.stroke);
-    }
-  }
-  const old = cache.drafts;
-  cache.setDrafts(gesture.segments.map((s) => s.stroke).filter(Boolean));
-  for (const s of [...old, ...changed]) markStroke(s);
+  if (gesture?.mode !== 'draw') return;
+  const start = performance.now(),
+    next = gesture.engine.materialize(last),
+    old = cache.drafts;
+  const before = new Map(old.map((s) => [s.id, s])),
+    after = new Map(next.map((s) => [s.id, s]));
+  cache.setDrafts(next);
+  for (const s of old) if (after.get(s.id) !== s) markStroke(s);
+  for (const s of next) if (before.get(s.id) !== s) markStroke(s);
+  metrics.geometryMs.push(performance.now() - start);
 }
 function render(now) {
   scheduled = 0;
@@ -237,14 +282,14 @@ function trimMetrics() {
       metrics[k].splice(0, metrics[k].length - 2000);
 }
 function updateButtons() {
-  $('undo').disabled = !doc?.undoStack.length;
+  $('undo').disabled = !doc?.undoStack.length && gesture?.mode !== 'draw';
   $('redo').disabled = !doc?.redoStack.length;
   const c = cache?.stats();
   if (c)
     $('status').textContent =
       (message ? message + ' · ' : '') +
       doc.strokes.length +
-      ' strokes · ' +
+      ' operations · ' +
       c.tiles +
       ' tiles · ' +
       (c.bytes / 1048576).toFixed(2) +
@@ -253,7 +298,7 @@ function updateButtons() {
       ' MB display';
 }
 function resize() {
-  cancelGesture();
+  finish();
   measureRect();
   width = stageRect.width;
   height = stageRect.height;
@@ -294,54 +339,22 @@ function brush() {
     type: $('brushType').value,
     softness: Number($('softness').value) / 100,
     seed: crypto.getRandomValues(new Uint32Array(1))[0],
+    scatter: Number($('scatter').value) / 100,
+    dotScale: Number($('dotScale').value) / 100,
   };
 }
-// A grid gesture is sampled in one stable sheet space. Only its completed
-// outline is placed into frames; cell borders never restart the brush.
-function feed(p, time) {
-  const g = gesture,
-    target = g.target;
+function feed(p, time, shift = false) {
+  const g = gesture;
+  if (!g || g.mode !== 'draw') return;
   if (g.speed) p = [p[0], p[1], g.speed.sample(p[0], p[1], time)];
-  const surface =
-    target === 'bg'
-      ? 'bg-' + g.view
-      : g.view === 'grid'
-        ? 'sheet'
-        : target === 'tpl'
-          ? 'tpl'
-          : 'frame-' + activeFrame;
-  let segment = g.segments.at(-1);
-  if (!segment || segment.options.surface !== surface) {
-    segment = {
-      options: { ...g.brush, id: doc.newId(), surface, target },
-      points: [],
-      changed: true,
-    };
-    g.segments.push(segment);
+  if (shift && g.anchor) {
+    const dx = p[0] - g.anchor[0],
+      dy = p[1] - g.anchor[1],
+      a = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * Math.PI) / 4,
+      n = Math.hypot(dx, dy);
+    p = [g.anchor[0] + Math.cos(a) * n, g.anchor[1] + Math.sin(a) * n, p[2]];
   }
-  const ext = surfaceSize(surface),
-    q = [
-      Math.max(
-        -512,
-        Math.min(ext.w + 512, ((p[0] - g.rect.x) / g.rect.w) * ext.w),
-      ),
-      Math.max(
-        -512,
-        Math.min(ext.h + 512, ((p[1] - g.rect.y) / g.rect.h) * ext.h),
-      ),
-      p[2],
-    ];
-  const previous = segment.points.at(-1);
-  if (
-    !previous ||
-    Math.hypot(previous[0] - q[0], previous[1] - q[1]) > 0.2 ||
-    Math.abs(previous[2] - q[2]) > 0.005
-  ) {
-    if (segment.points.length >= LIMITS.perStroke)
-      throw Error('Long-stroke limit reached. Start another stroke.');
-    segment.points.push(q);
-    segment.changed = true;
-  }
+  g.engine.feed(p);
   g.lastPressure = p[2];
   metrics.samples++;
 }
@@ -349,24 +362,23 @@ function cancelGesture() {
   if (gesture?.mode === 'draw') {
     for (const s of cache.drafts) markStroke(s);
     cache.setDrafts([]);
-    schedule();
   }
   gesture = null;
   nav = null;
+  schedule();
 }
 function finish() {
-  if (!gesture || gesture.mode !== 'draw') {
+  if (gesture?.mode !== 'draw') {
     gesture = null;
     return;
   }
   try {
-    refreshDrafts(true);
-    const strokes = gesture.segments
-      .map((s) => s.stroke)
-      .filter((s) => s && renderInstances(s).length);
-    cache.setDrafts([]);
+    const strokes = gesture.engine.finish();
+    const old = cache.drafts;
+    cache.setDrafts(strokes);
+    for (const s of [...old, ...strokes]) markStroke(s);
+    cache.commitDrafts(strokes);
     gesture = null;
-    doc.addGesture(strokes);
     message = '';
   } catch (e) {
     cancelGesture();
@@ -374,69 +386,130 @@ function finish() {
   }
   schedule();
 }
+let penActive = null,
+  suppressTouch = false,
+  lastPenTime = -Infinity;
+function startNavigation() {
+  const contacts = [...pointers.values()].filter((p) => p.type === 'touch');
+  if (contacts.length < 2) return;
+  const [a, b] = contacts.map((p) => p.point);
+  nav = {
+    distance: Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1])),
+    center: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
+  };
+}
 canvas.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+  if (![0, 1, 2, 5].includes(e.button)) return;
+  if (
+    e.pointerType === 'touch' &&
+    (penActive !== null || performance.now() - lastPenTime < 350)
+  )
+    return;
+  if (e.pointerType === 'pen') {
+    lastPenTime = performance.now();
+    penActive = e.pointerId;
+    // A pen takes ownership from touch navigation/accidental palm contact.
+    if (gesture && pointers.get(gesture.pointerId)?.type === 'touch') finish();
+    for (const [id, p] of pointers) if (p.type === 'touch') pointers.delete(id);
+    nav = null;
+    suppressTouch = false;
+  }
   e.preventDefault();
   measureRect();
-  pointers.set(e.pointerId, point(e));
-  canvas.setPointerCapture(e.pointerId);
-  if (pointers.size === 2) {
-    cancelGesture();
-    const [a, b] = [...pointers.values()];
-    nav = {
-      distance: Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1])),
-      center: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
-    };
+  const p = point(e);
+  pointers.set(e.pointerId, { point: p, type: e.pointerType });
+  try {
+    canvas.setPointerCapture(e.pointerId);
+  } catch {}
+  const contacts = [...pointers.values()].filter((p) => p.type === 'touch');
+  if (contacts.length >= 2) {
+    if (gesture?.mode === 'draw') {
+      if (
+        performance.now() - gesture.started < 90 &&
+        gesture.engine.samples < 3
+      )
+        cancelGesture();
+      else finish();
+    }
+    suppressTouch = true;
+    startNavigation();
     return;
   }
-  if (pointers.size !== 1) return;
-  if ($('tool').value === 'pan' || space || e.button !== 0) {
-    gesture = { mode: 'pan', previous: point(e) };
+  if (gesture || suppressTouch) return;
+  const penEraser =
+    e.pointerType === 'pen' && (e.button === 5 || Boolean(e.buttons & 32));
+  if (
+    $('tool').value === 'pan' ||
+    space ||
+    $('brushOff').checked ||
+    (e.button !== 0 && !penEraser) ||
+    (e.pointerType === 'touch' && !$('touchDraw').checked)
+  ) {
+    gesture = { mode: 'pan', previous: p, pointerId: e.pointerId };
     return;
   }
+  const b = {
+    ...brush(),
+    erase: penEraser || $('tool').value === 'erase',
+    pressure:
+      ($('pressure').checked && e.pointerType === 'pen') ||
+      $('velocity').checked,
+  };
   gesture = {
     mode: 'draw',
-    segments: [],
-    target: $('target').value,
-    brush: {
-      ...brush(),
-      pressure:
-        ($('pressure').checked && e.pointerType === 'pen') ||
-        $('velocity').checked,
-    },
+    pointerId: e.pointerId,
+    pointerType: e.pointerType,
+    started: performance.now(),
+    anchor: p,
     speed:
       $('velocity').checked &&
       !($('pressure').checked && e.pointerType === 'pen')
         ? new SpeedPressure()
         : null,
-    view,
-    rect: { ...gridRect },
-    previous: null,
-    pointerId: e.pointerId,
+    engine: new DrawingGesture({
+      document: doc,
+      brush: b,
+      target: $('target').value,
+      view,
+      layout: layout.map((r) => ({ ...r })),
+      composition: { ...compositionRect },
+      oneFrame: $('oneFrame').checked,
+      longStroke: $('longStroke').checked,
+      trail: Number($('trail').value),
+      tick: timelineTick,
+      playing,
+    }),
   };
   firstPendingInput = performance.now();
-  feed(point(e), e.timeStamp);
-  schedule();
+  try {
+    feed(p, e.timeStamp);
+    schedule();
+  } catch (error) {
+    cancelGesture();
+    message = error.message;
+  }
 });
 canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'pen') lastPenTime = performance.now();
   if (!pointers.has(e.pointerId)) return;
-  const start = performance.now(),
+  const started = performance.now(),
     p = point(e);
-  pointers.set(e.pointerId, p);
-  if (pointers.size >= 2 && nav) {
-    const [a, b] = [...pointers.values()];
-    const dist = Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1])),
+  pointers.set(e.pointerId, { point: p, type: e.pointerType });
+  const touches = [...pointers.values()].filter((p) => p.type === 'touch');
+  if (touches.length >= 2 && nav) {
+    const [a, b] = touches.map((p) => p.point),
+      distance = Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1])),
       center = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    zoomAt(dist / nav.distance, ...nav.center, true);
+    zoomAt(distance / nav.distance, ...nav.center, true);
     pan.x += center[0] - nav.center[0];
     pan.y += center[1] - nav.center[1];
-    nav = { distance: dist, center };
+    nav = { distance, center };
     rects();
     fullDirty = true;
     schedule();
     return;
   }
-  if (!gesture) return;
+  if (!gesture || gesture.pointerId !== e.pointerId) return;
   if (gesture.mode === 'pan') {
     pan.x += p[0] - gesture.previous[0];
     pan.y += p[1] - gesture.previous[1];
@@ -446,51 +519,52 @@ canvas.addEventListener('pointermove', (e) => {
     schedule();
     return;
   }
-  if (e.pointerId !== gesture.pointerId) return;
+  e.preventDefault();
   try {
-    for (const sample of e.getCoalescedEvents?.().length
-      ? e.getCoalescedEvents()
-      : [e])
-      feed(point(sample), sample.timeStamp);
+    const coalesced = e.getCoalescedEvents?.();
+    for (const sample of coalesced?.length ? coalesced : [e])
+      feed(point(sample), sample.timeStamp, e.shiftKey);
     if (!firstPendingInput) firstPendingInput = performance.now();
     schedule();
-  } catch (err) {
-    cancelGesture();
-    message = err.message;
-    updateButtons();
+  } catch (error) {
+    finish();
+    message = error.message;
+    schedule();
   }
-  metrics.inputMs.push(performance.now() - start);
+  metrics.inputMs.push(performance.now() - started);
 });
-canvas.addEventListener('pointerup', (e) => {
-  if (gesture?.mode === 'draw' && e.pointerId === gesture.pointerId) {
-    try {
-      feed(point(e), e.timeStamp);
-      finish();
-    } catch (err) {
-      cancelGesture();
-      message = err.message;
-      schedule();
+function endPointer(e, includePoint = false) {
+  if (gesture?.pointerId === e.pointerId) {
+    if (gesture.mode === 'draw' && includePoint) {
+      try {
+        feed(point(e), e.timeStamp, e.shiftKey);
+      } catch (error) {
+        message = error.message;
+      }
     }
-  } else if (pointers.size === 1) gesture = null;
+    finish();
+  }
   pointers.delete(e.pointerId);
-  if (pointers.size < 2) nav = null;
-});
-canvas.addEventListener('pointercancel', (e) => {
-  pointers.delete(e.pointerId);
-  cancelGesture();
-});
-canvas.addEventListener('lostpointercapture', (e) => {
-  pointers.delete(e.pointerId);
-  if (gesture?.pointerId === e.pointerId) cancelGesture();
-});
+  if (penActive === e.pointerId) penActive = null;
+  if ([...pointers.values()].filter((p) => p.type === 'touch').length < 2)
+    nav = null;
+  if (![...pointers.values()].some((p) => p.type === 'touch'))
+    suppressTouch = false;
+}
+canvas.addEventListener('pointerup', (e) => endPointer(e, true));
+canvas.addEventListener('pointercancel', (e) => endPointer(e));
+canvas.addEventListener('lostpointercapture', (e) => endPointer(e));
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('blur', () => {
+  finish();
   pointers.clear();
-  cancelGesture();
+  penActive = null;
+  suppressTouch = false;
+  nav = null;
   space = false;
 });
 function zoomAt(factor, x = width / 2, y = height / 2, navigating = false) {
-  if (!navigating) cancelGesture();
+  if (!navigating) finish();
   const next = Math.max(0.75, Math.min(16, zoom * factor)),
     f = next / zoom;
   pan.x = x - width / 2 - (x - width / 2 - pan.x) * f;
@@ -505,6 +579,15 @@ canvas.addEventListener(
   (e) => {
     e.preventDefault();
     measureRect();
+    if (!e.ctrlKey && !e.metaKey) {
+      finish();
+      pan.x -= e.deltaX;
+      pan.y -= e.deltaY;
+      rects();
+      fullDirty = true;
+      schedule();
+      return;
+    }
     zoomAt(
       Math.exp(-e.deltaY * 0.002),
       e.clientX - stageRect.left,
@@ -516,7 +599,7 @@ canvas.addEventListener(
 $('zoomIn').onclick = () => zoomAt(1.5);
 $('zoomOut').onclick = () => zoomAt(1 / 1.5);
 $('fit').onclick = () => {
-  cancelGesture();
+  finish();
   zoom = 1;
   pan = { x: 0, y: 0 };
   rects();
@@ -524,7 +607,7 @@ $('fit').onclick = () => {
   schedule();
 };
 $('view').onchange = () => {
-  cancelGesture();
+  finish();
   view = $('view').value;
   zoom = 1;
   pan = { x: 0, y: 0 };
@@ -532,8 +615,7 @@ $('view').onchange = () => {
   fullDirty = true;
   schedule();
 };
-for (const id of ['target', 'tool', 'brushType'])
-  $(id).onchange = cancelGesture;
+for (const id of ['target', 'tool', 'brushType']) $(id).onchange = finish;
 function syncBrushControls(source) {
   if (source === 'number') {
     const n = Number($('sizeNumber').value);
@@ -568,23 +650,176 @@ $('sizeNumber').onchange = () => {
 for (const id of ['smooth', 'streamline', 'opacity', 'softness'])
   $(id).oninput = () => syncBrushControls();
 $('undo').onclick = () => {
-  cancelGesture();
+  finish();
   doc.undo();
   message = '';
   schedule();
 };
 $('redo').onclick = () => {
-  cancelGesture();
+  finish();
   doc.redo();
   message = '';
   schedule();
 };
 $('clear').onclick = () => {
-  cancelGesture();
-  doc.clear();
+  finish();
+  const target = $('target').value;
+  doc.replaceSurfaces(
+    target === 'frm'
+      ? Array.from({ length: 96 }, (_, i) => 'frame-' + i)
+      : [target === 'bg' ? 'bg-' + view : 'tpl'],
+  );
   message = 'Cleared. Undo restores it.';
   schedule();
 };
+const numericSettings = [
+  'columns',
+  'gap',
+  'margin',
+  'fps',
+  'loop',
+  'loopOffset',
+  'phases',
+  'trail',
+];
+const booleanSettings = [
+  'oneFrame',
+  'longStroke',
+  'onion',
+  'templateVisible',
+  'bgAbove',
+  'touchDraw',
+];
+const selectSettings = ['direction', 'pattern'];
+function captureSettings() {
+  doc.settings = { tick: timelineTick, view };
+  for (const id of numericSettings) doc.settings[id] = Number($(id).value);
+  for (const id of booleanSettings) doc.settings[id] = $(id).checked;
+  for (const id of selectSettings) doc.settings[id] = $(id).value;
+}
+function restoreSettings() {
+  const defaults = {
+    columns: 8,
+    gap: 0,
+    margin: 0,
+    fps: 8,
+    loop: 0,
+    loopOffset: 0,
+    phases: 1,
+    trail: 8,
+    oneFrame: false,
+    longStroke: false,
+    onion: false,
+    templateVisible: true,
+    bgAbove: false,
+    touchDraw: true,
+    direction: 'forward',
+    pattern: 'sequential',
+    tick: 0,
+    view: 'grid',
+  };
+  const settings = { ...defaults, ...doc.settings };
+  for (const id of numericSettings) $(id).value = settings[id];
+  for (const id of booleanSettings) $(id).checked = settings[id];
+  for (const id of selectSettings) $(id).value = settings[id];
+  view = settings.view;
+  $('view').value = view;
+  timelineTick = settings.tick;
+  playing = false;
+  syncPlay();
+  zoom = 1;
+  pan = { x: 0, y: 0 };
+  rects();
+  fullDirty = true;
+  schedule();
+}
+for (const id of [
+  ...numericSettings,
+  ...booleanSettings,
+  ...selectSettings,
+  'brushOff',
+  'scatter',
+  'dotScale',
+]) {
+  $(id).addEventListener('change', () => {
+    finish();
+    if ($(id).type === 'number')
+      $(id).value = Math.max(
+        Number($(id).min),
+        Math.min(Number($(id).max), Math.round(Number($(id).value) || 0)),
+      );
+    rects();
+    syncPlay();
+    fullDirty = true;
+    schedule();
+  });
+}
+$('bake').onclick = () => {
+  finish();
+  try {
+    const s = makeComposite(
+      doc,
+      'tpl',
+      Array.from({ length: 96 }, (_, i) => 'frame-' + i),
+    );
+    if (s) doc.replaceSurfaces(['tpl'], [s]);
+    message = s
+      ? 'TPL applied to 96 frames. Undo restores both layers.'
+      : 'TPL is empty.';
+  } catch (e) {
+    message = e.message;
+  }
+  schedule();
+};
+let imageLoad = 0;
+$('images').onclick = () => $('imageFiles').click();
+$('resetImages').onclick = () => {
+  imageLoad++;
+  for (const i of previewImages) i.close();
+  previewImages = [];
+  fullDirty = true;
+  schedule();
+};
+$('imageFiles').onchange = async () => {
+  const generation = ++imageLoad,
+    decoded = [];
+  try {
+    const files = [...$('imageFiles').files].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true }),
+    );
+    if (files.length > 96) throw Error('Choose at most 96 images.');
+    if (files.reduce((n, f) => n + f.size, 0) > 64 * 1024 * 1024)
+      throw Error('Image selection exceeds 64 MiB.');
+    for (const f of files) {
+      // Session preview is deliberately bounded. Original media project support is a later step.
+      decoded.push(
+        await createImageBitmap(f, {
+          resizeWidth: 512,
+          resizeHeight: 288,
+          resizeQuality: 'high',
+        }),
+      );
+      if (generation !== imageLoad) {
+        decoded.forEach((i) => i.close());
+        return;
+      }
+    }
+    for (const i of previewImages) i.close();
+    previewImages = decoded;
+    message =
+      files.length +
+      ' preview images. Save strokes does not include these images.';
+    fullDirty = true;
+    schedule();
+  } catch (e) {
+    decoded.forEach((i) => i.close());
+    message = e.message;
+    updateButtons();
+  } finally {
+    $('imageFiles').value = '';
+  }
+};
+
 function download(blob, name) {
   const url = URL.createObjectURL(blob),
     a = document.createElement('a');
@@ -595,6 +830,7 @@ function download(blob, name) {
 }
 $('save').onclick = () => {
   finish();
+  captureSettings();
   download(
     new Blob([doc.serialize()], { type: 'application/json' }),
     'TimeGrid-' + APP_VERSION + '.timegrid-drawing.json',
@@ -611,6 +847,7 @@ $('file').onchange = async () => {
     const next = StrokeDocument.parse(await f.text());
     cancelGesture();
     setDocument(next);
+    restoreSettings();
     message = 'Opened ' + f.name;
   } catch (e) {
     message = 'Could not open: ' + e.message;
@@ -619,67 +856,88 @@ $('file').onchange = async () => {
     updateButtons();
   }
 };
-function setFrame(value) {
-  cancelGesture();
-  activeFrame = (value + 96) % 96;
-  $('frame').value = activeFrame + 1;
+function advanceTo(value) {
+  const oldTick = timelineTick;
+  timelineTick = Math.max(0, Math.min(10000000, Math.floor(value)));
   rects();
+  if (gesture?.mode === 'draw' && oldTick !== timelineTick) {
+    try {
+      gesture.engine.transition({
+        layout: layout.map((r) => ({ ...r })),
+        composition: { ...compositionRect },
+        tick: timelineTick,
+        playing,
+      });
+    } catch (error) {
+      finish();
+      message = error.message;
+    }
+  }
   fullDirty = true;
   schedule();
 }
-$('frame').onchange = () =>
-  setFrame(Math.max(0, Math.min(95, (Number($('frame').value) || 1) - 1)));
-$('prev').onclick = () => setFrame(activeFrame - 1);
-$('next').onclick = () => setFrame(activeFrame + 1);
+function setFrame(value) {
+  playing = false;
+  syncPlay();
+  advanceTo(value);
+}
+$('frame').onchange = () => setFrame((Number($('frame').value) || 1) - 1);
+$('prev').onclick = () => setFrame(Math.max(0, timelineTick - 1));
+$('next').onclick = () => setFrame(timelineTick + 1);
+let tickRequest = 0;
+function syncPlay() {
+  $('play').textContent =
+    (playing ? 'Pause' : 'Play') + ' · ' + $('fps').value + ' fps';
+  $('play').classList.toggle('active', playing);
+}
 $('play').onclick = () => {
   playing = !playing;
-  $('play').textContent = playing ? 'Pause · 8 fps' : 'Play · 8 fps';
-  $('play').classList.toggle('active', playing);
+  syncPlay();
+  if (gesture?.mode === 'draw') gesture.engine.playing = playing;
+  cancelAnimationFrame(tickRequest);
   if (playing) {
     lastTick = performance.now();
-    requestAnimationFrame(tick);
+    tickRequest = requestAnimationFrame(tick);
   }
 };
 function tick(now) {
   if (!playing) return;
-  if (now - lastTick >= 125) {
-    lastTick = now;
-    activeFrame = (activeFrame + 1) % 96;
-    $('frame').value = activeFrame + 1;
-    rects();
-    if (gesture?.mode === 'draw') gesture.previous = null;
-    fullDirty = true;
-    schedule();
+  const interval = 1000 / Number($('fps').value);
+  // Match TimeGrid's clock: one delivered transition per rAF, retain phase.
+  if (now - lastTick >= interval) {
+    lastTick = now - ((now - lastTick) % interval);
+    advanceTo(timelineTick + 1);
   }
-  requestAnimationFrame(tick);
+  tickRequest = requestAnimationFrame(tick);
 }
 function exportCanvas() {
-  const out = document.createElement('canvas');
-  out.width = view === 'grid' ? 1536 : 2048;
-  out.height = view === 'grid' ? 1296 : 1152;
-  const c = out.getContext('2d');
-  c.fillStyle = '#1a1c25';
-  c.fillRect(0, 0, out.width, out.height);
-  const placements =
-    view === 'grid'
-      ? Array.from({ length: 96 }, (_, id) => ({
-          id,
-          x: (id % 8) * 192,
-          y: Math.floor(id / 8) * 108,
-          w: 192,
-          h: 108,
-        }))
-      : [{ id: activeFrame, x: 0, y: 0, w: 2048, h: 1152 }];
-  const exportCache = new StrokeTileCache(doc, { budget: 4 * 1024 * 1024 });
-  function surface(id, r) {
-    exportCache.draw(c, id, r, 1);
+  const out = document.createElement('canvas'),
+    size = Number($('exportSize').value);
+  const scale = size / Math.max(compositionRect.w, compositionRect.h);
+  out.width = Math.max(1, Math.round(compositionRect.w * scale));
+  out.height = Math.max(1, Math.round(compositionRect.h * scale));
+  const c = out.getContext('2d'),
+    exportCache = new StrokeTileCache(doc, { budget: 4 * 1024 * 1024 });
+  if (!$('transparent').checked) {
+    c.fillStyle = '#1a1c25';
+    c.fillRect(0, 0, out.width, out.height);
   }
-  surface('bg-' + view, { x: 0, y: 0, w: out.width, h: out.height });
-  for (const r of placements) {
-    fixture(c, r);
-    surface('tpl', r);
+  const surface = (id, r) => exportCache.draw(c, id, r, 1);
+  const bg = { x: 0, y: 0, w: out.width, h: out.height };
+  if (!$('bgAbove').checked) surface('bg-' + view, bg);
+  for (const item of layout) {
+    const r = {
+      ...item,
+      x: (item.x - compositionRect.x) * scale,
+      y: (item.y - compositionRect.y) * scale,
+      w: item.w * scale,
+      h: item.h * scale,
+    };
+    if (!$('transparent').checked) fixture(c, r);
+    if ($('templateVisible').checked) surface('tpl', r);
     surface('frame-' + r.id, r);
   }
+  if ($('bgAbove').checked) surface('bg-' + view, bg);
   exportCache.dispose();
   return out;
 }
@@ -855,6 +1113,8 @@ window.timegridLab = {
     cancelGesture();
     setDocument(StrokeDocument.parse(text));
   },
+  captureSettings,
+  restoreSettings,
   stats: () => ({
     strokes: doc.strokes.length,
     points: doc.totalPoints,
@@ -865,6 +1125,11 @@ window.timegridLab = {
     activeFrame,
   }),
   layout: () => layout.map((r) => ({ ...r })),
+  composition: () => ({ ...compositionRect }),
+  advance: advanceTo,
+  tick: () => timelineTick,
+  gesture: () => gesture?.engine,
+  finish,
   benchmark,
   exportCanvas,
   reset: () => setDocument(new StrokeDocument()),

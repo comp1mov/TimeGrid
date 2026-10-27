@@ -3,7 +3,7 @@
   "version": "28.35.0-drawing.2",
   "description": "An experimental spatial montage and frame-sampling browser application",
   "scripts": {
-    "test": "node --test tests/chrono-animation.test.mjs tests/chrono-compositing.test.mjs tests/drawing-geometry.test.mjs tests/stroke-document.test.mjs",
+    "test": "node --test tests/chrono-animation.test.mjs tests/chrono-compositing.test.mjs tests/drawing-geometry.test.mjs tests/stroke-document.test.mjs tests/drawing-temporal.test.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

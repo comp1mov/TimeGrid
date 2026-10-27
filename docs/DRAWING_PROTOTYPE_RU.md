@@ -1,81 +1,88 @@
-# Drawing Lab 28.35.0-drawing.4
+# Drawing Lab 28.35.0-drawing.5
 
-26 октября 2026. Ветка `codex/drawing-engine`. [Текущий стенд](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.4/drawing-lab.html). [Проверки](drawing-evidence/2026-10-26-perfect-freehand-4/README.md). [История .3](drawing-evidence/2026-10-26-perfect-freehand-3/README.md).
-
-> Последующее уточнение механики: stationary hold не перенесён, Grid playback имеет упрощённую адресацию. [Полный аудит, матрица и состав исправленного стенда](DRAWING_BEHAVIOR_AUDIT_RU.md). Текущий план 4.8 сначала восстанавливает совместимость целиком. Ниже сохранено описание выпущенной .4.
-
-> Уточнение после авторского теста .4: live Spray заметно тормозит, BG не покрывает поля, старые scatter/dotScale не перенесены. Это открытые дефекты стенда. [Диагностика и предложенные исправления](drawing-evidence/2026-10-26-live-input-review/README.md). Следующая приоритетная работа пересмотрена в плане 4.7; текст архитектуры ниже описывает выпущенную .4, а не обещание полного соответствия TimeGrid.
+27 октября 2026. Ветка codex/drawing-engine. [Тестовая ссылка](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.5/drawing-lab.html). [Проверки и сырые данные](drawing-evidence/2026-10-27-drawing-5/README.md). [Исходный аудит механики](DRAWING_BEHAVIOR_AUDIT_RU.md).
 
 ## Граница выпуска
 
-Это продолжение одного Drawing Lab на 96 сгенерированных кадрах. Ordinary TimeGrid этой ветки остаётся drawing.2; stable 28.34 и Cloud не меняются. Grid/Single являются видами одного банка. Видеоматериал, legacy raster, полный ProjectDocument, 1F, layout/reorder, Long Stroke/Trail и Onion Skin ещё не интегрированы. Текущее переключение playback между frame-N не является готовым Long Stroke.
+Один прежний стенд, новый временной движок и coordinator ввода. Ordinary TimeGrid остаётся drawing.2, stable 28.34 и Cloud не обновлены. Сохраняются BG/TPL/FRM, Single/Grid как виды, принятая perfect-freehand Round и её Stabilizer/Edge smoothing. Новые настройки находятся в раскрываемой строке Animation, layers, input and grid settings. Шрифт остаётся Inter.
 
-Автор принял базовую кисть/стабилизацию, Save/Open и Undo/Redo в .3. Для .4 согласованы fast-thick speed, Spray/soft edge и eraser. Принятие характера новых кистей остаётся за автором на его устройствах.
+Реализованы stationary hold, настоящее изменение адресов в Grid, Long Stroke/Trail, 1F, Onion, Apply TPL, поля BG, порядок BG, перестройка колонок/gaps, scatter/dot size и временный image-sequence preview. Это ещё не перенос всех панелей и всего media workflow TimeGrid.
 
-## Документ и геометрия
+## Разделение ответственности
 
-Format timegrid-strokes, schema 3, engine perfect-freehand@1.2.3. Кадр 1024 × 576, grid 8192 × 6912. Координаты не зависят от zoom, DPR и размеров preview.
-
-- Жёсткий Round хранит исходные x/y/эффективное давление, fixed outline, параметры и renderer quadratic-v1. Путь следует quadratic midpoint примеру perfect-freehand. Уже сохранённый outline не генерируется заново.
-- Spray и мягкий Round хранят points, brush type/softness/seed и fixed stamps [x,y,r], renderer stamps-v1. Outline пуст. После коммита геометрия заморожена.
-- getStrokePoints даёт стабилизированную траекторию. Отпечатки распределяются по длине пути, с переносом остатка шага между сегментами. Новая seed выбирается один раз на жест. Рендер читает stamps, а не запускает random заново.
-- Точность частиц 0.0001 logical px. Ошибка отдельного числа не более 0.00005, при максимальном raster LOD 4 это 0.0002 output px. JSON не хранит ненужные хвосты double. Validator проверяет эту точность, размер, радиусы и диапазоны.
-- Один sheet-жест имеет одну геометрию и список placements {surface,x,y}. Переход границы не перезапускает кисть. FRM адресует frame-0…95; TPL размещает части общего жеста в общем tpl в фиксированном порядке. BG имеет отдельные bg-grid/bg-single.
-- Кадры выбираются по отпечатку, включая радиус. Round использует flattened contour для hit test; Spray/soft Round проверяют circle/rect только в кандидатных ячейках. Бокс не означает, что заполнены все клетки внутри него.
-- Spatial index документа адресует placements. Отдельный WeakMap stamp index с bucket 256 logical px выбирает частицы для области плитки в исходных координатах. Индекс и кеш не входят в файл.
-- Bbox при Open пересчитывается по геометрии. Schema 1 сохраняет прежний linear-v1; schema 2 сохраняет старый quadratic-v1 и simulatePressure. Старый вид не меняется от новой speed-логики.
-
-Frame-N пока адрес fixture. Устойчивые SampleOccurrence IDs и явное поведение reflow/reorder/deletion нужны до интеграции. Нельзя привязывать рисунок к другому кадру по случайно совпавшему номеру.
-
-## Кисти и ввод
-
-Width 2…180 frame px, slider и число. Масштаб UI показывает приблизительную экранную ширину hard Round без pressure. Spray footprint шире этой величины из-за scatter. Большая стабилизация даёт намеренное отставание.
-
-| Контрол | Поведение |
+| Модуль | Ответственность |
 | --- | --- |
-| Round, Soft edge 0 | perfect-freehand outline, Edge smoothing управляет краем |
-| Spray | Шаг 0.22 size, scatter 0.95 size, count clamp(round(size×1.6),10,90), радиусы примерно 0.055…0.1 size |
-| Soft edge | Радиальный спад dabs; для Round шаг 0.16 size, для Spray смягчает частицы |
-| Opacity | Round outline одна opacity на операцию; stamp-кисти накапливают opacity при перекрытии отпечатков. Spray paint дополнительно ×0.35 |
-| Eraser | Выбранная форма/softness/opacity, destination-out только внутри выбранной поверхности. Spray erase без paint-множителя 0.35, как у старого инструмента |
-| Stabilizer | Streamline траектории всех кистей. Edge smoothing не меняет частицы Spray или soft Round |
-| Vary with speed | CSS-distance / timestamp delta, фильтр 35 ms, давление от 0.2 до 1, насыщение около 1.2 CSS px/ms. Быстро толще |
-| Pen pressure | Реальное PointerEvent pressure приоритетно над speed для пера. Для mouse/touch давление либо постоянное, либо рассчитано из скорости |
+| drawing-time.mjs | Чистый адаптер вычислений времени из 28.34. Direction, pattern, phases, loop/offset. 20 736 сравнений с замороженным исходным эталоном |
+| drawing-gesture.mjs | Жест, его параметры, spatial mapping, переходы между occurrence, накопление и placements |
+| brush-geometry.mjs | Fixed stamps, потоковый spatial resampling, persistent seed, pressure/speed, soft sprites |
+| stroke-document.mjs | Immutable operations, placements, сериализация/валидация, история и изолированный TPL bake |
+| stroke-cache.mjs | Sparse tiles, LOD, invalidation, дописывание новых операций в готовые tiles |
+| drawing-lab.mjs | Pointer Events, часы playback, представление, настройки, файлы и PNG |
 
-Speed измеряется до перевода в frame coordinates, поэтому DPR/zoom не меняют реакцию при одинаковом движении руки. Повторная stationary release-точка не создаёт тонкий кончик. Само давление фиксируется в points; рендер не требует заново вычислять скорость.
+Stable пока не импортирует новый адаптер. Формулировка «общая модель» означает выделенное проверенное ядро для будущего подключения, а не уже выполненный перенос в main.
 
-Настройки фиксируются на pointerdown. Pointer capture и coalesced input сохраняются. Geometry reads не выполняются по каждому кадру/точке. Draft перестраивается по rAF; текущая реализация ещё перестраивает весь активный сегмент, это ограничение для длинных/плотных жестов. Resize, смена вида/инструмента, blur, pointercancel и pinch отменяют draft без коммита.
+## Время и художественная механика
 
-## Кеш, Undo и экспорт
+Удержание обычной FRM кисти получает событие смены отображаемого кадра независимо от pointermove. Новое отображаемое occurrence получает точку. Повторный repaint того же адреса не добавляет opacity. Возврат после другого кадра записывает новый след.
 
-Sparse Canvas2D tiles 256 raster px с bleed 2 px, LOD 1/32…4, LRU 24 MiB, Path2D cache до 1024 для contour-кисти. Stamp geometry рисуется только в пересекающихся плитках. Пустой банк из 96 кадров не выделяет drawing raster backing.
+Grid использует тот же набор расчётов адресов, что 28.34. Single показывает первую ячейку исходного порядка; переход в Single не пересчитывает timing pattern как одноколоночный банк. Loop After N в Single игнорируется согласно существующему правилу. Random в этом fixture воспроизводится с seed 1; создание нового shuffle на каждом Play из старого UI намеренно не добавлено без сохраняемого seed-контрола.
 
-Соседние плитки получают непересекающиеся целые device-pixel области с общей трансформацией выборки. Исправление .3 для внутренних швов сохраняется. Два viewport buffers считаются отдельно; DPR до 2, примерно до 4 млн px каждый. RGBA bytes не равны памяти браузера: JS arrays, stamp index, Path2D и графический драйвер имеют дополнительную стоимость.
+Long Stroke при playback хранит сегменты траектории и переносит геометрию в последующие кадры через placements. Trail 0 переносит всю историю жеста. Положительный Trail оставляет переносимое окно по ticks, а не по числу input events. Уже нарисованные предыдущие кадры сохраняются. Release фиксирует результат, без старого повторного alpha bake. При паузе новые линии ведут себя как обычная кисть; при смене адреса разрывается соединение между локальными сегментами. Художественная приёмка этого поведения на авторском материале ещё нужна.
 
-Undo одного жеста отменяет все его размещения, Clear обратим. История до 100 операций и оценки 16 MiB геометрии, последняя операция остаётся. History session-only. Для stamps учитываются x/y/r.
+1F ограничивает footprint текущей ячейкой и разрывает линию при переходе. Следующий кадр доступен для рисования. При 1F off возможен выход на соседние ячейки композиции, не на случайного соседа bitmap atlas. Single остаётся видом.
 
-Лимиты: 30 000 точек на сегмент, 120 000 stamps на сегмент, 20 000 strokes, 1 млн points; документ может раньше достичь консервативной оценки 32 MiB. При превышении во время ввода текущий жест отменяется с сообщением, завершённые операции остаются. Open проверяет всё до замены документа. JSON parse и построение индексов пока синхронные.
+Onion отображает FRM соседних индексов с opacity .35, без wrap 95→0. Это guide, PNG его не включает. При изменении соседнего рисунка invalidation затрагивает также соответствующий onion preview.
 
-Save/Open сохраняет рисунок, не полный медиапроект; автосохранения нет. Новые schema 3 требуют drawing.4+. PNG Grid 1536 × 1296, Single 2048 × 1152. Общий renderer заново рисует сохранённую геометрию с отдельным кешем 4 MiB. Это доказательство повторной растеризации рисунка, а не полного proxy → оригинальное видео workflow.
+BG покрывает композицию с полями и gaps. Grid и Single имеют отдельные BG. При reflow BG масштабируется относительно всей композиции; FRM/TPL сохраняют локальные координаты кадра. BG above рисуется один раз после кадров и рисунков.
 
-## Что даёт perfect-freehand, что остаётся нашим
+## Ввод
 
-[Официальный README](https://github.com/steveruizok/perfect-freehand): getStroke/getStrokePoints/getStrokeOutlinePoints, size/thinning/pressure, smoothing/streamline, easing, start/end cap и taper. Это генератор геометрии, не редактор. Заливка, Spray, UI, слои, Undo, память, файлы и распределение по кадрам реализуются TimeGrid.
+| Источник | Реализованное правило | Что проверено |
+| --- | --- | --- |
+| Mouse | Capture, coalesced samples, обычная кисть/скорость, Space-pan, Shift направления 45° | Native Edge mouse и управляемые события |
+| Trackpad | Browser pointer для клика/drag, wheel pan, Ctrl/Command-wheel zoom | Wheel protocol; физический trackpad отдельно не проверен |
+| Touch | Один палец рисует; два пальца pan/zoom; Draw with finger можно отключить | Touch protocol на эмуляции 390×844 |
+| Pen | Pressure приоритетнее speed, не обнулять конец при release, eraser button 5/buttons 32 | Synthetic PointerEvent, не физический стилус |
+| Pen + touch | Pen получает владение, touch во время pen игнорируется; pen может прервать touch navigation | Управляемые смешанные события |
+| Cancel/blur/resize | Сохраняется уже принятая часть жеста | Browser checks |
+| Начало pinch | Короткий touch-кандидат до 90 ms и меньше 3 samples отменяется как возможный случайный контакт | Pinch fixture без лишней точки |
 
-Дополнительный кандидат для будущего исследования: сужение начала и конца штриха и настройка caps. Не включено в .4 и не заменяет согласованную очередь.
+Это единый coordinator по pointerType, не аппаратная сертификация. Safari/iPad/Pencil, Windows touchscreen и Wacom с драйвером ещё не проверены. Tilt, azimuth, barrel-button shortcuts и жесты трёх пальцев не реализованы. Touch suppression не заменяет системный palm rejection. Исключения и лимиты должны проверяться отдельно на устройствах.
 
-## Заливка, уточнение автора
+## Данные и совместимость
 
-Автор хочет заливать внутри нарисованной фигуры. Первая предлагаемая граница: замкнутая область активного drawing-слоя в текущем кадре, без анализа видео/изображения. Заливка должна быть отдельной отменяемой операцией и сохранять зафиксированный результат.
+Формат timegrid-strokes, schema 4, engine perfect-freehand@1.2.3. Кадр 1024×576. Fixture содержит 96 самостоятельных frame-N адресов. Это стабильные адреса внутри данного банка, не полноценные UUID/relink/resampling media project.
 
-До реализации проверить: тонкий/полупрозрачный контур, антиалиасинг, маленькие разрывы, отверстия, самопересечения, края кадра, TPL, Undo и совпадение proxy/full-size. Для Spray и мягкого контура понятие закрытой границы требует явного порога; нельзя незаметно заливать весь кадр при утечке. Выбор хранения region contour с holes либо небольшой локальной маски требует отдельного прототипа. Большой пустой canvas на все кадры не нужен. Это план, кнопки заливки в .4 нет.
+- Hard Round сохраняет points с эффективным pressure и законченный quadratic-v1 outline. На Open контур не генерируется заново.
+- Новые Spray/soft Round сохраняют небольшие immutable chunks stamps-v2. Один пользовательский жест может содержать сотни внутренних операций, но имеет один Undo.
+- Стабилизатор stamps является причинным фильтром: новый input добавляет только новые dabs; прошлый след не пересчитывается. Значение Stabilizer сохранено, художественное ощущение stamp-кисти может отличаться от .4.
+- Scatter 150%, dot scale 10% возвращают параметры старого Spray; сравнение скорости отдельно проведено при 100%/100% как у .4. Seed фиксируется на начало жеста; новые частицы не генерируются заново при zoom/Save/Open.
+- Geometry space и placements {surface,x,y,visit} независимы от CSS. Layout/gaps задают перевод координат. Перестройка не ресэмплирует рисунок.
+- Apply TPL создаёт composite-v1: один сохранённый набор операций шаблона и до 96 placements. Его eraser применяется внутри изолированной группы, не к нижнему FRM. Группа растеризуется по запрошенным tiles. Один Undo восстанавливает оба слоя.
+- Schema 1/2/3 поддерживаются. stamps-v1 сохраняет прежний gradient renderer. Настоящий файл .4 дал одинаковый SHA-256 PNG на старом и новом renderer.
+- В schema 4 сохраняются layout/timing/view, 1F, Long/Trail, Onion/TPL visibility, BG order и touch setting. Brush controls, zoom/pan и session Undo не являются настройками проекта в файле.
+- JSON имеет стабильный порядок ключей. Open валидирует до замены документа. При неверном файле текущая работа остаётся.
+
+## Рендер и память
+
+Sparse Canvas2D tiles: 256 raster px, bleed 2 px, LOD 1/32…4, LRU 24 MiB. Пустые 96 кадров: 0 drawing tiles/bytes. Два display buffers учитываются отдельно, каждый ограничен примерно 4 млн px; это до примерно 32 MiB RGBA вместе, не память процесса.
+
+Новые stamps дописываются в существующие кешированные tiles. Завершение продвигает draft в документ без повторного рисования уже накопленных полупрозрачных частиц. Rebuild/Open/Undo/Redo дают одинаковые PNG для новых stamp-кистей во всех трёх целях.
+
+Мягкий dab использует повторно применяемый sprite 256×256. LRU до 16 sprites, максимум 4 MiB сверх tile cache. Новый renderer отличается от точного gradient .4, поэтому имеет отдельный version tag. Старые рисунки не переводятся на него.
+
+Hard Round пока пересчитывает outline активного сегмента и его tiles. В тесте p95 3.0 ms против старых 1.9 ms. Bounding placements нового жеста консервативны и могут включать пустые участки внутри bounding box. Дальнейшее уменьшение объёма пересчёта Round остаётся задачей; разрезать принятую линию на куски с заметными швами нельзя.
+
+Undo: до 100 команд и оценки 16 MiB geometry, последняя команда сохраняется. Document guard 32 MiB, до 20 000 операций, 1 млн points, 30 000 input samples в жесте; stamps stream ограничен 120 000 частицами на сегмент, temporal placements до 2048 на операцию. На лимите ввода сохраняется накопленная валидная часть. При отказе транзакции storage текущий draft может не быть принят, ранее завершённые операции остаются. Это предохранители, не целевые размеры производительности. Parse/index/history пока синхронные.
+
+## Изображения и экспорт
+
+Preview image sequence принимает до 96 PNG/JPEG/WebP и до 64 MiB входных файлов, сортирует имена по номеру, повторяет их на 96 слотов. Каждый preview декодируется в 512×288; до 54 MiB RGBA для 96 изображений. Эти session previews не входят в Save strokes и не являются original/proxy media pipeline. При замене bitmap закрываются.
+
+PNG использует текущие layout, tick, TPL visibility и BG order, без Onion. Longest side 2048 или 4096, либо drawings only с alpha. Геометрия рисуется заново, с отдельным tile cache 4 MiB. Это доказывает масштабируемость рисунка; загруженные preview images остаются уменьшенными. Оригинальное видео, full media project, MP4/GIF, legacy raster migration, sampling deletion/relink в .5 не включены.
 
 ## Доказательства и следующий шаг
 
-38 unit tests; 34 checks на production HTML, Edge headless Windows/Radeon 890M. Независимый raster reference для stamps, точное восстановление кеша, смешанный Save/Open и PNG, все прежние quality checks, synthetic timed mouse/pen, эмулированный телефон со Spray. Скриншоты кистей просмотрены; видимой внутренней сетки/разрывов в этих fixtures нет. Физический телефон/Pencil и авторская художественная приёмка .4 остаются открытыми.
+47 unit tests, 28 temporal/input browser checks, 13 extended checks, 9 прежних quality checks и один реальный .4 compatibility check. Точное совпадение timing с замороженными исходными функциями 28.34 в 20 736 случаях. Физических устройств в этом перечне нет. Методика и сырые данные доступны по ссылке в начале.
 
-Тяжёлый Spray 96/96, 595 968 частиц: cold 667.4 ms, Open 170.2 ms; кешированный redraw max 1.4 ms. Это известное ограничение, не готовая высокая производительность. Следующая оптимизация должна разделить incremental input и холодную растеризацию с проверкой одинакового результата; увеличение лимитов не решает причину.
-
-После авторской проверки .4 следующий предлагаемый выпуск: stable frame IDs/layout/1F. Затем Long Stroke/Trail/Onion, заливка и разрешения/proxy-full-size. Перенос в обычный TimeGrid отдельно согласуется после сценариев стенда.
-
-Lab имеет отдельные metadata/build/version/history. Публикуется только новый lab HTML и licenses; ordinary app и Vercel production не переиздаются. Старые immutable URLs остаются историей.
+Следующий пользовательский шаг: проверить ощущение кисти и temporal workflow на настоящем touchscreen/пере. Следующий этап разработки: заливка внутри нарисованной замкнутой фигуры с отдельным Undo и воспроизводимым сохранением. Затем legacy migration и согласованный перенос в основной TimeGrid. Полный проект и proxy идут после этого, по общему плану.

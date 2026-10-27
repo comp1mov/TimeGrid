@@ -27,23 +27,51 @@ export class StrokeTileCache {
     this.evictions = 0;
     this.rasterMs = 0;
     this.unsubscribe = doc.onChange(({ dirty }) => {
-      for (const [surface, box] of dirty) this.invalidate(surface, box);
+      if (!this.promoting)
+        for (const [surface, box] of dirty) this.invalidate(surface, box);
     });
   }
   setDrafts(next) {
-    const before = new Map(this.drafts.map((s) => [s.id, s])),
-      after = new Map(next.map((s) => [s.id, s]));
-    for (const s of [...this.drafts, ...next])
-      if (before.get(s.id) !== after.get(s.id)) {
-        for (const item of renderInstances(s))
-          this.invalidate(item.surface, item.box);
-        this.paths.delete(s.id);
-      }
+    const append = this.drafts.every((s, i) => next[i] === s);
+    if (append) {
+      // Existing cached tiles already contain the prefix. Paint each new operation once.
+      for (const s of next.slice(this.drafts.length))
+        for (const item of renderInstances(s)) {
+          for (const tile of this.tiles.values())
+            if (
+              tile.surface === item.surface &&
+              intersects(tile.box, item.box)
+            ) {
+              const c = tile.canvas.getContext('2d');
+              paintStroke(c, item, this.path(item), tile.box);
+            }
+        }
+    } else {
+      const before = new Map(this.drafts.map((s) => [s.id, s])),
+        after = new Map(next.map((s) => [s.id, s]));
+      for (const s of [...this.drafts, ...next])
+        if (before.get(s.id) !== after.get(s.id)) {
+          for (const item of renderInstances(s))
+            this.invalidate(item.surface, item.box);
+          this.paths.delete(s.id);
+        }
+    }
     this.drafts = next;
+    this.draftInstances = next.flatMap(renderInstances);
+  }
+  commitDrafts(strokes) {
+    this.promoting = true;
+    try {
+      this.doc.addGesture(strokes);
+      this.drafts = [];
+      this.draftInstances = [];
+    } finally {
+      this.promoting = false;
+    }
   }
   path(s) {
     s = s.stroke || s;
-    if (s.renderer === 'stamps-v1') return null;
+    if (s.renderer.startsWith('stamps-')) return null;
     let p = this.paths.get(s.id);
     if (p) {
       this.paths.delete(s.id);
@@ -100,9 +128,9 @@ export class StrokeTileCache {
     };
     const strokes = [
       ...this.doc.query(surface, box),
-      ...this.drafts
-        .flatMap(renderInstances)
-        .filter((s) => s.surface === surface && intersects(s.box, box)),
+      ...(this.draftInstances || []).filter(
+        (s) => s.surface === surface && intersects(s.box, box),
+      ),
     ];
     if (!strokes.some((s) => !s.brush.erase)) return null;
     const start = performance.now(),
@@ -155,7 +183,7 @@ export class StrokeTileCache {
       snap(rect.y + rect.h) - snap(rect.y),
     );
     ctx.clip();
-    ctx.globalAlpha = 1;
+    // Preserve caller opacity for Onion Skin. Tile internals keep their own alpha.
     ctx.globalCompositeOperation = 'source-over';
     const x0 = Math.max(
         0,

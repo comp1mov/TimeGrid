@@ -7,14 +7,14 @@
       content="width=device-width,initial-scale=1,viewport-fit=cover"
     />
     <meta name="theme-color" content="#171820" />
-    <title>TimeGrid Drawing Lab 28.35.0-drawing.4</title>
+    <title>TimeGrid Drawing Lab 28.35.0-drawing.5</title>
     <link rel="stylesheet" href="./src/styles/drawing-lab.css" />
   </head>
   <body>
     <header>
       <div>
         <strong>TimeGrid <span class="accent">Drawing Lab</span></strong
-        ><small>28.35.0-drawing.4 · perfect-freehand prototype</small>
+        ><small>28.35.0-drawing.5 · perfect-freehand prototype</small>
       </div>
     </header>
     <main>
@@ -93,6 +93,150 @@
         >
         <small id="brushHint"></small>
       </section>
+      <details class="settings">
+        <summary>Animation, layers, input and grid settings</summary>
+        <div class="toolbar">
+          <label class="check"
+            ><input id="oneFrame" type="checkbox" />1F · clip at cell
+            edge</label
+          >
+          <label class="check"
+            ><input id="longStroke" type="checkbox" />Long Stroke</label
+          >
+          <label
+            >Trail · 0 = all<input
+              id="trail"
+              type="number"
+              min="0"
+              max="50"
+              value="8"
+          /></label>
+          <label class="check"
+            ><input id="onion" type="checkbox" />Onion Skin</label
+          >
+          <label class="check"
+            ><input id="templateVisible" type="checkbox" checked />Show
+            TPL</label
+          >
+          <button id="bake">Apply TPL to frames</button>
+          <label class="check"
+            ><input id="bgAbove" type="checkbox" />BG above frames</label
+          >
+          <label class="check"
+            ><input id="brushOff" type="checkbox" />Brush off · navigate</label
+          >
+          <label class="check"
+            ><input id="touchDraw" type="checkbox" checked />Draw with
+            finger</label
+          >
+          <label
+            >Spray scatter %<input
+              id="scatter"
+              type="number"
+              min="5"
+              max="300"
+              value="150"
+          /></label>
+          <label
+            >Spray dot size %<input
+              id="dotScale"
+              type="number"
+              min="5"
+              max="300"
+              value="10"
+          /></label>
+          <label
+            >Columns<input
+              id="columns"
+              type="number"
+              min="1"
+              max="16"
+              value="8"
+          /></label>
+          <label
+            >Gap · frame px<input
+              id="gap"
+              type="number"
+              min="0"
+              max="256"
+              value="0"
+          /></label>
+          <label
+            >Margins · frame px<input
+              id="margin"
+              type="number"
+              min="0"
+              max="512"
+              value="96"
+          /></label>
+          <label
+            >FPS<input id="fps" type="number" min="1" max="60" value="8"
+          /></label>
+          <label
+            >Direction<select id="direction">
+              <option value="forward">Forward</option>
+              <option value="backward">Backward</option>
+              <option value="pingpong">Ping-pong</option>
+              <option value="bounce-offset">Bounce offset</option>
+              <option value="sync">Sync</option>
+              <option value="stutter">Stutter</option>
+              <option value="holdskip">Hold / skip</option>
+              <option value="random">Random</option>
+              <option value="shuffleloop">Shuffle loop</option>
+            </select></label
+          >
+          <label
+            >Pattern<select id="pattern">
+              <option value="sequential">Sequential</option>
+              <option value="snake">Snake</option>
+              <option value="vertical">Vertical</option>
+              <option value="vertical-snake">Vertical snake</option>
+              <option value="checkerboard">Checkerboard</option>
+              <option value="center">Center</option>
+              <option value="spiral">Spiral</option>
+              <option value="random">Random</option>
+            </select></label
+          >
+          <label
+            >Loop · 0 = full<input
+              id="loop"
+              type="number"
+              min="0"
+              max="96"
+              value="0"
+          /></label>
+          <label
+            >Loop offset<input
+              id="loopOffset"
+              type="number"
+              min="0"
+              max="95"
+              value="0"
+          /></label>
+          <label
+            >Phases<input id="phases" type="number" min="1" max="96" value="1"
+          /></label>
+          <label
+            >PNG longest side<select id="exportSize">
+              <option>2048</option>
+              <option>4096</option>
+            </select></label
+          >
+          <label class="check"
+            ><input id="transparent" type="checkbox" />PNG · drawings
+            only</label
+          >
+          <button id="images">Preview image sequence</button>
+          <input
+            id="imageFiles"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            hidden
+          />
+          <button id="resetImages">Generated frames</button>
+        </div>
+      </details>
       <section class="actions" aria-label="Document and view">
         <button id="undo" disabled>Undo</button
         ><button id="redo" disabled>Redo</button
@@ -104,7 +248,7 @@
         <button id="play">Play · 8 fps</button
         ><button id="prev" aria-label="Previous frame">←</button
         ><label
-          >Frame<input
+          >Tick<input
             id="frame"
             type="number"
             min="1"
@@ -124,37 +268,51 @@
       <details>
         <summary>What to test</summary>
         <p>
-          Start in Single: change Width and Stabilizer, draw slow curves and
-          fast diagonals. Then draw across cells, try TPL, erase part of a line,
-          Undo/Redo, then Save → Open. Grid and Single are views of the same
-          frame drawings. BG has separate Grid/Single surfaces. Wheel or two
-          fingers zoom; choose Pan to move. Frame buttons and Play select the
-          active frame. In Grid, the frame number is highlighted.
+          Start in Single. Hold the brush while playing: every displayed frame
+          receives a mark, even if your hand stops. Long Stroke carries the
+          previous path forward; Trail 0 keeps all of it, a positive Trail
+          limits the carried segments. Releasing keeps the recorded frames. One
+          Undo removes the whole gesture.
         </p>
         <p>
-          This lab uses 96 generated test frames. Drawing Lab has its own
-          version; this release updates only the lab. Each grid gesture keeps
-          one continuous geometry shared by its affected frames. Width uses
-          frame pixels, so it looks smaller in Grid. It does not replace the
-          existing TimeGrid drawing tools, import old raster drawings, or save a
-          full media project. Files from Drawing Lab drawing.2 open with their
-          original contours. New files use schema 3 and need drawing.4 or newer.
-          Spray particles and soft dabs are saved as geometry. Pen pressure
-          takes priority over speed. Soft edge accumulates opacity as dabs
-          overlap. PNG exports the current view at 1536 × 1296 (Grid) or 2048 ×
-          1152 (Single), from saved geometry. Undo history is session-only, up
-          to 100 gestures with a 16 MB geometry estimate budget (the latest
-          gesture is always retained). No uploads or cloud processing. Browser
-          closing requires Save first.
+          1F clips the brush to the cell under the pointer, including its edge.
+          Grid and Single are views of the same frame drawings. Grid playback
+          changes the frame in each cell using TimeGrid's timing. FRM follows
+          frame identity when columns, pattern or timing change. TPL repeats
+          across frames. Apply TPL copies its appearance onto all frames and
+          clears TPL, with one Undo. Onion Skin is a preview guide only.
         </p>
         <p>
-          Benchmark runs in a separate temporary document, then downloads
-          timings from your device. It does not change your drawing. Physical
-          pen and phone testing is still needed.
-          <a href="./licenses/perfect-freehand.txt"
-            >perfect-freehand MIT license</a
-          >
-          · <a href="./licenses/inter-OFL.txt">Inter font license</a>
+          BG has separate Grid and Single surfaces and covers composition
+          margins. Mouse/trackpad drag draws. Wheel scroll pans; Ctrl/Command +
+          wheel or two fingers zoom. Space + drag pans. Touch draws with one
+          finger; two fingers navigate. Turn off Draw with finger for pen-only
+          drawing. Pen pressure takes priority over speed. Hardware eraser uses
+          the selected brush. Shift constrains a segment to 45° directions.
+        </p>
+        <p>
+          Save stores stroke geometry and layout/timing settings, with schema 4.
+          Older lab drawings retain their saved geometry. Images loaded with
+          Preview image sequence are temporary session references, ordered by
+          filename, repeating across 96 slots; they are not saved in the drawing
+          file. PNG uses the current frame mapping and layers, rerendered from
+          geometry. This is not yet a full media project or video proxy
+          workflow. Fill is the next separate step.
+        </p>
+        <p>
+          The drawing tile cache is capped at 24 MiB. Soft-brush sprites add at
+          most 4 MiB. Empty frames allocate no drawing tiles. Undo is
+          session-only, up to 100 gestures with a 16 MiB geometry estimate
+          budget; the latest gesture is retained. Save before closing. Physical
+          touchscreen, iPad/Pencil and Wacom testing remains necessary.
+          Benchmark measures a separate temporary document and downloads a
+          report.
+        </p>
+        <p>
+          <a href="https://comp1mov.github.io/TimeGrid/">Version map</a> ·
+          <a href="https://timegri.vercel.app/">TimeGrid stable</a> ·
+          <a href="./licenses/perfect-freehand.txt">perfect-freehand MIT</a> ·
+          <a href="./licenses/inter-OFL.txt">Inter font license</a>
         </p>
       </details>
     </main>

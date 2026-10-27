@@ -1,0 +1,201 @@
+{
+  "date": "2026-10-27T00:12:18.535Z",
+  "url": "http://127.0.0.1:5317/drawing-lab.html",
+  "browser": "156.0.4314.42",
+  "checks": [
+    {
+      "name": "empty 96 frames allocate zero drawing tiles",
+      "data": {
+        "tiles": 0,
+        "bytes": 0,
+        "budget": 25165824,
+        "hits": 0,
+        "misses": 0,
+        "evictions": 0,
+        "pathCount": 0,
+        "rasterMs": 0
+      },
+      "pass": true
+    },
+    {
+      "name": "native mouse stationary hold at 8 fps stamps each frame and one undo",
+      "data": {
+        "ids": [
+          "frame-0",
+          "frame-1",
+          "frame-2",
+          "frame-3",
+          "frame-4",
+          "frame-5",
+          "frame-6"
+        ],
+        "undo": 1
+      },
+      "pass": true
+    },
+    {
+      "name": "synthetic mouse stationary timing",
+      "data": 6,
+      "pass": true
+    },
+    {
+      "name": "synthetic touch stationary timing",
+      "data": 6,
+      "pass": true
+    },
+    {
+      "name": "synthetic pen stationary timing",
+      "data": 6,
+      "pass": true
+    },
+    {
+      "name": "mouse edge 1F=false and undo",
+      "data": [
+        "frame-0",
+        "frame-1"
+      ],
+      "pass": true
+    },
+    {
+      "name": "mouse edge 1F=true and undo",
+      "data": [
+        "frame-0"
+      ],
+      "pass": true
+    },
+    {
+      "name": "touch edge 1F=false and undo",
+      "data": [
+        "frame-0",
+        "frame-1"
+      ],
+      "pass": true
+    },
+    {
+      "name": "touch edge 1F=true and undo",
+      "data": [
+        "frame-0"
+      ],
+      "pass": true
+    },
+    {
+      "name": "pen edge 1F=false and undo",
+      "data": [
+        "frame-0",
+        "frame-1"
+      ],
+      "pass": true
+    },
+    {
+      "name": "pen edge 1F=true and undo",
+      "data": [
+        "frame-0"
+      ],
+      "pass": true
+    },
+    {
+      "name": "Long Stroke Trail 0",
+      "data": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "pass": true
+    },
+    {
+      "name": "Long Stroke Trail 2",
+      "data": [
+        1,
+        2,
+        2,
+        2,
+        2
+      ],
+      "pass": true
+    },
+    {
+      "name": "pen pressure retained, pointercancel commits",
+      "data": [
+        0.10000000149011612,
+        0.8999999761581421
+      ],
+      "pass": true
+    },
+    {
+      "name": "blur commits without losing stroke",
+      "pass": true
+    },
+    {
+      "name": "pen hardware eraser maps to erase",
+      "pass": true
+    },
+    {
+      "name": "finger drawing disabled navigates without marks",
+      "pass": true
+    },
+    {
+      "name": "pen owns gesture, concurrent palm touch ignored",
+      "pass": true
+    },
+    {
+      "name": "pen takes ownership from active two-finger navigation",
+      "pass": true
+    },
+    {
+      "name": "pen eraser buttons bit without button 5",
+      "pass": true
+    },
+    {
+      "name": "BG paints outside frame grid in composition margin",
+      "pass": true
+    },
+    {
+      "name": "Apply TPL isolates erasers from underlying FRM",
+      "data": {
+        "hole": [
+          0,
+          255,
+          0,
+          255
+        ],
+        "ring": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "strokes": 2,
+        "children": 2
+      },
+      "pass": true
+    },
+    {
+      "name": "composite save/open/undo/redo",
+      "pass": true
+    },
+    {
+      "name": "grid reflow and playback do not rewrite drawings",
+      "pass": true
+    },
+    {
+      "name": "onion excluded from export",
+      "pass": true
+    },
+    {
+      "name": "actual download/reload/open restores drawing and settings",
+      "pass": true
+    },
+    {
+      "name": "4096px rerender from geometry",
+      "data": [
+        4096,
+        2587
+      ],
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "physicalDevice": false
+}

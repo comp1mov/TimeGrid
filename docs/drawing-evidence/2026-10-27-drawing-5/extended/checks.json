@@ -1,0 +1,165 @@
+{
+  "date": "2026-10-27T00:10:58.475Z",
+  "browser": "156.0.4314.42",
+  "url": "http://127.0.0.1:5317/drawing-lab.html",
+  "checks": [
+    {
+      "name": "round softness=70 target=frm stream/cache/erase/save",
+      "pass": true,
+      "data": {
+        "sameRebuild": true,
+        "sameOpen": true,
+        "erased": true,
+        "undo": true,
+        "redo": true,
+        "operations": 53
+      }
+    },
+    {
+      "name": "round softness=70 target=tpl stream/cache/erase/save",
+      "pass": true,
+      "data": {
+        "sameRebuild": true,
+        "sameOpen": true,
+        "erased": true,
+        "undo": true,
+        "redo": true,
+        "operations": 53
+      }
+    },
+    {
+      "name": "round softness=70 target=bg stream/cache/erase/save",
+      "pass": true,
+      "data": {
+        "sameRebuild": true,
+        "sameOpen": true,
+        "erased": true,
+        "undo": true,
+        "redo": true,
+        "operations": 44
+      }
+    },
+    {
+      "name": "spray softness=0 target=frm stream/cache/erase/save",
+      "pass": true,
+      "data": {
+        "sameRebuild": true,
+        "sameOpen": true,
+        "erased": true,
+        "undo": true,
+        "redo": true,
+        "operations": 39
+      }
+    },
+    {
+      "name": "spray softness=0 target=tpl stream/cache/erase/save",
+      "pass": true,
+      "data": {
+        "sameRebuild": true,
+        "sameOpen": true,
+        "erased": true,
+        "undo": true,
+        "redo": true,
+        "operations": 39
+      }
+    },
+    {
+      "name": "spray softness=0 target=bg stream/cache/erase/save",
+      "pass": true,
+      "data": {
+        "sameRebuild": true,
+        "sameOpen": true,
+        "erased": true,
+        "undo": true,
+        "redo": true,
+        "operations": 32
+      }
+    },
+    {
+      "name": "spray softness=70 target=frm stream/cache/erase/save",
+      "pass": true,
+      "data": {
+        "sameRebuild": true,
+        "sameOpen": true,
+        "erased": true,
+        "undo": true,
+        "redo": true,
+        "operations": 39
+      }
+    },
+    {
+      "name": "spray softness=70 target=tpl stream/cache/erase/save",
+      "pass": true,
+      "data": {
+        "sameRebuild": true,
+        "sameOpen": true,
+        "erased": true,
+        "undo": true,
+        "redo": true,
+        "operations": 39
+      }
+    },
+    {
+      "name": "spray softness=70 target=bg stream/cache/erase/save",
+      "pass": true,
+      "data": {
+        "sameRebuild": true,
+        "sameOpen": true,
+        "erased": true,
+        "undo": true,
+        "redo": true,
+        "operations": 32
+      }
+    },
+    {
+      "name": "onion displays neighbor 1, never wraps frame 95 onto frame 0",
+      "pass": true,
+      "data": {
+        "without": [
+          [
+            49,
+            36,
+            43,
+            255
+          ],
+          [
+            49,
+            36,
+            43,
+            255
+          ]
+        ],
+        "onion": [
+          [
+            121,
+            112,
+            117,
+            255
+          ],
+          [
+            49,
+            36,
+            43,
+            255
+          ]
+        ]
+      }
+    },
+    {
+      "name": "image sequence input and PNG follow current frame mapping",
+      "pass": true
+    },
+    {
+      "name": "wheel pans; Ctrl wheel zooms for trackpad/mouse event model",
+      "pass": true
+    },
+    {
+      "name": "390px mobile emulation: pinch zoom leaves no accidental ink and no horizontal overflow",
+      "pass": true,
+      "data": {
+        "physicalDevice": false
+      }
+    }
+  ],
+  "errors": []
+}

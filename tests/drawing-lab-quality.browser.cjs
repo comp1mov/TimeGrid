@@ -283,6 +283,8 @@ fs.mkdirSync(out, { recursive: true });
   legacy.schema = 1;
   // Use a real schema-1-compatible local geometry, then compare its old lineTo raster.
   legacy.strokes = [structuredClone(narrow)];
+  legacy.strokes[0].surface='frame-0';
+  delete legacy.strokes[0].space;
   delete legacy.strokes[0].placements;
   delete legacy.strokes[0].renderer;
   delete legacy.strokes[0].brush.streamline;

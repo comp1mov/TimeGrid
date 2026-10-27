@@ -1,8 +1,31 @@
 # Development History
 
-Обновлено: 2026-10-26
+Обновлено: 2026-10-27
 
 Этот файл фиксирует не весь chat log, а важные архитектурные решения, баги и смысловые повороты, чтобы не терять контекст проекта.
+
+## 2026-10-27: Drawing Lab 28.35.0-drawing.5
+
+Ветка codex/drawing-engine. Согласованный этап совместимости того же стенда после полного аудита .4. Автор отдельно потребовал учитывать mouse, trackpad, desktop touchscreen, iPad/Pencil и Wacom. [Архитектура и ограничения](DRAWING_PROTOTYPE_RU.md), [сырые проверки](drawing-evidence/2026-10-27-drawing-5/README.md). Ordinary app остаётся drawing.2 по отдельной версификации Lab; stable 28.34 и Cloud не менялись.
+
+Изменения:
+- Выделен drawing-time из вычислений 28.34, сохранены direction/pattern/phases/loop/offset и Single loop rule. Grid действительно меняет отображаемые frames. Single использует порядок исходной сетки; дополнительная проверка поймала ошибочное использование одной колонки для temporal mapping, исправлено до публикации.
+- Новый DrawingGesture принимает pointer samples и frame transitions. Обычное удержание ставит точку на каждом новом отображаемом frame даже без движения. Long Stroke переносит immutable геометрию с Trail window, release сохраняет результат; один жест остаётся одной Undo-командой.
+- 1F клиппирует текущую ячейку для всех типов ввода; без него разрешён footprint на соседях композиции. Onion prev/next .35 без wrap, preview only. FRM следует frame identity при layout/timing changes.
+- Единый Pointer Events coordinator, coalesced input, pressure, hardware eraser button 5/buttons32, mouse/trackpad wheel pan и Ctrl-wheel zoom, touch one-finger draw/two-finger navigation, pen ownership, Draw with finger toggle. Blur/cancel сохраняют принятую часть. 90 ms/<3 samples touch-кандидат отменяется при начале pinch. Реальные устройства остаются отдельной проверкой.
+- BG теперь покрывает поля и gaps, с отдельными Grid/Single surfaces и BG above. TPL visibility согласована между preview/PNG. Apply TPL хранит изолированную группу операций один раз с 96 placements; eraser шаблона не стирает нижний FRM. Clear выбранного слоя и bake обратимы.
+- Потоковые stamps-v2: causal stabilizer, persistent seed/spatial spacing, новые chunks дописываются в tiles. Soft sprites переиспользуются, лимит 4 MiB. Tile cache остаётся 24 MiB. Scatter/dot size восстановлены с default 150%/10%; hard Round perfect-freehand и его smoothing сохранены.
+- Schema 4 сохраняет geometry/placements/custom coordinate space/visits, isolated composite и layout/timing settings. Canonical JSON, валидация до замены, старые 1/2/3 читаются прежними renderer. Пустые 96 frames имеют 0 drawing tiles.
+- Columns/gaps/margins, 96-slot preview image sequence через file input, PNG 2048/4096 по текущей композиции, drawings-only alpha. Preview images намеренно session-only 512×288 и не входят в Save strokes. Это не полный медиапроект.
+- Новые проверки включены в npm test. Ordinary package/lock version .2 сохранены; package script дополнен temporal tests. Lab metadata/HTML/APP_VERSION/README согласованы на .5.
+
+Результаты: 47 unit tests; 28 temporal/input browser checks, 13 extended checks, 9 quality regressions и 1 actual .4-file compatibility check. 20 736 timing comparisons с frozen stable functions. Native mouse hold, synthetic mouse/touch/pen, mobile touch/pinch 390×844, real Save/download/reload/Open, actual file input sequence, TPL eraser isolation, legacy raster appearance, 12 fractional scale/DPR, 96-cell stroke. Физических устройств нет. Build:lab и обе проверки версий прошли. Просмотрены screenshots. Main main.js SHA256 остаётся 6636e424f18390523557d17c811d858e78b9b6d7ef5ef1d510ed939819caabfa.
+
+Edge 156.0.4314.42 headless, 240 rAF input samples, size80, 96frames, scatter/dots100/100: p95 render hard Round 3.0ms, soft Round0.9, Spray1.4, soft Spray1.5. Старые .4:1.9/4.1/47.3/123.3ms. Round немного медленнее, общий speedup не заявлен. Фильтр частиц изменён, 39 690 против39 870 stamps. На1200 samples около20s Round p95 3.5ms, soft Spray1.2ms; release+flush wall39/89ms. Это JS timings, не hardware input latency/RSS. Новые defaults150/10 не использованы для сравнительных цифр.
+
+Ограничения: настоящий Safari/iPad/Wacom/touchscreen не проверены; hard Round всё ещё пересчитывается по сегменту; долгие documents/cold raster нуждаются в дальнейшем profiling; media bank/relink/migration/полный proxy pipeline и Fill ещё не входят. Полный набор прежних palette/slots/reference UI не перенесён. Художественное ощущение новой stamp-стабилизации и временной кисти принимает автор.
+
+Следующий шаг: одна новая Pages ссылка, проверка реальных устройств и авторского движения; затем заливка замкнутой нарисованной фигуры, legacy migration и отдельное согласование переноса в TimeGrid. Публичные старые version folders не заменяются.
 
 ## 2026-10-26: Полный разбор механики рисования и план 4.8
 

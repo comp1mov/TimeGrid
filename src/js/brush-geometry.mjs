@@ -55,8 +55,13 @@ export function makeStamps(points, brush, last) {
         throw Error('Spray stroke limit reached. Start a shorter stroke.');
       for (let i = 0; i < count; i++) {
         const angle = random() * Math.PI * 2,
-          r = Math.sqrt(random()) * Math.max(2, size * 0.95),
-          radius = Math.max(0.9, size * 0.1) * (0.55 + random() * 0.45);
+          r =
+            Math.sqrt(random()) *
+            Math.max(2, size * 0.95 * (brush.scatter ?? 1)),
+          radius =
+            Math.max(0.9, size * 0.1) *
+            (brush.dotScale ?? 1) *
+            (0.55 + random() * 0.45);
         stamps.push([x + Math.cos(angle) * r, y + Math.sin(angle) * r, radius]);
       }
     } else {
@@ -154,6 +159,8 @@ export function queryStamps(stroke, box) {
 }
 export function paintStamps(ctx, s, box) {
   const b = s.brush;
+  if (s.renderer === 'stamps-v2' && b.softness > 0)
+    return paintSoftStamps(ctx, s, box);
   ctx.globalAlpha = b.opacity * (b.type === 'spray' && !b.erase ? 0.35 : 1);
   for (const [x, y, r] of queryStamps(s, box)) {
     if (b.softness > 0) {
@@ -173,4 +180,112 @@ export function paintStamps(ctx, s, box) {
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+// Streaming stamps: stable input filter + spatial resampling + a persistent RNG.
+// Only newly generated geometry is returned. Finalization never rebuilds old dots.
+export class StampStream {
+  constructor(brush) {
+    this.brush = brush;
+    this.random = randomGenerator(brush.seed);
+    this.previous = null;
+    this.remaining = 0;
+    this.count = 0;
+  }
+  push(point) {
+    const b = this.brush,
+      stamps = [],
+      old = this.previous;
+    const response = 1 - 0.85 * b.streamline;
+    const p = old
+      ? [
+          old[0] + (point[0] - old[0]) * response,
+          old[1] + (point[1] - old[1]) * response,
+          point[2],
+        ]
+      : [...point];
+    const spacing = Math.max(1, b.size * (b.type === 'spray' ? 0.22 : 0.16));
+    const add = (x, y, pressure) => {
+      const size = b.size * (b.pressure ? 0.45 + 1.1 * pressure : 1);
+      const count =
+        b.type === 'spray' ? clamp(Math.round(b.size * 1.6), 10, 90) : 1;
+      if (this.count + count > MAX_STAMPS)
+        throw Error('Stroke particle limit reached. Release to continue.');
+      this.count += count;
+      for (let j = 0; j < count; j++) {
+        if (b.type === 'spray') {
+          const a = this.random() * Math.PI * 2,
+            r =
+              Math.sqrt(this.random()) *
+              Math.max(2, size * 0.95 * (b.scatter ?? 1));
+          const radius =
+            Math.max(0.9, size * 0.1) *
+            (b.dotScale ?? 1) *
+            (0.55 + this.random() * 0.45);
+          stamps.push([x + Math.cos(a) * r, y + Math.sin(a) * r, radius]);
+        } else stamps.push([x, y, size / 2]);
+      }
+    };
+    if (!old) {
+      add(...p);
+      this.remaining = spacing;
+    } else {
+      const length = Math.hypot(p[0] - old[0], p[1] - old[1]);
+      if (length) {
+        for (let at = this.remaining; at <= length; at += spacing) {
+          const f = at / length;
+          add(
+            old[0] + (p[0] - old[0]) * f,
+            old[1] + (p[1] - old[1]) * f,
+            old[2] + (p[2] - old[2]) * f,
+          );
+        }
+        this.remaining =
+          (((this.remaining - length) % spacing) + spacing) % spacing ||
+          spacing;
+      }
+    }
+    this.previous = p;
+    return stamps.map((p) => p.map((v) => Math.round(v * 10000) / 10000));
+  }
+}
+const softSprites = new Map();
+function softSprite(b) {
+  const key = b.color + '|' + b.softness;
+  let sprite = softSprites.get(key);
+  if (sprite) {
+    softSprites.delete(key);
+    softSprites.set(key, sprite);
+    return sprite;
+  }
+  sprite = document.createElement('canvas');
+  sprite.width = sprite.height = 256;
+  const c = sprite.getContext('2d'),
+    r = 127;
+  const g = c.createRadialGradient(128, 128, r * (1 - b.softness), 128, 128, r);
+  g.addColorStop(0, b.color);
+  g.addColorStop(1, b.color + '00');
+  c.fillStyle = g;
+  c.fillRect(0, 0, 256, 256);
+  softSprites.set(key, sprite);
+  if (softSprites.size > 16) {
+    const k = softSprites.keys().next().value,
+      old = softSprites.get(k);
+    old.width = old.height = 0;
+    softSprites.delete(k);
+  }
+  return sprite;
+}
+function paintSoftStamps(ctx, s, box) {
+  const b = s.brush,
+    sprite = softSprite(b);
+  ctx.globalAlpha = b.opacity * (b.type === 'spray' && !b.erase ? 0.35 : 1);
+  for (const [x, y, r] of queryStamps(s, box))
+    ctx.drawImage(
+      sprite,
+      x - (r * 128) / 127,
+      y - (r * 128) / 127,
+      (r * 256) / 127,
+      (r * 256) / 127,
+    );
 }

@@ -1,0 +1,185 @@
+TAP version 13
+# Stable timing comparisons: 20736
+# Subtest: held mouse/touch/pen geometry addresses every new frame with no movement
+ok 1 - held mouse/touch/pen geometry addresses every new frame with no movement
+  ---
+  duration_ms: 3.5431
+  type: 'test'
+  ...
+# Subtest: repeat repaint does not add opacity, revisit after another frame does
+ok 2 - repeat repaint does not add opacity, revisit after another frame does
+  ---
+  duration_ms: 0.3602
+  type: 'test'
+  ...
+# Subtest: Long Stroke accumulates, Trail limits carried segments, release keeps data
+ok 3 - Long Stroke accumulates, Trail limits carried segments, release keeps data
+  ---
+  duration_ms: 2.8672
+  type: 'test'
+  ...
+# Subtest: 1F footprint clips current cell, off permits neighboring placement
+ok 4 - 1F footprint clips current cell, off permits neighboring placement
+  ---
+  duration_ms: 0.3298
+  type: 'test'
+  ...
+# Subtest: columns, gaps, repeating frame mapping preserve explicit frame addresses
+ok 5 - columns, gaps, repeating frame mapping preserve explicit frame addresses
+  ---
+  duration_ms: 0.5562
+  type: 'test'
+  ...
+# Subtest: streaming spray geometry prefix stays immutable and roundtrips
+ok 6 - streaming spray geometry prefix stays immutable and roundtrips
+  ---
+  duration_ms: 10.9424
+  type: 'test'
+  ...
+# Subtest: TPL bake keeps isolated erase geometry once with 96 placements, atomic undo
+ok 7 - TPL bake keeps isolated erase geometry once with 96 placements, atomic undo
+  ---
+  duration_ms: 2.7669
+  type: 'test'
+  ...
+# Subtest: timing adapter parity with actual stable source over patterns/directions/loops
+ok 8 - timing adapter parity with actual stable source over patterns/directions/loops
+  ---
+  duration_ms: 763.4852
+  type: 'test'
+  ...
+# Subtest: one cross-frame gesture is one undo and redo transaction
+ok 9 - one cross-frame gesture is one undo and redo transaction
+  ---
+  duration_ms: 2.7852
+  type: 'test'
+  ...
+# Subtest: clear is reversible and new drawing invalidates redo
+ok 10 - clear is reversible and new drawing invalidates redo
+  ---
+  duration_ms: 0.4499
+  type: 'test'
+  ...
+# Subtest: 100 gestures, 50 undo and redo preserve ordered contours
+ok 11 - 100 gestures, 50 undo and redo preserve ordered contours
+  ---
+  duration_ms: 13.6184
+  type: 'test'
+  ...
+# Subtest: ten save/open cycles preserve all data, pressure, alpha and erase order
+ok 12 - ten save/open cycles preserve all data, pressure, alpha and erase order
+  ---
+  duration_ms: 9.5775
+  type: 'test'
+  ...
+# Subtest: spatial query returns intersecting strokes in compositing order
+ok 13 - spatial query returns intersecting strokes in compositing order
+  ---
+  duration_ms: 0.7893
+  type: 'test'
+  ...
+# Subtest: untrusted files reject invalid engine, identity, coordinates, opacity and order
+ok 14 - untrusted files reject invalid engine, identity, coordinates, opacity and order
+  ---
+  duration_ms: 1.004
+  type: 'test'
+  ...
+# Subtest: stored bounds are recomputed and imported contours stay immutable
+ok 15 - stored bounds are recomputed and imported contours stay immutable
+  ---
+  duration_ms: 0.3232
+  type: 'test'
+  ...
+# Subtest: atomic add rejects unordered or duplicate IDs without partial write
+ok 16 - atomic add rejects unordered or duplicate IDs without partial write
+  ---
+  duration_ms: 0.2199
+  type: 'test'
+  ...
+# Subtest: fast segment crossing clips exact boundaries and interpolates pressure
+ok 17 - fast segment crossing clips exact boundaries and interpolates pressure
+  ---
+  duration_ms: 0.197
+  type: 'test'
+  ...
+# Subtest: grid keeps one library contour across all cell boundaries
+ok 18 - grid keeps one library contour across all cell boundaries
+  ---
+  duration_ms: 3.4525
+  type: 'test'
+  ...
+# Subtest: thin diagonal indexes touched frames, not its entire sheet bounding box
+ok 19 - thin diagonal indexes touched frames, not its entire sheet bounding box
+  ---
+  duration_ms: 3.6178
+  type: 'test'
+  ...
+# Subtest: TPL uses shared geometry with multiple ordered placements
+ok 20 - TPL uses shared geometry with multiple ordered placements
+  ---
+  duration_ms: 0.5531
+  type: 'test'
+  ...
+# Subtest: schema 1 imports fixed contours with its original linear renderer
+ok 21 - schema 1 imports fixed contours with its original linear renderer
+  ---
+  duration_ms: 0.6981
+  type: 'test'
+  ...
+# Subtest: placement and brush validation is atomic
+ok 22 - placement and brush validation is atomic
+  ---
+  duration_ms: 0.5949
+  type: 'test'
+  ...
+# Subtest: Spray saves fixed particles, deterministic seed and immutable roundtrip geometry
+ok 23 - Spray saves fixed particles, deterministic seed and immutable roundtrip geometry
+  ---
+  duration_ms: 5.4089
+  type: 'test'
+  ...
+# Subtest: stamp spatial queries preserve order and agree with full footprint filtering
+ok 24 - stamp spatial queries preserve order and agree with full footprint filtering
+  ---
+  duration_ms: 2.472
+  type: 'test'
+  ...
+# Subtest: soft round uses saved pressure-scaled dabs, no outline regeneration on Open
+ok 25 - soft round uses saved pressure-scaled dabs, no outline regeneration on Open
+  ---
+  duration_ms: 0.7902
+  type: 'test'
+  ...
+# Subtest: schema 2 opens its exact contour with original renderer and pressure flags
+ok 26 - schema 2 opens its exact contour with original renderer and pressure flags
+  ---
+  duration_ms: 0.3976
+  type: 'test'
+  ...
+# Subtest: invalid particles and brush parameters are rejected atomically
+ok 27 - invalid particles and brush parameters are rejected atomically
+  ---
+  duration_ms: 7.4396
+  type: 'test'
+  ...
+# Subtest: speed response is fast-thick and independent of event frequency at constant velocity
+ok 28 - speed response is fast-thick and independent of event frequency at constant velocity
+  ---
+  duration_ms: 0.2971
+  type: 'test'
+  ...
+# Subtest: stamp placement includes brush footprint across frame borders
+ok 29 - stamp placement includes brush footprint across frame borders
+  ---
+  duration_ms: 0.2127
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 863.4666

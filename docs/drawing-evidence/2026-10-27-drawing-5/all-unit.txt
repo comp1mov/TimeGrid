@@ -1,0 +1,65 @@
+
+> timegrid@28.35.0-drawing.2 pretest
+> node scripts/check-release.cjs
+
+Release metadata consistent: 28.35.0-drawing.2
+
+> timegrid@28.35.0-drawing.2 test
+> node --test tests/chrono-animation.test.mjs tests/chrono-compositing.test.mjs tests/drawing-geometry.test.mjs tests/stroke-document.test.mjs tests/drawing-temporal.test.mjs
+
+✔ default keys cover one loop and never duplicate short clips (0.9682ms)
+✔ key normalization sorts, clamps and resolves duplicates (0.1732ms)
+✔ interpolation uses source frame index, exact keys and held endpoints (0.7087ms)
+✔ disabled animation and empty table preserve static depth; zero really hides all copies (0.1284ms)
+✔ fractional copy fades in without changing full copies (0.1251ms)
+✔ cascade and mirror retain integer profiles and remain continuous at every depth boundary (2.0166ms)
+✔ large key tables resolve correctly without a key count limit (1.0128ms)
+✔ Exposure computes an equal average instead of an order-dependent opacity stack (0.9159ms)
+✔ static background stays constant at any depth or mix (1.4566ms)
+✔ Mix blends the averaged stack with the sharp original frame (0.2077ms)
+✔ Clean Loop null slots are excluded from normalization (1.3294ms)
+✔ Cascade provides normalized weights instead of reducing overall brightness (0.3077ms)
+✔ fractional depth has a fractional sample weight and reaches the untouched frame at zero (0.4065ms)
+✔ existing blend modes retain their opacity behavior (0.282ms)
+✔ regular, partial rows, seams and gaps match the legacy rule at edges and off-grid (53.0661ms)
+✔ irregular and hidden cells preserve DOM ordering and snapping (4.3536ms)
+✔ fractional transform rounding only broadens candidates, never changes the hit (4.9927ms)
+Stable timing comparisons: 20736
+✔ held mouse/touch/pen geometry addresses every new frame with no movement (6.7384ms)
+✔ repeat repaint does not add opacity, revisit after another frame does (0.8399ms)
+✔ Long Stroke accumulates, Trail limits carried segments, release keeps data (4.5757ms)
+✔ 1F footprint clips current cell, off permits neighboring placement (0.8132ms)
+✔ columns, gaps, repeating frame mapping preserve explicit frame addresses (0.9949ms)
+✔ streaming spray geometry prefix stays immutable and roundtrips (14.5898ms)
+✔ TPL bake keeps isolated erase geometry once with 96 placements, atomic undo (2.9628ms)
+✔ timing adapter parity with actual stable source over patterns/directions/loops (345.0861ms)
+✔ one column with maximum gaps remains serializable at 96 frames (0.8809ms)
+✔ one cross-frame gesture is one undo and redo transaction (4.7895ms)
+✔ clear is reversible and new drawing invalidates redo (0.6505ms)
+✔ 100 gestures, 50 undo and redo preserve ordered contours (17.9384ms)
+✔ ten save/open cycles preserve all data, pressure, alpha and erase order (11.8819ms)
+✔ spatial query returns intersecting strokes in compositing order (0.9175ms)
+✔ untrusted files reject invalid engine, identity, coordinates, opacity and order (1.0514ms)
+✔ stored bounds are recomputed and imported contours stay immutable (0.3763ms)
+✔ atomic add rejects unordered or duplicate IDs without partial write (0.3427ms)
+✔ fast segment crossing clips exact boundaries and interpolates pressure (0.2862ms)
+✔ grid keeps one library contour across all cell boundaries (4.7455ms)
+✔ thin diagonal indexes touched frames, not its entire sheet bounding box (4.1267ms)
+✔ TPL uses shared geometry with multiple ordered placements (0.7821ms)
+✔ schema 1 imports fixed contours with its original linear renderer (0.7643ms)
+✔ placement and brush validation is atomic (1.2885ms)
+✔ Spray saves fixed particles, deterministic seed and immutable roundtrip geometry (7.0935ms)
+✔ stamp spatial queries preserve order and agree with full footprint filtering (2.4379ms)
+✔ soft round uses saved pressure-scaled dabs, no outline regeneration on Open (1.4459ms)
+✔ schema 2 opens its exact contour with original renderer and pressure flags (0.4779ms)
+✔ invalid particles and brush parameters are rejected atomically (6.0122ms)
+✔ speed response is fast-thick and independent of event frequency at constant velocity (0.5047ms)
+✔ stamp placement includes brush footprint across frame borders (0.2628ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 47
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 513.6273
