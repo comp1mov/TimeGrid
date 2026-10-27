@@ -8,8 +8,9 @@ import {
 } from './brush-geometry.mjs';
 
 export const STROKE_FORMAT = 'timegrid-strokes';
-export const STROKE_SCHEMA = 4;
+export const STROKE_SCHEMA = 5;
 export const ENGINE_VERSION = 'perfect-freehand@1.2.3';
+export const BG_COORD_LIMIT = 32768;
 export const FRAME_W = 1024,
   FRAME_H = 576;
 export const LIMITS = Object.freeze({
@@ -223,6 +224,7 @@ export function createStroke({
   dotScale = 1,
   placements,
   space,
+  overflow,
 }) {
   const stamped = type === 'spray' || softness > 0;
   const outline = stamped
@@ -259,6 +261,7 @@ export function createStroke({
     engine: ENGINE_VERSION,
     renderer: 'quadratic-v1',
     ...(space ? { space } : {}),
+    ...(overflow ? { overflow: true } : {}),
   };
   if (stamped) {
     s.renderer = 'stamps-v1';
@@ -281,10 +284,14 @@ export function renderInstances(s) {
   out = s.placements
     .map((p, order) => {
       const extent = surfaceSize(p.surface),
-        x = Math.max(0, s.box.x + p.x),
-        y = Math.max(0, s.box.y + p.y),
-        right = Math.min(extent.w, s.box.x + p.x + s.box.w),
-        bottom = Math.min(extent.h, s.box.y + p.y + s.box.h);
+        x = s.overflow ? s.box.x + p.x : Math.max(0, s.box.x + p.x),
+        y = s.overflow ? s.box.y + p.y : Math.max(0, s.box.y + p.y),
+        right = s.overflow
+          ? x + s.box.w
+          : Math.min(extent.w, s.box.x + p.x + s.box.w),
+        bottom = s.overflow
+          ? y + s.box.h
+          : Math.min(extent.h, s.box.y + p.y + s.box.h);
       return {
         id: s.id,
         key: s.id + '@' + order,
@@ -322,6 +329,7 @@ export class StrokeDocument {
     this.byId = new Map();
     this.instances = new Map();
     this.index = new Map();
+    this.extendedSurfaces = new Set();
     this.undoStack = [];
     this.redoStack = [];
     this.listeners = new Set();
@@ -340,6 +348,7 @@ export class StrokeDocument {
   }
   _index(s) {
     this.byId.set(s.id, s);
+    if (s.overflow) this.extendedSurfaces.add(s.surface);
     for (const item of renderInstances(s)) {
       this.instances.set(item.key, item);
       let grid = this.index.get(item.surface);
@@ -353,6 +362,7 @@ export class StrokeDocument {
   }
   _reindex() {
     this.index.clear();
+    this.extendedSurfaces.clear();
     this.byId.clear();
     this.instances.clear();
     this.totalPoints = 0;
@@ -530,7 +540,7 @@ export class StrokeDocument {
     const data = JSON.parse(text);
     if (
       data?.format !== STROKE_FORMAT ||
-      ![1, 2, 3, 4].includes(data.schema) ||
+      ![1, 2, 3, 4, 5].includes(data.schema) ||
       data.engine !== ENGINE_VERSION
     )
       throw Error('Unsupported drawing format or engine version.');
@@ -546,6 +556,8 @@ export class StrokeDocument {
     if (data.schema >= 4) doc.settings = validateSettings(data.settings || {});
     let last = 0;
     for (const raw of data.strokes) {
+      if (data.schema < 5 && raw?.overflow !== undefined)
+        throw Error('Extended BG requires schema 5.');
       const b = raw?.brush;
       const s = {
         ...raw,
@@ -569,6 +581,7 @@ export class StrokeDocument {
               seed: data.schema < 3 ? 1 : b.seed,
               ...(b.scatter !== undefined ? { scatter: b.scatter } : {}),
               ...(b.dotScale !== undefined ? { dotScale: b.dotScale } : {}),
+              ...(b.density !== undefined ? { density: b.density } : {}),
             }
           : null,
       };
@@ -595,6 +608,7 @@ export class StrokeDocument {
         engine: ENGINE_VERSION,
         renderer: s.renderer,
         ...(s.space ? { space: { ...s.space } } : {}),
+        ...(s.overflow ? { overflow: true } : {}),
         ...(s.renderer.startsWith('stamps-')
           ? { stamps: s.stamps.map((p) => p.slice()) }
           : {}),
@@ -688,7 +702,21 @@ function validateStroke(s) {
       s.space.h > 131072)
   )
     throw Error('Invalid stroke coordinate space.');
-  const extent = s.space || surfaceSize(s.surface);
+  if (
+    s.overflow !== undefined &&
+    (s.overflow !== true ||
+      !/^bg-(grid|single)$/.test(s.surface) ||
+      !Array.isArray(s.placements) ||
+      s.placements.some(
+        (p) => p.surface !== s.surface || p.x !== 0 || p.y !== 0,
+      ))
+  )
+    throw Error('Invalid extended background.');
+  const extent = s.overflow
+    ? { w: BG_COORD_LIMIT, h: BG_COORD_LIMIT }
+    : s.space || surfaceSize(s.surface);
+  const inputMin = s.overflow ? -BG_COORD_LIMIT : -1024;
+  const geometryMin = s.overflow ? -BG_COORD_LIMIT - 4096 : -4096;
   for (const p of s.points)
     if (
       !Array.isArray(p) ||
@@ -696,8 +724,8 @@ function validateStroke(s) {
       !p.every(finite) ||
       p[2] < 0 ||
       p[2] > 1 ||
-      p[0] < -1024 ||
-      p[1] < -1024 ||
+      p[0] < inputMin ||
+      p[1] < inputMin ||
       p[0] > extent.w + 1024 ||
       p[1] > extent.h + 1024
     )
@@ -707,8 +735,8 @@ function validateStroke(s) {
       !Array.isArray(p) ||
       p.length !== 2 ||
       !p.every(finite) ||
-      p[0] < -4096 ||
-      p[1] < -4096 ||
+      p[0] < geometryMin ||
+      p[1] < geometryMin ||
       p[0] > extent.w + 4096 ||
       p[1] > extent.h + 4096
     )
@@ -728,8 +756,8 @@ function validateStroke(s) {
         !p.every((n) => finite(n) && n === Math.round(n * 10000) / 10000) ||
         p[2] <= 0 ||
         p[2] > 256 ||
-        p[0] < -4096 ||
-        p[1] < -4096 ||
+        p[0] < geometryMin ||
+        p[1] < geometryMin ||
         p[0] > extent.w + 4096 ||
         p[1] > extent.h + 4096
       )
@@ -744,6 +772,8 @@ function validateStroke(s) {
       (!finite(b.scatter) || b.scatter < 0.05 || b.scatter > 3)) ||
     (b.dotScale !== undefined &&
       (!finite(b.dotScale) || b.dotScale < 0.05 || b.dotScale > 3)) ||
+    (b.density !== undefined &&
+      (!finite(b.density) || b.density < 0.1 || b.density > 3)) ||
     !finite(b.softness) ||
     b.softness < 0 ||
     b.softness > 1 ||
@@ -814,13 +844,26 @@ export function strokePath(value) {
   traceOutline(s, p);
   return p;
 }
-export function paintStroke(ctx, value, path = strokePath(value), box) {
+export function paintStroke(
+  ctx,
+  value,
+  path = strokePath(value),
+  box,
+  extendedBG = false,
+) {
   const s = value.stroke || value,
     p = value.placement;
   ctx.save();
   // The destination clips each surface. Keep raster bleed outside its bounds
   // for bilinear sampling at fractional display scales.
   if (p) ctx.translate(p.x, p.y);
+  // Old files keep their original composition crop even alongside new exterior ink.
+  if (extendedBG && /^bg-/.test(s.surface) && !s.overflow) {
+    const extent = surfaceSize(s.surface);
+    ctx.beginPath();
+    ctx.rect(0, 0, extent.w, extent.h);
+    ctx.clip();
+  }
   ctx.globalCompositeOperation = s.brush.erase
     ? 'destination-out'
     : 'source-over';
@@ -893,6 +936,7 @@ export function validateSettings(raw) {
     'templateVisible',
     'bgAbove',
     'touchDraw',
+    'exportBg',
   ])
     if (raw[key] !== undefined) {
       if (typeof raw[key] !== 'boolean') throw Error('Invalid ' + key);

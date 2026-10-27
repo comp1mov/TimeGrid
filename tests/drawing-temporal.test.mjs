@@ -304,3 +304,63 @@ test('one column with maximum gaps remains serializable at 96 frames', () => {
     g.document.serialize(),
   );
 });
+
+test('extended BG preserves negative exterior coordinates and legacy BG stays clipped', async () => {
+  const { renderInstances } = await import('../src/js/stroke-document.mjs');
+  for (const type of ['round', 'spray']) {
+    const g = make({ target: 'bg', brush: { ...brush, type, density: 2 } });
+    g.feed([-3000, -2000, 0.5]);
+    g.feed([-2900, -1900, 0.5]);
+    const strokes = g.finish();
+    g.document.addGesture(strokes);
+    assert.ok(renderInstances(strokes[0])[0].box.x < -2800);
+    const text = g.document.serialize(),
+      restored = StrokeDocument.parse(text);
+    assert.equal(restored.serialize(), text);
+    assert.ok(restored.extendedSurfaces.has('bg-single'));
+    g.document.undo();
+    assert.equal(g.document.extendedSurfaces.size, 0);
+    g.document.redo();
+    assert.ok(g.document.extendedSurfaces.has('bg-single'));
+  }
+  const old = createStroke({
+    id: 's1',
+    surface: 'bg-single',
+    points: [
+      [-20, 20, 0.5],
+      [30, 20, 0.5],
+    ],
+    size: 20,
+  });
+  assert.equal(renderInstances(old)[0].box.x, 0);
+});
+test('extended BG flags and density are validated without partially accepting data', () => {
+  const d = new StrokeDocument(),
+    s = createStroke({
+      id: 's1',
+      surface: 'frame-0',
+      points: [[100, 100, 0.5]],
+      overflow: true,
+    });
+  assert.throws(() => d.addGesture([s]), /extended background/);
+  assert.equal(d.strokes.length, 0);
+  const g = make({ target: 'bg' });
+  g.feed([200, 200, 0.5]);
+  g.document.addGesture(g.finish());
+  const raw = JSON.parse(g.document.serialize());
+  raw.schema = 4;
+  assert.throws(() => StrokeDocument.parse(JSON.stringify(raw)), /schema 5/);
+  raw.schema = 5;
+  raw.strokes[0].brush.density = 4;
+  assert.throws(() => StrokeDocument.parse(JSON.stringify(raw)), /brush/);
+});
+test('Spray density scales counts while saved geometry remains fixed', async () => {
+  const { StampStream } = await import('../src/js/brush-geometry.mjs');
+  const counts = [0.1, 1, 3].map(
+    (density) =>
+      new StampStream({ ...brush, type: 'spray', size: 100, density }).push([
+        100, 100, 0.5,
+      ]).length,
+  );
+  assert.deepEqual(counts, [9, 90, 270]);
+});

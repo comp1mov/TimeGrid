@@ -208,7 +208,14 @@ export class StampStream {
     const add = (x, y, pressure) => {
       const size = b.size * (b.pressure ? 0.45 + 1.1 * pressure : 1);
       const count =
-        b.type === 'spray' ? clamp(Math.round(b.size * 1.6), 10, 90) : 1;
+        b.type === 'spray'
+          ? Math.max(
+              1,
+              Math.round(
+                clamp(Math.round(b.size * 1.6), 10, 90) * (b.density ?? 1),
+              ),
+            )
+          : 1;
       if (this.count + count > MAX_STAMPS)
         throw Error('Stroke particle limit reached. Release to continue.');
       this.count += count;

@@ -1,6 +1,6 @@
 @font-face {
   font-family: Inter;
-  src: url("../fonts/inter-latin.woff2") format("woff2");
+  src: url('../fonts/inter-latin.woff2') format('woff2');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -66,7 +66,7 @@ input {
 }
 button,
 select,
-input[type="number"] {
+input[type='number'] {
   border: 1px solid #424653;
   background: #252833;
   color: #f0f1f5;
@@ -88,12 +88,12 @@ button.active {
   border-color: #ffa0b7;
   color: #ffa0b7;
 }
-input[type="range"] {
+input[type='range'] {
   width: 100px;
   height: 32px;
   accent-color: #ff8cab;
 }
-input[type="color"] {
+input[type='color'] {
   height: 38px;
   width: 44px;
   border: 0;
@@ -105,12 +105,12 @@ input[type="color"] {
   align-items: center;
   height: 38px;
 }
-input[type="checkbox"] {
+input[type='checkbox'] {
   width: 18px;
   height: 18px;
   accent-color: #ff8cab;
 }
-input[type="number"] {
+input[type='number'] {
   width: 65px;
 }
 .spacer {
@@ -188,11 +188,11 @@ output {
   }
   button,
   select,
-  input[type="number"] {
+  input[type='number'] {
     min-height: 42px;
     padding: 6px 8px;
   }
-  input[type="range"] {
+  input[type='range'] {
     width: 78px;
   }
   #stage {
@@ -228,4 +228,100 @@ output {
 }
 #frame {
   width: 85px;
+}
+
+/* The lab exposes existing controls in small groups; no settings accordion. */
+[hidden] {
+  display: none !important;
+}
+header {
+  padding: 8px 16px;
+}
+header strong {
+  font-size: 16px;
+}
+.quickbar {
+  align-items: center;
+}
+.workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 12px;
+  height: calc(100dvh - 190px);
+  min-height: 440px;
+}
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+#stage {
+  flex: 1;
+  height: auto;
+  min-height: 260px;
+}
+.controls {
+  overflow-y: auto;
+  min-width: 0;
+  padding-right: 6px;
+  scrollbar-width: thin;
+}
+.panel {
+  border-bottom: 1px solid #343745;
+  padding: 0 0 8px;
+  margin-bottom: 12px;
+}
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #e6e8ef;
+}
+.panel .toolbar {
+  margin-bottom: 0;
+}
+.panel .check {
+  height: auto;
+  min-height: 28px;
+}
+#sprayControls {
+  flex-basis: 100%;
+}
+.actions {
+  gap: 5px;
+  align-items: center;
+}
+.actions button {
+  padding: 5px 8px;
+  min-height: 34px;
+}
+#status {
+  font-size: 11px;
+}
+.key-hint {
+  font-size: 11px;
+  color: #aeb3c5;
+}
+@media (max-width: 800px) {
+  .workbench {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+  }
+  #stage {
+    flex: none;
+    height: 52dvh;
+    min-height: 300px;
+  }
+  .controls {
+    overflow: visible;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    gap: 12px;
+  }
+  .quickbar {
+    gap: 6px;
+  }
 }

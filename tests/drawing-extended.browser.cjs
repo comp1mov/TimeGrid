@@ -219,13 +219,13 @@ fs.mkdirSync(out, { recursive: true });
   await p.mouse.wheel(0, 80);
   await p.evaluate(() => timegridLab.flush());
   const moved = await p.evaluate(() => timegridLab.composition());
-  assert.ok(moved.y < initial.y);
+  assert.ok(moved.w < initial.w);
   await p.keyboard.down('Control');
   await p.mouse.wheel(0, -160);
   await p.keyboard.up('Control');
   await p.evaluate(() => timegridLab.flush());
   assert.ok((await p.evaluate(() => timegridLab.composition())).w > moved.w);
-  check('wheel pans; Ctrl wheel zooms for trackpad/mouse event model');
+  check('wheel and Ctrl wheel zoom under pointer');
   const phone = await b.newContext({
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 3,

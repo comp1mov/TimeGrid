@@ -4,6 +4,24 @@
 
 Этот файл фиксирует не весь chat log, а важные архитектурные решения, баги и смысловые повороты, чтобы не терять контекст проекта.
 
+## 2026-10-27: Drawing Lab 28.35.0-drawing.6
+
+Ветка codex/drawing-engine. Автор согласовал .6 с возвращением управления TimeGrid, внешним BG, Spray и упрощением меню. Ordinary Drawing .2, stable 28.34 и Cloud не обновляются.
+
+- Wheel делает zoom под курсором; правый/средний drag делает pan. Space Play/Pause, G Grid/Single, F Fit, Q/W/E BG/TPL/FRM, A brush off, L Long, T TPL, Z/Ctrl-Z Undo, Shift-Z/Ctrl-Shift-Z Redo, C Clear. Физические code работают на русской раскладке; ввод чисел и select сохраняют свои клавиши. Удержание toggle/clear клавиш не повторяет действие.
+- [ ] размер ±4; Shift+[ ] softness ±5%; Ctrl/Cmd+[ ] opacity ±10%. ± FPS, с Shift шаг5, Ctrl/Cmd шаг5, Ctrl+Shift шаг10. ←/→ кадр, Shift+←/→ phases, ↑/↓ pattern, Shift+↑/↓ columns, Ctrl/Cmd+↑/↓ direction, Home/End первый/последний tick. Клавиши функций отсутствующих в Lab (palette, slots, full app draw mode, video export) не переопределены под чужие действия.
+- Новые BG strokes имеют overflow:true в schema5. Signed coordinates и tiles позволяют рисовать снаружи всех четырёх сторон. Нет огромного заранее выделенного растра. Grid/Single BG независимы; сохраняется composition-relative mapping .5 при reflow. Существующий BG старых файлов сохраняет crop даже рядом с новыми внешними штрихами.
+- Export BG расширяет crop до объединения композиции и границ красящих BG-операций. Выключение исключает BG и возвращает обычные границы. Выбор сохраняется в файле. Zoom/pan не изменяют геометрию. После ластика crop консервативен и может сохранять пустое поле от прежнего штриха. Координатный предел ввода BG ±32768, это не бесконечный холст.
+- Spray dot size default100% вместо10%, scatter150%, density100% с диапазоном10…300%. Density управляет числом частиц, старые сохранённые stamps не генерируются заново. Три Spray-настройки видны только при выборе Spray. Характер случайного распределения, прозрачности и мягкости сохранён.
+- Общая раскрывашка убрана. Группы Brush, Drawing, Grid & time, Files & export открыты; desktop имеет прокручиваемую боковую панель, mobile показывает canvas перед настройками. Шрифт Inter сохранён. Benchmark находится в справке.
+- Schema1/2/3/4 читаются; schema5 нужен для сохранения нового внешнего BG. Старые версии не открывают schema5. Версии Lab metadata/HTML/APP_VERSION/README синхронизированы, обычное приложение остаётся .2.
+
+Проверено локально: 50 unit, 61 browser check (28 temporal,13 extended,9 quality,11 workspace), отдельно реальный .4-file raster compatibility. Внешний BG Round/Spray с четырёх сторон в Grid/Single, erase/Undo/Redo/cache rebuild/Open, реальный Save/download/reload/Open с Export BG off, legacy .5 BG на краю и смешение с новым, zoom-anchor, хоткеи и русская раскладка, числовые поля, сохранение frame identity, 96-frame geometry и 390px touch/pinch. Screenshots просмотрены. Build:lab и версия проверены. Публичная проверка записывается отдельно после публикации.
+
+Desktop Edge156, 240 rAF samples, size80,96frames, scatter150/dot100/density100: render p95 Round2.1ms, soft Round0.8ms, Spray1.2ms, soft Spray1.3ms. Это JS время, не input-to-photon и не физический touchscreen/pen. Размер viewport1440×1000 сохранён, layout canvas теперь другой; это новый замер .6, не строгий A/B speedup. Нулевой рисунок имеет0 drawing tiles; основной cache24MiB, soft sprites до4MiB отдельно.
+
+Художественный результат: вернулись знакомые управление и работа за краями листа; точки Spray заметнее без изменения сохранённых работ. Presets кистей остаются идеей после авторского подбора, не функцией .6. Следующий шаг: короткая авторская проверка настоящих устройств, затем согласовать модель заливки внутри нарисованной фигуры. Legacy raster migration и перенос в основной TimeGrid идут отдельно после приёмки, далее полный проект/proxy. [Evidence](drawing-evidence/2026-10-27-drawing-6/README.md).
+
 ## 2026-10-27: Drawing Lab 28.35.0-drawing.5
 
 Ветка codex/drawing-engine. Согласованный этап совместимости того же стенда после полного аудита .4. Автор отдельно потребовал учитывать mouse, trackpad, desktop touchscreen, iPad/Pencil и Wacom. [Архитектура и ограничения](DRAWING_PROTOTYPE_RU.md), [сырые проверки](drawing-evidence/2026-10-27-drawing-5/README.md). Ordinary app остаётся drawing.2 по отдельной версификации Lab; stable 28.34 и Cloud не менялись.

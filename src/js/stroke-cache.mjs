@@ -43,7 +43,7 @@ export class StrokeTileCache {
               intersects(tile.box, item.box)
             ) {
               const c = tile.canvas.getContext('2d');
-              paintStroke(c, item, this.path(item), tile.box);
+              paintStroke(c, item, this.path(item), tile.box, tile.extended);
             }
         }
     } else {
@@ -104,8 +104,15 @@ export class StrokeTileCache {
     this.unsubscribe();
     this.clear();
   }
-  tile(surface, level, tx, ty) {
-    const key = surface + '|' + level + '|' + tx + '|' + ty;
+  extended(surface) {
+    return (
+      this.doc.extendedSurfaces.has(surface) ||
+      this.drafts.some((s) => s.overflow && s.surface === surface)
+    );
+  }
+  tile(surface, level, tx, ty, extended = this.extended(surface)) {
+    const key =
+      surface + '|' + level + '|' + tx + '|' + ty + '|' + Number(extended);
     let tile = this.tiles.get(key);
     if (tile) {
       this.tiles.delete(key);
@@ -117,8 +124,8 @@ export class StrokeTileCache {
       step = TILE / level;
     const x = tx * step,
       y = ty * step,
-      w = Math.min(step, size.w - x),
-      h = Math.min(step, size.h - y);
+      w = extended ? step : Math.min(step, size.w - x),
+      h = extended ? step : Math.min(step, size.h - y);
     if (w <= 0 || h <= 0) return null;
     const box = {
       x: x - BLEED / level,
@@ -139,9 +146,10 @@ export class StrokeTileCache {
     canvas.height = Math.ceil(h * level) + 2 * BLEED;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.setTransform(level, 0, 0, level, BLEED - x * level, BLEED - y * level);
-    for (const s of strokes) paintStroke(ctx, s, this.path(s), box);
+    for (const s of strokes) paintStroke(ctx, s, this.path(s), box, extended);
     tile = {
       canvas,
+      extended,
       surface,
       box,
       x,
@@ -162,7 +170,8 @@ export class StrokeTileCache {
     return tile;
   }
   draw(ctx, surface, rect, dpr = 1, clip = rect) {
-    const size = surfaceSize(surface);
+    const size = surfaceSize(surface),
+      extended = this.extended(surface);
     const level = Math.max(
       1 / 32,
       Math.min(
@@ -176,34 +185,35 @@ export class StrokeTileCache {
     // Adjacent tiles must own disjoint device pixels. Fractional drawImage
     // edges blend twice with the background and expose a grid in thick ink.
     const snap = (v) => Math.round(v * dpr) / dpr;
+    const crop = extended ? clip : rect;
     ctx.rect(
-      snap(rect.x),
-      snap(rect.y),
-      snap(rect.x + rect.w) - snap(rect.x),
-      snap(rect.y + rect.h) - snap(rect.y),
+      snap(crop.x),
+      snap(crop.y),
+      snap(crop.x + crop.w) - snap(crop.x),
+      snap(crop.y + crop.h) - snap(crop.y),
     );
     ctx.clip();
     // Preserve caller opacity for Onion Skin. Tile internals keep their own alpha.
     ctx.globalCompositeOperation = 'source-over';
     const x0 = Math.max(
-        0,
+        extended ? -Infinity : 0,
         Math.floor((((clip.x - rect.x) / rect.w) * size.w) / step),
       ),
       y0 = Math.max(
-        0,
+        extended ? -Infinity : 0,
         Math.floor((((clip.y - rect.y) / rect.h) * size.h) / step),
       );
     const x1 = Math.min(
-        Math.ceil(size.w / step),
+        extended ? Infinity : Math.ceil(size.w / step),
         Math.ceil((((clip.x + clip.w - rect.x) / rect.w) * size.w) / step),
       ),
       y1 = Math.min(
-        Math.ceil(size.h / step),
+        extended ? Infinity : Math.ceil(size.h / step),
         Math.ceil((((clip.y + clip.h - rect.y) / rect.h) * size.h) / step),
       );
     for (let ty = y0; ty < y1; ty++)
       for (let tx = x0; tx < x1; tx++) {
-        const tile = this.tile(surface, level, tx, ty);
+        const tile = this.tile(surface, level, tx, ty, extended);
         if (!tile) continue;
         const left = snap(rect.x + (tile.x / size.w) * rect.w),
           top = snap(rect.y + (tile.y / size.h) * rect.h),

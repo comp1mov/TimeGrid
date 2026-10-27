@@ -13,7 +13,7 @@ import {
 } from './stroke-document.mjs';
 import { SpeedPressure } from './brush-geometry.mjs';
 import { StrokeTileCache } from './stroke-cache.mjs';
-export const APP_VERSION = '28.35.0-drawing.5';
+export const APP_VERSION = '28.35.0-drawing.6';
 const $ = (id) => document.getElementById(id),
   canvas = $('canvas'),
   ctx = canvas.getContext('2d', {
@@ -46,7 +46,6 @@ let layout = [],
   gesture = null,
   pointers = new Map(),
   nav = null,
-  space = false,
   playing = false,
   lastTick = 0,
   message = '';
@@ -341,6 +340,7 @@ function brush() {
     seed: crypto.getRandomValues(new Uint32Array(1))[0],
     scatter: Number($('scatter').value) / 100,
     dotScale: Number($('dotScale').value) / 100,
+    density: Number($('density').value) / 100,
   };
 }
 function feed(p, time, shift = false) {
@@ -440,7 +440,6 @@ canvas.addEventListener('pointerdown', (e) => {
     e.pointerType === 'pen' && (e.button === 5 || Boolean(e.buttons & 32));
   if (
     $('tool').value === 'pan' ||
-    space ||
     $('brushOff').checked ||
     (e.button !== 0 && !penEraser) ||
     (e.pointerType === 'touch' && !$('touchDraw').checked)
@@ -561,7 +560,6 @@ window.addEventListener('blur', () => {
   penActive = null;
   suppressTouch = false;
   nav = null;
-  space = false;
 });
 function zoomAt(factor, x = width / 2, y = height / 2, navigating = false) {
   if (!navigating) finish();
@@ -579,17 +577,17 @@ canvas.addEventListener(
   (e) => {
     e.preventDefault();
     measureRect();
-    if (!e.ctrlKey && !e.metaKey) {
-      finish();
-      pan.x -= e.deltaX;
-      pan.y -= e.deltaY;
-      rects();
-      fullDirty = true;
-      schedule();
-      return;
-    }
     zoomAt(
-      Math.exp(-e.deltaY * 0.002),
+      Math.exp(
+        -Math.max(
+          -200,
+          Math.min(
+            200,
+            e.deltaY *
+              (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? height : 1),
+          ),
+        ) * 0.002,
+      ),
       e.clientX - stageRect.left,
       e.clientY - stageRect.top,
     );
@@ -615,8 +613,17 @@ $('view').onchange = () => {
   fullDirty = true;
   schedule();
 };
-for (const id of ['target', 'tool', 'brushType']) $(id).onchange = finish;
+for (const id of ['target', 'tool', 'brushType'])
+  $(id).onchange = () => {
+    finish();
+    syncBrushControls();
+    fullDirty = true;
+    schedule();
+  };
 function syncBrushControls(source) {
+  $('sprayControls').hidden = $('brushType').value !== 'spray';
+  $('smooth').closest('label').hidden =
+    $('brushType').value === 'spray' || Number($('softness').value) > 0;
   if (source === 'number') {
     const n = Number($('sizeNumber').value);
     if (n < 2 || n > 180) return;
@@ -689,6 +696,7 @@ const booleanSettings = [
   'templateVisible',
   'bgAbove',
   'touchDraw',
+  'exportBg',
 ];
 const selectSettings = ['direction', 'pattern'];
 function captureSettings() {
@@ -713,6 +721,7 @@ function restoreSettings() {
     templateVisible: true,
     bgAbove: false,
     touchDraw: true,
+    exportBg: true,
     direction: 'forward',
     pattern: 'sequential',
     tick: 0,
@@ -740,6 +749,7 @@ for (const id of [
   'brushOff',
   'scatter',
   'dotScale',
+  'density',
 ]) {
   $(id).addEventListener('change', () => {
     finish();
@@ -910,26 +920,49 @@ function tick(now) {
   }
   tickRequest = requestAnimationFrame(tick);
 }
+function exportBounds() {
+  let box = { ...compositionRect };
+  if (!$('exportBg').checked) return box;
+  const ext = surfaceSize('bg-' + view);
+  for (const item of doc.instances.values()) {
+    if (item.surface !== 'bg-' + view || item.brush.erase) continue;
+    const r = item.box;
+    box = union(box, {
+      x: compositionRect.x + (r.x / ext.w) * compositionRect.w,
+      y: compositionRect.y + (r.y / ext.h) * compositionRect.h,
+      w: (r.w / ext.w) * compositionRect.w,
+      h: (r.h / ext.h) * compositionRect.h,
+    });
+  }
+  return box;
+}
 function exportCanvas() {
   const out = document.createElement('canvas'),
     size = Number($('exportSize').value);
-  const scale = size / Math.max(compositionRect.w, compositionRect.h);
-  out.width = Math.max(1, Math.round(compositionRect.w * scale));
-  out.height = Math.max(1, Math.round(compositionRect.h * scale));
+  const crop = exportBounds();
+  const scale = size / Math.max(crop.w, crop.h);
+  out.width = Math.max(1, Math.round(crop.w * scale));
+  out.height = Math.max(1, Math.round(crop.h * scale));
   const c = out.getContext('2d'),
     exportCache = new StrokeTileCache(doc, { budget: 4 * 1024 * 1024 });
   if (!$('transparent').checked) {
     c.fillStyle = '#1a1c25';
     c.fillRect(0, 0, out.width, out.height);
   }
-  const surface = (id, r) => exportCache.draw(c, id, r, 1);
-  const bg = { x: 0, y: 0, w: out.width, h: out.height };
-  if (!$('bgAbove').checked) surface('bg-' + view, bg);
+  const viewport = { x: 0, y: 0, w: out.width, h: out.height };
+  const surface = (id, r) => exportCache.draw(c, id, r, 1, viewport);
+  const bg = {
+    x: (compositionRect.x - crop.x) * scale,
+    y: (compositionRect.y - crop.y) * scale,
+    w: compositionRect.w * scale,
+    h: compositionRect.h * scale,
+  };
+  if ($('exportBg').checked && !$('bgAbove').checked) surface('bg-' + view, bg);
   for (const item of layout) {
     const r = {
       ...item,
-      x: (item.x - compositionRect.x) * scale,
-      y: (item.y - compositionRect.y) * scale,
+      x: (item.x - crop.x) * scale,
+      y: (item.y - crop.y) * scale,
       w: item.w * scale,
       h: item.h * scale,
     };
@@ -937,7 +970,7 @@ function exportCanvas() {
     if ($('templateVisible').checked) surface('tpl', r);
     surface('frame-' + r.id, r);
   }
-  if ($('bgAbove').checked) surface('bg-' + view, bg);
+  if ($('exportBg').checked && $('bgAbove').checked) surface('bg-' + view, bg);
   exportCache.dispose();
   return out;
 }
@@ -949,19 +982,105 @@ $('png').onclick = () => {
     out.width = 0;
   }, 'image/png');
 };
+// Physical codes preserve TimeGrid bindings on Russian and English layouts.
+function changeControl(id, value) {
+  const el = $(id);
+  if (el.type === 'checkbox') el.checked = value;
+  else el.value = value;
+  el.dispatchEvent(new Event('change'));
+}
+function stepControl(id, delta) {
+  const el = $(id);
+  changeControl(
+    id,
+    Math.max(
+      Number(el.min),
+      Math.min(Number(el.max), Number(el.value) + delta),
+    ),
+  );
+  syncBrushControls();
+}
+function cycleControl(id, delta) {
+  const el = $(id),
+    n = el.options.length;
+  changeControl(id, el.options[(el.selectedIndex + delta + n) % n].value);
+}
 window.addEventListener('keydown', (e) => {
-  if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-  if (e.code === 'Space') {
-    e.preventDefault();
-    space = true;
+  const el = e.target,
+    code = e.code,
+    mod = e.ctrlKey || e.metaKey;
+  if (el.isContentEditable || el.closest?.('input, textarea, select')) return;
+  if (e.altKey) return;
+  let action;
+  if (mod) {
+    if (code === 'KeyZ') action = () => $(e.shiftKey ? 'redo' : 'undo').click();
+    else if (code === 'BracketLeft' || code === 'BracketRight')
+      action = () => stepControl('opacity', code === 'BracketLeft' ? -10 : 10);
+    else if (['Equal', 'NumpadAdd', 'Minus', 'NumpadSubtract'].includes(code))
+      action = () =>
+        stepControl(
+          'fps',
+          (['Minus', 'NumpadSubtract'].includes(code) ? -1 : 1) *
+            (e.shiftKey ? 10 : 5),
+        );
+    else if (code === 'ArrowUp' || code === 'ArrowDown')
+      action = () => cycleControl('direction', code === 'ArrowUp' ? -1 : 1);
+  } else {
+    if (code === 'Space') action = () => $('play').click();
+    else if (code === 'KeyG')
+      action = () => changeControl('view', view === 'grid' ? 'single' : 'grid');
+    else if (code === 'KeyF') action = () => $('fit').click();
+    else if (['KeyQ', 'KeyW', 'KeyE'].includes(code))
+      action = () => {
+        changeControl('brushOff', false);
+        changeControl('target', { KeyQ: 'bg', KeyW: 'tpl', KeyE: 'frm' }[code]);
+      };
+    else if (code === 'KeyZ')
+      action = () => $(e.shiftKey ? 'redo' : 'undo').click();
+    else if (code === 'KeyC') action = () => $('clear').click();
+    else if (code === 'KeyA')
+      action = () => changeControl('brushOff', !$('brushOff').checked);
+    else if (code === 'Escape') action = () => changeControl('brushOff', true);
+    else if (code === 'KeyL')
+      action = () => changeControl('longStroke', !$('longStroke').checked);
+    else if (code === 'KeyT')
+      action = () =>
+        changeControl('templateVisible', !$('templateVisible').checked);
+    else if (code === 'BracketLeft' || code === 'BracketRight')
+      action = () =>
+        stepControl(
+          e.shiftKey ? 'softness' : 'size',
+          (code === 'BracketLeft' ? -1 : 1) * (e.shiftKey ? 5 : 4),
+        );
+    else if (['Equal', 'NumpadAdd', 'Minus', 'NumpadSubtract'].includes(code))
+      action = () =>
+        stepControl(
+          'fps',
+          (['Minus', 'NumpadSubtract'].includes(code) ? -1 : 1) *
+            (e.shiftKey ? 5 : 1),
+        );
+    else if (code === 'ArrowUp' || code === 'ArrowDown')
+      action = () =>
+        e.shiftKey
+          ? stepControl('columns', code === 'ArrowUp' ? 1 : -1)
+          : cycleControl('pattern', code === 'ArrowUp' ? -1 : 1);
+    else if (code === 'ArrowLeft' || code === 'ArrowRight')
+      action = () =>
+        e.shiftKey
+          ? stepControl('phases', code === 'ArrowLeft' ? -1 : 1)
+          : $(code === 'ArrowLeft' ? 'prev' : 'next').click();
+    else if (code === 'Home' || code === 'End')
+      action = () => {
+        finish();
+        advanceTo(code === 'Home' ? 0 : 95);
+      };
   }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+  if (action) {
     e.preventDefault();
-    $(e.shiftKey ? 'redo' : 'undo').click();
+    // Toggle keys and destructive commands must not repeat while held.
+    if (e.repeat && /^(Space|Key|Escape)/.test(code)) return;
+    action();
   }
-});
-window.addEventListener('keyup', (e) => {
-  if (e.code === 'Space') space = false;
 });
 const pct = (values, p) =>
   values.length
@@ -1132,6 +1251,7 @@ window.timegridLab = {
   finish,
   benchmark,
   exportCanvas,
+  exportBounds,
   reset: () => setDocument(new StrokeDocument()),
   add: (strokes) => doc.addGesture(strokes),
   createStroke,

@@ -8,6 +8,7 @@ import {
   ENGINE_VERSION,
   bounds,
   LIMITS,
+  BG_COORD_LIMIT,
 } from './stroke-document.mjs';
 import { StampStream, stampBounds } from './brush-geometry.mjs';
 const W = FRAME_W,
@@ -75,13 +76,25 @@ export class DrawingGesture {
   }
   mapping(p) {
     const c = this.composition;
-    if (p[0] < c.x || p[1] < c.y || p[0] > c.x + c.w || p[1] > c.y + c.h)
+    if (
+      this.target !== 'bg' &&
+      (p[0] < c.x || p[1] < c.y || p[0] > c.x + c.w || p[1] > c.y + c.h)
+    )
       return null;
     if (this.target === 'bg') {
       const r = this.composition,
         ext = surfaceSize('bg-' + this.view);
+      const q = [
+        ((p[0] - r.x) / r.w) * ext.w,
+        ((p[1] - r.y) / r.h) * ext.h,
+        p[2],
+      ];
+      if (Math.abs(q[0]) > BG_COORD_LIMIT || Math.abs(q[1]) > BG_COORD_LIMIT)
+        throw Error(
+          'BG coordinate limit reached. Move closer to the composition.',
+        );
       return {
-        q: [((p[0] - r.x) / r.w) * ext.w, ((p[1] - r.y) / r.h) * ext.h, p[2]],
+        q,
         surface: 'bg-' + this.view,
         key: 'bg',
         space: ext,
@@ -148,6 +161,7 @@ export class DrawingGesture {
         surface: m.surface,
         placements: [],
         space: m.space,
+        ...(this.target === 'bg' ? { overflow: true } : {}),
       },
       mapping: m,
       points: [],
@@ -203,6 +217,7 @@ export class DrawingGesture {
           engine: ENGINE_VERSION,
           renderer: 'stamps-v2',
           space: m.space,
+          ...(this.target === 'bg' ? { overflow: true } : {}),
         };
         stroke.placements = this.placements(stroke, m);
         this.estimatedBytes +=

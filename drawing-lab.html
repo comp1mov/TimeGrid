@@ -7,18 +7,19 @@
       content="width=device-width,initial-scale=1,viewport-fit=cover"
     />
     <meta name="theme-color" content="#171820" />
-    <title>TimeGrid Drawing Lab 28.35.0-drawing.5</title>
+    <title>TimeGrid Drawing Lab 28.35.0-drawing.6</title>
     <link rel="stylesheet" href="./src/styles/drawing-lab.css" />
   </head>
   <body>
     <header>
       <div>
         <strong>TimeGrid <span class="accent">Drawing Lab</span></strong
-        ><small>28.35.0-drawing.5 · perfect-freehand prototype</small>
+        ><small>28.35.0-drawing.6 · perfect-freehand prototype</small>
       </div>
     </header>
+
     <main>
-      <section class="toolbar" aria-label="Drawing tools">
+      <section class="toolbar quickbar" aria-label="Drawing tools">
         <label
           >View<select id="view">
             <option value="grid">Grid · 96 frames</option>
@@ -45,12 +46,7 @@
             <option value="spray">Spray</option>
           </select></label
         >
-        <label
-          >Soft edge <output id="softnessOut">0</output
-          ><input id="softness" type="range" min="0" max="100" value="0"
-        /></label>
         <label>Color<input id="color" type="color" value="#ff7799" /></label>
-
         <label class="width-control"
           >Width <output id="sizeOut">32</output>
           <span class="width-inputs"
@@ -70,201 +66,254 @@
               value="32"
           /></span>
         </label>
-        <label
-          >Opacity <output id="opacityOut">100</output
-          ><input id="opacity" type="range" min="5" max="100" value="100"
-        /></label>
-        <label
-          title="Smooths the hard Round outline. Spray and Soft edge use the Stabilizer."
-          >Edge smoothing <output id="smoothOut">50</output
-          ><input id="smooth" type="range" min="0" max="100" value="50"
-        /></label>
-        <label
-          title="Stabilizes the input trajectory. Higher values follow your hand more slowly."
-          >Stabilizer <output id="streamlineOut">50</output
-          ><input id="streamline" type="range" min="0" max="100" value="50"
-        /></label>
-        <label class="check"
-          ><input id="pressure" type="checkbox" checked /> Pen pressure</label
-        >
-        <label class="check"
-          ><input id="velocity" type="checkbox" /> Vary with speed · fast =
-          thick</label
-        >
-        <small id="brushHint"></small>
       </section>
-      <details class="settings">
-        <summary>Animation, layers, input and grid settings</summary>
-        <div class="toolbar">
-          <label class="check"
-            ><input id="oneFrame" type="checkbox" />1F · clip at cell
-            edge</label
-          >
-          <label class="check"
-            ><input id="longStroke" type="checkbox" />Long Stroke</label
-          >
-          <label
-            >Trail · 0 = all<input
-              id="trail"
-              type="number"
-              min="0"
-              max="50"
-              value="8"
-          /></label>
-          <label class="check"
-            ><input id="onion" type="checkbox" />Onion Skin</label
-          >
-          <label class="check"
-            ><input id="templateVisible" type="checkbox" checked />Show
-            TPL</label
-          >
-          <button id="bake">Apply TPL to frames</button>
-          <label class="check"
-            ><input id="bgAbove" type="checkbox" />BG above frames</label
-          >
-          <label class="check"
-            ><input id="brushOff" type="checkbox" />Brush off · navigate</label
-          >
-          <label class="check"
-            ><input id="touchDraw" type="checkbox" checked />Draw with
-            finger</label
-          >
-          <label
-            >Spray scatter %<input
-              id="scatter"
-              type="number"
-              min="5"
-              max="300"
-              value="150"
-          /></label>
-          <label
-            >Spray dot size %<input
-              id="dotScale"
-              type="number"
-              min="5"
-              max="300"
-              value="10"
-          /></label>
-          <label
-            >Columns<input
-              id="columns"
-              type="number"
-              min="1"
-              max="16"
-              value="8"
-          /></label>
-          <label
-            >Gap · frame px<input
-              id="gap"
-              type="number"
-              min="0"
-              max="256"
-              value="0"
-          /></label>
-          <label
-            >Margins · frame px<input
-              id="margin"
-              type="number"
-              min="0"
-              max="512"
-              value="96"
-          /></label>
-          <label
-            >FPS<input id="fps" type="number" min="1" max="60" value="8"
-          /></label>
-          <label
-            >Direction<select id="direction">
-              <option value="forward">Forward</option>
-              <option value="backward">Backward</option>
-              <option value="pingpong">Ping-pong</option>
-              <option value="bounce-offset">Bounce offset</option>
-              <option value="sync">Sync</option>
-              <option value="stutter">Stutter</option>
-              <option value="holdskip">Hold / skip</option>
-              <option value="random">Random</option>
-              <option value="shuffleloop">Shuffle loop</option>
-            </select></label
-          >
-          <label
-            >Pattern<select id="pattern">
-              <option value="sequential">Sequential</option>
-              <option value="snake">Snake</option>
-              <option value="vertical">Vertical</option>
-              <option value="vertical-snake">Vertical snake</option>
-              <option value="checkerboard">Checkerboard</option>
-              <option value="center">Center</option>
-              <option value="spiral">Spiral</option>
-              <option value="random">Random</option>
-            </select></label
-          >
-          <label
-            >Loop · 0 = full<input
-              id="loop"
-              type="number"
-              min="0"
-              max="96"
-              value="0"
-          /></label>
-          <label
-            >Loop offset<input
-              id="loopOffset"
-              type="number"
-              min="0"
-              max="95"
-              value="0"
-          /></label>
-          <label
-            >Phases<input id="phases" type="number" min="1" max="96" value="1"
-          /></label>
-          <label
-            >PNG longest side<select id="exportSize">
-              <option>2048</option>
-              <option>4096</option>
-            </select></label
-          >
-          <label class="check"
-            ><input id="transparent" type="checkbox" />PNG · drawings
-            only</label
-          >
-          <button id="images">Preview image sequence</button>
-          <input
-            id="imageFiles"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            multiple
-            hidden
-          />
-          <button id="resetImages">Generated frames</button>
-        </div>
-      </details>
-      <section class="actions" aria-label="Document and view">
-        <button id="undo" disabled>Undo</button
-        ><button id="redo" disabled>Redo</button
-        ><button id="clear">Clear</button>
-        <button id="save">Save strokes</button
-        ><button id="open">Open strokes</button
-        ><input id="file" type="file" accept=".json,application/json" hidden />
-        <button id="png">Export PNG</button><span class="spacer"></span>
-        <button id="play">Play · 8 fps</button
-        ><button id="prev" aria-label="Previous frame">←</button
-        ><label
-          >Tick<input
-            id="frame"
-            type="number"
-            min="1"
-            max="96"
-            value="1" /></label
-        ><button id="next" aria-label="Next frame">→</button>
-        <button id="fit">Fit</button
-        ><button id="zoomOut" aria-label="Zoom out">−</button
-        ><button id="zoomIn" aria-label="Zoom in">+</button
-        ><button id="bench">Benchmark</button>
-      </section>
-      <div id="stage">
-        <canvas id="canvas" aria-label="96 frame drawing surface"></canvas>
-        <div id="zoomLabel">100%</div>
+      <div class="workbench">
+        <section class="workspace" aria-label="Canvas">
+          <section class="actions" aria-label="Playback and view">
+            <button id="play">Play · 8 fps</button>
+            <button id="prev" aria-label="Previous frame">←</button>
+            <label
+              >Tick<input id="frame" type="number" min="1" max="96" value="1"
+            /></label>
+            <button id="next" aria-label="Next frame">→</button>
+            <button id="fit">Fit</button>
+            <button id="zoomOut" aria-label="Zoom out">−</button>
+            <button id="zoomIn" aria-label="Zoom in">+</button>
+            <button id="undo" disabled>Undo</button>
+            <button id="redo" disabled>Redo</button>
+          </section>
+          <div id="stage">
+            <canvas id="canvas" aria-label="96 frame drawing surface"></canvas>
+            <div id="zoomLabel">100%</div>
+          </div>
+          <div id="status" role="status">Ready</div>
+        </section>
+        <aside class="controls" aria-label="Drawing settings">
+          <section class="panel" aria-label="Brush">
+            <h2>Brush</h2>
+            <div class="toolbar">
+              <label
+                >Opacity <output id="opacityOut">100</output
+                ><input id="opacity" type="range" min="5" max="100" value="100"
+              /></label>
+              <label
+                >Soft edge <output id="softnessOut">0</output
+                ><input id="softness" type="range" min="0" max="100" value="0"
+              /></label>
+              <label
+                title="Smooths the hard Round outline. Spray and Soft edge use the Stabilizer."
+                >Edge smoothing <output id="smoothOut">50</output
+                ><input id="smooth" type="range" min="0" max="100" value="50"
+              /></label>
+              <label
+                title="Stabilizes the input trajectory. Higher values follow your hand more slowly."
+                >Stabilizer <output id="streamlineOut">50</output
+                ><input
+                  id="streamline"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value="50"
+              /></label>
+              <label class="check"
+                ><input id="pressure" type="checkbox" checked /> Pen
+                pressure</label
+              >
+              <label class="check"
+                ><input id="velocity" type="checkbox" /> Vary with speed · fast
+                = thick</label
+              >
+              <div id="sprayControls" class="toolbar" hidden>
+                <label
+                  >Spray scatter %<input
+                    id="scatter"
+                    type="number"
+                    min="5"
+                    max="300"
+                    value="150" /></label
+                ><label
+                  >Spray dot size %<input
+                    id="dotScale"
+                    type="number"
+                    min="5"
+                    max="300"
+                    value="100"
+                /></label>
+                <label
+                  >Spray density %<input
+                    id="density"
+                    type="number"
+                    min="10"
+                    max="300"
+                    value="100"
+                /></label>
+              </div>
+              <small id="brushHint"></small>
+            </div>
+          </section>
+          <section class="panel" aria-label="Drawing">
+            <h2>Drawing</h2>
+            <div class="toolbar">
+              <label class="check"
+                ><input id="oneFrame" type="checkbox" />1F · clip at cell
+                edge</label
+              >
+              <label class="check"
+                ><input id="longStroke" type="checkbox" />Long Stroke</label
+              >
+              <label
+                >Trail · 0 = all<input
+                  id="trail"
+                  type="number"
+                  min="0"
+                  max="50"
+                  value="8"
+              /></label>
+              <label class="check"
+                ><input id="onion" type="checkbox" />Onion Skin</label
+              >
+              <label class="check"
+                ><input id="templateVisible" type="checkbox" checked />Show
+                TPL</label
+              >
+              <button id="bake">Apply TPL to frames</button>
+              <label class="check"
+                ><input id="bgAbove" type="checkbox" />BG above frames</label
+              >
+              <label class="check"
+                ><input id="brushOff" type="checkbox" />Brush off ·
+                navigate</label
+              >
+              <label class="check"
+                ><input id="touchDraw" type="checkbox" checked />Draw with
+                finger</label
+              >
+            </div>
+          </section>
+          <section class="panel" aria-label="Grid & time">
+            <h2>Grid & time</h2>
+            <div class="toolbar">
+              <label
+                >Columns<input
+                  id="columns"
+                  type="number"
+                  min="1"
+                  max="16"
+                  value="8"
+              /></label>
+              <label
+                >Gap · frame px<input
+                  id="gap"
+                  type="number"
+                  min="0"
+                  max="256"
+                  value="0"
+              /></label>
+              <label
+                >Margins · frame px<input
+                  id="margin"
+                  type="number"
+                  min="0"
+                  max="512"
+                  value="96"
+              /></label>
+              <label
+                >FPS<input id="fps" type="number" min="1" max="60" value="8"
+              /></label>
+              <label
+                >Direction<select id="direction">
+                  <option value="forward">Forward</option>
+                  <option value="backward">Backward</option>
+                  <option value="pingpong">Ping-pong</option>
+                  <option value="bounce-offset">Bounce offset</option>
+                  <option value="sync">Sync</option>
+                  <option value="stutter">Stutter</option>
+                  <option value="holdskip">Hold / skip</option>
+                  <option value="random">Random</option>
+                  <option value="shuffleloop">Shuffle loop</option>
+                </select></label
+              >
+              <label
+                >Pattern<select id="pattern">
+                  <option value="sequential">Sequential</option>
+                  <option value="snake">Snake</option>
+                  <option value="vertical">Vertical</option>
+                  <option value="vertical-snake">Vertical snake</option>
+                  <option value="checkerboard">Checkerboard</option>
+                  <option value="center">Center</option>
+                  <option value="spiral">Spiral</option>
+                  <option value="random">Random</option>
+                </select></label
+              >
+              <label
+                >Loop · 0 = full<input
+                  id="loop"
+                  type="number"
+                  min="0"
+                  max="96"
+                  value="0"
+              /></label>
+              <label
+                >Loop offset<input
+                  id="loopOffset"
+                  type="number"
+                  min="0"
+                  max="95"
+                  value="0"
+              /></label>
+              <label
+                >Phases<input
+                  id="phases"
+                  type="number"
+                  min="1"
+                  max="96"
+                  value="1"
+              /></label>
+            </div>
+          </section>
+          <section class="panel" aria-label="Files and export">
+            <h2>Files & export</h2>
+            <div class="toolbar">
+              <button id="save">Save strokes</button>
+              <button id="open">Open strokes</button>
+              <button id="clear">Clear</button>
+              <button id="images">Preview image sequence</button>
+              <button id="resetImages">Generated frames</button>
+              <label
+                >PNG longest side<select id="exportSize">
+                  <option>2048</option>
+                  <option>4096</option>
+                </select></label
+              >
+              <label class="check"
+                ><input id="exportBg" type="checkbox" checked />Export BG ·
+                include outside drawing</label
+              >
+              <label class="check"
+                ><input id="transparent" type="checkbox" />PNG · drawings
+                only</label
+              ><button id="png">Export PNG</button>
+              <input
+                id="file"
+                type="file"
+                accept=".json,application/json"
+                hidden
+              />
+              <input
+                id="imageFiles"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                multiple
+                hidden
+              />
+            </div>
+          </section>
+        </aside>
       </div>
-      <div id="status" role="status">Ready</div>
+      <p class="key-hint">
+        Space Play · G Grid/Single · F Fit · Q/W/E BG/TPL/FRM · [ ] Width ·
+        Shift ↑/↓ Columns · Wheel Zoom · Right/middle drag Pan
+      </p>
       <details>
         <summary>What to test</summary>
         <p>
@@ -283,15 +332,17 @@
           clears TPL, with one Undo. Onion Skin is a preview guide only.
         </p>
         <p>
-          BG has separate Grid and Single surfaces and covers composition
-          margins. Mouse/trackpad drag draws. Wheel scroll pans; Ctrl/Command +
-          wheel or two fingers zoom. Space + drag pans. Touch draws with one
-          finger; two fingers navigate. Turn off Draw with finger for pen-only
-          drawing. Pen pressure takes priority over speed. Hardware eraser uses
-          the selected brush. Shift constrains a segment to 45° directions.
+          BG has separate Grid and Single surfaces. New BG strokes can extend
+          outside the composition. Export BG includes the full exterior drawing;
+          disable it to use the normal composition bounds. Mouse/trackpad drag
+          draws. Wheel or two fingers zoom. Right/middle drag pans. Space plays
+          or pauses. Touch draws with one finger; two fingers navigate. Turn off
+          Draw with finger for pen-only drawing. Pen pressure takes priority
+          over speed. Hardware eraser uses the selected brush. Shift constrains
+          a segment to 45° directions.
         </p>
         <p>
-          Save stores stroke geometry and layout/timing settings, with schema 4.
+          Save stores stroke geometry and layout/timing settings, with schema 5.
           Older lab drawings retain their saved geometry. Images loaded with
           Preview image sequence are temporary session references, ordered by
           filename, repeating across 96 slots; they are not saved in the drawing
@@ -314,6 +365,7 @@
           <a href="./licenses/perfect-freehand.txt">perfect-freehand MIT</a> ·
           <a href="./licenses/inter-OFL.txt">Inter font license</a>
         </p>
+        <button id="bench">Benchmark</button>
       </details>
     </main>
     <script type="module" src="./src/js/drawing-lab.mjs"></script>

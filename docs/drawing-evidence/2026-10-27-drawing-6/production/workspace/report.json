@@ -1,0 +1,153 @@
+{
+  "date": "2026-10-27T01:40:27.469Z",
+  "url": "file:///C:/Users/gregt/.codex/worktrees/timegrid-drawing/TimeGrid/.drawing-lab-build/drawing-lab.html",
+  "browser": "156.0.4314.42",
+  "checks": [
+    {
+      "name": "TimeGrid physical shortcuts, including Russian key value, toggle play/view/targets/brush/time/columns",
+      "pass": true
+    },
+    {
+      "name": "number input retains arrows and modified keys without triggering canvas actions",
+      "pass": true
+    },
+    {
+      "name": "wheel anchors zoom at cursor, right drag pans, F resets fit",
+      "pass": true
+    },
+    {
+      "name": "grid round exterior BG on all four sides, erase/undo/rebuild/open, include/exclude export",
+      "data": {
+        "crop": {
+          "x": 198.66290744026742,
+          "y": 69.24322941343952,
+          "w": 669.6662072932581,
+          "h": 576.7204399998132
+        },
+        "base": {
+          "x": 227.41670185810807,
+          "y": 98.02734375,
+          "w": 609.1665962837839,
+          "h": 516.1640625
+        },
+        "ink": 7912,
+        "cacheBytes": 1081600
+      },
+      "pass": true
+    },
+    {
+      "name": "grid spray exterior BG on all four sides, erase/undo/rebuild/open, include/exclude export",
+      "data": {
+        "crop": {
+          "x": 185.8639477174475,
+          "y": 57.32370021362305,
+          "w": 693.61557271229,
+          "h": 600.313978955078
+        },
+        "base": {
+          "x": 227.41670185810807,
+          "y": 98.02734375,
+          "w": 609.1665962837839,
+          "h": 516.1640625
+        },
+        "ink": 25172,
+        "cacheBytes": 1622400
+      },
+      "pass": true
+    },
+    {
+      "name": "single round exterior BG on all four sides, erase/undo/rebuild/open, include/exclude export",
+      "data": {
+        "crop": {
+          "x": 51.161763662070015,
+          "y": 9.96491341204559,
+          "w": 965.135408371981,
+          "h": 695.0557333227989
+        },
+        "base": {
+          "x": 142,
+          "y": 109.79358552631578,
+          "w": 780,
+          "h": 492.63157894736844
+        },
+        "ink": 307484,
+        "cacheBytes": 2704000
+      },
+      "pass": true
+    },
+    {
+      "name": "single spray exterior BG on all four sides, erase/undo/rebuild/open, include/exclude export",
+      "data": {
+        "crop": {
+          "x": -72.33424999999997,
+          "y": -133.7823684210527,
+          "w": 1194.948345703125,
+          "h": 970.6241315789475
+        },
+        "base": {
+          "x": 142,
+          "y": 109.79358552631578,
+          "w": 780,
+          "h": 492.63157894736844
+        },
+        "ink": 399357,
+        "cacheBytes": 8652800
+      },
+      "pass": true
+    },
+    {
+      "name": "Spray default dots100%, density changes particle count, controls only appear for Spray",
+      "data": [
+        9,
+        90,
+        270
+      ],
+      "pass": true
+    },
+    {
+      "name": "390px layout exposes canvas before grouped settings, without horizontal overflow",
+      "data": {
+        "body": 390,
+        "viewport": 390,
+        "stage": {
+          "x": 8,
+          "y": 325.953125,
+          "width": 374,
+          "height": 438.875,
+          "top": 325.953125,
+          "right": 382,
+          "bottom": 764.828125,
+          "left": 8
+        },
+        "settings": {
+          "x": 8,
+          "y": 806.21875,
+          "width": 374,
+          "height": 885.921875,
+          "top": 806.21875,
+          "right": 382,
+          "bottom": 1692.140625,
+          "left": 8
+        }
+      },
+      "pass": true
+    },
+    {
+      "name": "actual .5 BG edge raster stays identical; mixed legacy/new BG clips only old geometry",
+      "data": {
+        "legacyPngSHA256": "36af8dec9feb9be06acc2aa50a6cb403f99671efc1b4e26f4d724c2cd55112d8",
+        "mixed": {
+          "legacyOutside": 0,
+          "newOutside": 255
+        }
+      },
+      "pass": true
+    },
+    {
+      "name": "real Save/download/reload/Open preserves exterior BG and export exclusion choice",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "physicalDevices": false
+}

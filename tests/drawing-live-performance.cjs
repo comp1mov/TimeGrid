@@ -22,14 +22,14 @@ const summarize = (a) => ({
     results = [];
   for (const config of process.env.LONG
     ? [
-        { version: 5, type: 'round', softness: 0 },
-        { version: 5, type: 'spray', softness: 70 },
+        { type: 'round', softness: 0 },
+        { type: 'spray', softness: 70 },
       ]
     : [
-        { version: 5, type: 'round', softness: 0 },
-        { version: 5, type: 'round', softness: 70 },
-        { version: 5, type: 'spray', softness: 0 },
-        { version: 5, type: 'spray', softness: 70 },
+        { type: 'round', softness: 0 },
+        { type: 'round', softness: 70 },
+        { type: 'spray', softness: 0 },
+        { type: 'spray', softness: 70 },
       ]) {
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
@@ -44,21 +44,31 @@ const summarize = (a) => ({
     );
     await page.evaluate(() => document.fonts.ready);
     await page.locator('#sizeNumber').fill('80');
-    if (config.version === 5) {
+    config.version = await page.evaluate(() => timegridLab.version);
+    {
       await page.selectOption('#brushType', config.type);
       await page.locator('#softness').fill(String(config.softness));
     }
-    await page.evaluate(() => {
-      for (const [id, value] of [
-        ['margin', '0'],
-        ['scatter', '100'],
-        ['dotScale', '100'],
-      ]) {
-        const e = document.getElementById(id);
-        e.value = value;
-        e.dispatchEvent(new Event('change'));
-      }
-    });
+    await page.evaluate(
+      (params) => {
+        for (const [id, value] of [
+          ['margin', '0'],
+          ['scatter', String(params.scatter)],
+          ['dotScale', String(params.dots)],
+          ['density', String(params.density)],
+        ]) {
+          const e = document.getElementById(id);
+          if (!e) continue;
+          e.value = value;
+          e.dispatchEvent(new Event('change'));
+        }
+      },
+      {
+        scatter: Number(process.env.SCATTER) || 150,
+        dots: Number(process.env.DOT_SCALE) || 100,
+        density: Number(process.env.DENSITY) || 100,
+      },
+    );
     await page.uncheck('#velocity');
     await page.evaluate(() => timegridLab.flush());
     const r = await page.evaluate(() => {
@@ -130,6 +140,11 @@ const summarize = (a) => ({
     const report = {
       config,
       samples,
+      brushSettings: {
+        scatter: Number(process.env.SCATTER) || 150,
+        dotScale: Number(process.env.DOT_SCALE) || 100,
+        density: Number(process.env.DENSITY) || 100,
+      },
       url: page.url(),
       live: Object.fromEntries(
         ['inputMs', 'geometryMs', 'renderMs', 'eventToRenderEndMs'].map((k) => [
