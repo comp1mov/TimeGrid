@@ -6,6 +6,8 @@
 
 ## 2026-10-27: TimeGrid 28.35.0-drawing.9
 
+Публикация подтверждена: source6d8a081, Pagesd5fea12. [Открыть .9](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.9/index.html). HTML200 совпал со сборкой, публичные импорт/штрих/Save прошли. [Результат](drawing-evidence/2026-10-27-drawing-9/publication.json).
+
 Ветка codex/drawing-engine. Первый перенос принятого движка perfect-freehand в обычный интерфейс TimeGrid. Один StrokeDocument schema7: произвольный aspect/count, устойчивые адреса источников, неизменяемые strokes/stamps/Fill и ограниченный raster cache. Удалены старые atlas, ImageData undo, отдельные mouse/touch/pen drawing pipelines и raster slots. Существующие импорт, sampling, Grid/Single и контролы сетки сохранены. MP4 использует ту же конверсию Spacing, что PNG. BG за краями входит в экспорт при включённом флаге, направляющие учитывают внешний рисунок.
 
 Desktop4строки; phone3строки152px, Save раскрывает файл и3пары слотов. Одна FRM/TPL/BG-кнопка,3цвета, общий Size/Opacity/Edge; подробные параметры всегда вDraw. Spray Dot50%, BGaboveON. Сохранены hotkeys, добавлены ShiftZ/CtrlShiftZ Redo; редактирование текстовых/числовых полей не отбираетUndo у поля. TPL/FRM/BG, Long/Trail, stationary hold,1F,Onion,Fill,clear,save/open,slots иэкспорт подключены к общему движку.
