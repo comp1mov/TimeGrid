@@ -1,3 +1,4 @@
+import { createDrawingPanel } from './drawing-panel.mjs';
 import { DrawingGesture } from './drawing-gesture.mjs';
 import { createFrameTiming } from './drawing-time.mjs';
 import {
@@ -13,7 +14,8 @@ import {
 } from './stroke-document.mjs';
 import { SpeedPressure } from './brush-geometry.mjs';
 import { StrokeTileCache } from './stroke-cache.mjs';
-export const APP_VERSION = '28.35.0-drawing.6';
+export const APP_VERSION = '28.35.0-drawing.7';
+let drawingPanel;
 const $ = (id) => document.getElementById(id),
   canvas = $('canvas'),
   ctx = canvas.getContext('2d', {
@@ -159,7 +161,7 @@ function fixture(c, r) {
   c.save();
   c.fillStyle = 'hsla(' + ((r.id * 31) % 360) + ',30%,32%,.28)';
   c.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
-  c.strokeStyle = r.id === activeFrame ? '#f5b2c3' : '#545969';
+  c.strokeStyle = r.id === activeFrame ? '#35f2a3' : '#545969';
   c.lineWidth = r.id === activeFrame ? 2 : 1;
   c.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
   c.fillStyle = '#b7bdcf';
@@ -200,7 +202,7 @@ function drawScene(c, region, ratio = dpr, renderer = cache) {
   c.beginPath();
   c.rect(region.x, region.y, region.w, region.h);
   c.clip();
-  c.fillStyle = '#1a1c25';
+  c.fillStyle = '#282828';
   c.fillRect(region.x, region.y, region.w, region.h);
   if (!$('bgAbove').checked)
     renderer.draw(c, 'bg-' + view, compositionRect, ratio, region);
@@ -284,8 +286,22 @@ function updateButtons() {
   $('undo').disabled = !doc?.undoStack.length && gesture?.mode !== 'draw';
   $('redo').disabled = !doc?.redoStack.length;
   const c = cache?.stats();
+  $('status').textContent =
+    message ||
+    $('target').value.toUpperCase() +
+      ' · ' +
+      ($('brushOff').checked
+        ? 'Brush off'
+        : $('tool').value === 'erase'
+          ? 'Eraser'
+          : $('brushType').value === 'spray'
+            ? 'Spray'
+            : 'Round') +
+      ($('oneFrame').checked ? ' · 1F' : '') +
+      ($('onion').checked ? ' · Onion' : '') +
+      ($('longStroke').checked ? ' · Long ' + $('trail').value : '');
   if (c)
-    $('status').textContent =
+    $('diagnostics').textContent =
       (message ? message + ' · ' : '') +
       doc.strokes.length +
       ' operations · ' +
@@ -645,6 +661,7 @@ function syncBrushControls(source) {
     ' frame px · ' +
     (Number($('size').value) * scale).toFixed(1) +
     ' px on screen';
+  drawingPanel?.sync();
 }
 $('size').oninput = () => syncBrushControls('range');
 $('sizeNumber').oninput = () => syncBrushControls('number');
@@ -946,7 +963,7 @@ function exportCanvas() {
   const c = out.getContext('2d'),
     exportCache = new StrokeTileCache(doc, { budget: 4 * 1024 * 1024 });
   if (!$('transparent').checked) {
-    c.fillStyle = '#1a1c25';
+    c.fillStyle = '#282828';
     c.fillRect(0, 0, out.width, out.height);
   }
   const viewport = { x: 0, y: 0, w: out.width, h: out.height };
@@ -1222,6 +1239,8 @@ document.fonts.ready.then(() => {
   fullDirty = true;
   schedule();
 });
+drawingPanel = createDrawingPanel({ change: changeControl, finish });
+drawingPanel.sync();
 setDocument(new StrokeDocument());
 new ResizeObserver(resize).observe($('stage'));
 window.addEventListener('scroll', measureRect, { passive: true });

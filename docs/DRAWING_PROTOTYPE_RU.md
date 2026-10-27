@@ -1,12 +1,33 @@
-# Drawing Lab 28.35.0-drawing.6
+# Drawing Lab 28.35.0-drawing.7
 
-27 октября 2026. Ветка codex/drawing-engine. [Тестовая ссылка](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.6/drawing-lab.html). [Проверки и сырые данные](drawing-evidence/2026-10-27-drawing-6/README.md). [Исходный аудит механики](DRAWING_BEHAVIOR_AUDIT_RU.md).
+27 октября 2026. Ветка codex/drawing-engine. [Тестовая ссылка](https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.7/drawing-lab.html). [Проверки и сырые данные](drawing-evidence/2026-10-27-drawing-7/README.md). [Исходный аудит механики](DRAWING_BEHAVIOR_AUDIT_RU.md).
 
 ## Граница выпуска
 
-Один прежний стенд, новый временной движок и coordinator ввода. Ordinary TimeGrid остаётся drawing.2, stable 28.34 и Cloud не обновлены. Сохраняются BG/TPL/FRM, Single/Grid как виды, принятая perfect-freehand Round и её Stabilizer/Edge smoothing. Настройки находятся в открытых группах Brush, Drawing, Grid & time, Files & export. На desktop справа, на mobile ниже холста. Spray-параметры показаны только для Spray. Шрифт остаётся Inter.
+Один прежний стенд, новый временной движок и coordinator ввода. Ordinary TimeGrid остаётся drawing.2, stable 28.34 и Cloud не обновлены. Сохраняются BG/TPL/FRM, Single/Grid как виды, принятая perfect-freehand Round и её Stabilizer/Edge smoothing. В .7 компактная панель использует Inter, тёмную поверхность и зелёный accent TimeGrid. В портретном положении панель закреплена под холстом, в низком горизонтальном окне справа. Это панель того же Lab, не редизайн основного приложения. Подробности в Menu; группы внутри него не требуют раскрытия.
 
 Реализованы stationary hold, настоящее изменение адресов в Grid, Long Stroke/Trail, 1F, Onion, Apply TPL, поля BG, порядок BG, перестройка колонок/gaps, scatter/dot size и временный image-sequence preview. Это ещё не перенос всех панелей и всего media workflow TimeGrid.
+
+## Панель .7 и распределение контролов
+
+| Место | Контролы и смысл |
+| --- | --- |
+| Верхняя строка вида | Grid/Single, Play, соседний tick и его номер, Fit; отдельные Zoom кнопки на широкой области |
+| Панель, инструмент | Round/Spray, Eraser, одна кнопка FRM → TPL → BG; Q/W/E выбирают цель напрямую |
+| Панель, цвет | Три выбираемых образца; picker с плюсом изменяет выбранный образец. Начальные white/red/black, текущий цвет white |
+| Панель, параметр | Один видимый Size/Opacity/Edge; выбор через подпись, slider и числовое значение. Значения независимы |
+| Панель, действия | Undo/Redo, Save, Clear, Long, Draw/Off. Включённый Long показывает Trail |
+| Menu / Brush | Stabilizer, Edge smoothing для hard Round, pressure/speed, Spray scatter/dot/density только для Spray |
+| Menu / Draw | 1F, Onion, Trail при включённом Long, Show TPL, Apply TPL при цели TPL, BG order при цели BG, Brush off, finger input, Open |
+| Menu / Grid & time | Columns/gap/margins, FPS/direction/pattern/loop/offset/phases |
+| Menu / Preview & export | Временная image sequence, generated frames, размер PNG, Export BG, alpha, PNG export |
+| Menu / What to test | Пояснения, карта версий, ссылки и benchmark; диагностика памяти рядом |
+
+Clear сохраняет прежнюю семантику: FRM очищает рисунки всех96 кадров, TPL шаблон, BG фон текущего вида. Tooltip/accessible name и пояснение Menu показывают область удаления; Undo восстанавливает всё действие. Save скачивает тот же файл рисунков schema5, Open находится в Menu / Draw. Слотов основного приложения в Lab прежде не было; они не реализованы этим выпуском.
+
+Три цвета и выбранный параметр являются настройками текущей сессии панели, не частью файла рисунка; после перезагрузки начальные значения возвращаются. Геометрия штрихов сохраняет использованные цвета. История Undo остаётся в сеансе. Ни рисование, ни временная механика не заменены новым обработчиком: отдельный presentation module использует прежние controls; повторная синхронизация панели без изменения состояния не пишет DOM.
+
+Escape при открытом Menu сначала закрывает его и возвращает фокус к Menu. При закрытом меню действует прежний Brush Off. На телефоне панель не закрывает canvas. В 390×844: panel374×152, canvas390×569 (эмуляция без browser chrome/safe-area). Устройства320×568 и844×390 также проверены. Реальные размеры браузера телефона могут отличаться.
 
 ## Разделение ответственности
 
@@ -18,6 +39,7 @@
 | stroke-document.mjs | Immutable operations, placements, сериализация/валидация, история и изолированный TPL bake |
 | stroke-cache.mjs | Sparse tiles, LOD, invalidation, дописывание новых операций в готовые tiles |
 | drawing-lab.mjs | Pointer Events, часы playback, представление, настройки, файлы и PNG |
+| drawing-panel.mjs | Компактная панель, переключатели и Menu поверх прежних controls, без нового хранения штрихов |
 
 Stable пока не импортирует новый адаптер. Формулировка «общая модель» означает выделенное проверенное ядро для будущего подключения, а не уже выполненный перенос в main.
 
@@ -102,6 +124,6 @@ PNG использует текущие layout, tick, TPL visibility и BG order
 
 ## Доказательства и следующий шаг
 
-50 unit tests,61 browser checks (28temporal,13extended,9quality,11workspace) и один отдельный реальный .4 compatibility check. Точное совпадение timing с замороженными исходными функциями 28.34 в 20 736 случаях. Физических устройств в этом перечне нет. Методика и сырые данные доступны по ссылке в начале.
+Для .7: 50 unit tests,72 browser checks (28temporal,13extended,9quality,11workspace,11panel). Старая .5 BG-геометрия проверяется в workspace; отдельный .4-file check ранее проведён для .6 и не объявляется новым замером .7. Точное совпадение timing с замороженными исходными функциями 28.34 в 20 736 случаях. Физических устройств в этом перечне нет. Методика и сырые данные доступны по ссылке в начале.
 
-Следующий пользовательский шаг: проверить ощущение кисти и temporal workflow на настоящем touchscreen/пере. Следующий этап разработки: заливка внутри нарисованной замкнутой фигуры с отдельным Undo и воспроизводимым сохранением. Затем legacy migration и согласованный перенос в основной TimeGrid. Полный проект и proxy идут после этого, по общему плану.
+Следующий пользовательский шаг: проверить ощущение кисти и temporal workflow на настоящем телефоне/touchscreen/пере. Предложенные правила заливки внутри замкнутой нарисованной фигуры записаны в [едином плане](D:/Antigravity/TimeGrid/docs/DEVELOPMENT_PLAN_RU.md); реализация ещё не согласована. Автор 27 октября сообщил, что старых рисунков нет и их перенос не нужен. Legacy raster migration исключена из обязательной очереди; существующие readers файлов Lab сохраняются. Затем отдельное согласование переноса движка в основной TimeGrid. Панель .7 реализована в Lab по поручению автора; перенос её и движка в основной app требует отдельной проверки интеграции. Полный проект и proxy идут дальше.

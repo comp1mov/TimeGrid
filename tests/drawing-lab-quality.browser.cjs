@@ -236,8 +236,10 @@ fs.mkdirSync(out, { recursive: true });
     400 + (i % 2 ? 20 : -20),
   ]);
   await page.locator('#sizeNumber').fill('16');
+  await page.locator('#settingsToggle').click();
   await page.locator('#streamline').fill('90');
   await page.locator('#smooth').fill('20');
+  await page.locator('#settingsClose').click();
   const stabilized = await draw(zig);
   assert.equal(stabilized.brush.streamline, 0.9);
   assert.equal(stabilized.brush.smoothing, 0.2);
@@ -261,7 +263,9 @@ fs.mkdirSync(out, { recursive: true });
     last: true,
   });
   assert.notDeepEqual(stabilized.outline, noStabilizer);
+  await page.locator('#settingsToggle').click();
   await page.locator('#smooth').fill('100');
+  await page.locator('#settingsClose').click();
   const smooth = await draw(zig);
   assert.equal(smooth.brush.smoothing, 1);
   assert.deepEqual(
@@ -283,7 +287,7 @@ fs.mkdirSync(out, { recursive: true });
   legacy.schema = 1;
   // Use a real schema-1-compatible local geometry, then compare its old lineTo raster.
   legacy.strokes = [structuredClone(narrow)];
-  legacy.strokes[0].surface='frame-0';
+  legacy.strokes[0].surface = 'frame-0';
   delete legacy.strokes[0].space;
   delete legacy.strokes[0].placements;
   delete legacy.strokes[0].renderer;
@@ -413,7 +417,9 @@ fs.mkdirSync(out, { recursive: true });
 
   // Real browser input protocol, synthetic pen. It cannot replace hardware testing.
   await page.evaluate(() => timegridLab.reset());
+  await page.locator('#settingsToggle').click();
   await page.locator('#streamline').fill('50');
+  await page.locator('#settingsClose').click();
   await page.locator('#sizeNumber').fill('60');
   const penRect = await page.evaluate(() => {
     const b = document.querySelector('#canvas').getBoundingClientRect(),

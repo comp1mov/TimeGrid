@@ -1,0 +1,126 @@
+{
+  "date": "2026-10-27T02:51:22.884Z",
+  "version": "28.35.0-drawing.7",
+  "url": "file:///C:/Users/gregt/.codex/worktrees/timegrid-drawing/TimeGrid/.drawing-lab-build/drawing-lab.html",
+  "browser": "156.0.4314.42",
+  "checks": [
+    {
+      "name": "single target button cycles FRM/TPL/BG and stays synchronized with hotkeys",
+      "pass": true
+    },
+    {
+      "name": "one parameter row keeps independent size, opacity and edge values",
+      "pass": true
+    },
+    {
+      "name": "three direct colors; editing selected color retains the other slots",
+      "pass": true
+    },
+    {
+      "name": "visible controls produce corresponding color, size, opacity and softness in actual native stroke",
+      "pass": true
+    },
+    {
+      "name": "eraser toggle and Draw/Off route through existing input mechanics",
+      "pass": true
+    },
+    {
+      "name": "Long is direct; Trail changes reflected in button; Escape closes menu without disabling drawing",
+      "pass": true
+    },
+    {
+      "name": "actual Save download, Clear, Undo/Redo and Open restore geometry and Long/Trail settings",
+      "pass": true
+    },
+    {
+      "name": "existing brush, temporal, input, grid and export controls remain available without duplicate state",
+      "pass": true
+    },
+    {
+      "name": "phone no overflow, reachable actions and actual touch target/color/Long/menu controls",
+      "pass": true,
+      "data": {
+        "width": 390,
+        "scroll": 390,
+        "canvas": {
+          "x": 0,
+          "y": 92,
+          "width": 390,
+          "height": 569,
+          "top": 92,
+          "right": 390,
+          "bottom": 661,
+          "left": 0
+        },
+        "panel": {
+          "x": 8,
+          "y": 667,
+          "width": 374,
+          "height": 152,
+          "top": 667,
+          "right": 382,
+          "bottom": 819,
+          "left": 8
+        }
+      }
+    },
+    {
+      "name": "small-phone no overflow, reachable actions and actual touch target/color/Long/menu controls",
+      "pass": true,
+      "data": {
+        "width": 320,
+        "scroll": 320,
+        "canvas": {
+          "x": 0,
+          "y": 92,
+          "width": 320,
+          "height": 295,
+          "top": 92,
+          "right": 320,
+          "bottom": 387,
+          "left": 0
+        },
+        "panel": {
+          "x": 8,
+          "y": 393,
+          "width": 304,
+          "height": 150,
+          "top": 393,
+          "right": 312,
+          "bottom": 543,
+          "left": 8
+        }
+      }
+    },
+    {
+      "name": "landscape no overflow, reachable actions and actual touch target/color/Long/menu controls",
+      "pass": true,
+      "data": {
+        "width": 844,
+        "scroll": 844,
+        "canvas": {
+          "x": 0,
+          "y": 94,
+          "width": 552,
+          "height": 271,
+          "top": 94,
+          "right": 552,
+          "bottom": 365,
+          "left": 0
+        },
+        "panel": {
+          "x": 558,
+          "y": 94,
+          "width": 280,
+          "height": 194,
+          "top": 94,
+          "right": 838,
+          "bottom": 288,
+          "left": 558
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "physicalDevices": false
+}

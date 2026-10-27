@@ -47,6 +47,8 @@ const summarize = (a) => ({
     config.version = await page.evaluate(() => timegridLab.version);
     {
       await page.selectOption('#brushType', config.type);
+      if (await page.locator('#parameter').count())
+        await page.selectOption('#parameter', 'softness');
       await page.locator('#softness').fill(String(config.softness));
     }
     await page.evaluate(

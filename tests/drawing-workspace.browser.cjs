@@ -100,6 +100,7 @@ const out =
   check(
     'TimeGrid physical shortcuts, including Russian key value, toggle play/view/targets/brush/time/columns',
   );
+  await p.locator('#settingsToggle').click();
   await p.locator('#columns').focus();
   await p.keyboard.press('ArrowUp');
   assert.equal(await get('columns'), '9');
@@ -107,6 +108,7 @@ const out =
   await p.keyboard.press('Control+BracketLeft');
   assert.equal(await get('opacity'), '90');
   await focus();
+  await p.locator('#settingsClose').click();
   check(
     'number input retains arrows and modified keys without triggering canvas actions',
   );
@@ -259,7 +261,9 @@ const out =
   await set('brushType', 'spray');
   await set('size', 100);
   assert.equal(await get('dotScale'), '100');
+  await p.locator('#settingsToggle').click();
   assert.equal(await p.locator('#sprayControls').isVisible(), true);
+  await p.locator('#settingsClose').click();
   const densityCounts = [];
   for (const density of [10, 100, 300]) {
     await p.evaluate(() => timegridLab.reset());
@@ -298,7 +302,7 @@ const out =
     viewport: innerWidth,
     stage: document.getElementById('stage').getBoundingClientRect().toJSON(),
     settings: document
-      .querySelector('.controls')
+      .querySelector('.draw-palette')
       .getBoundingClientRect()
       .toJSON(),
   }));
@@ -308,7 +312,7 @@ const out =
   );
   await mobile.screenshot({ path: out + '/mobile.png', fullPage: true });
   check(
-    '390px layout exposes canvas before grouped settings, without horizontal overflow',
+    '390px layout keeps compact palette below canvas, without horizontal overflow',
     mobileSize,
   );
 
