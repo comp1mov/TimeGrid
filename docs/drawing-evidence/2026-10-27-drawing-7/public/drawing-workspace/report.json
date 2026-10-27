@@ -1,0 +1,153 @@
+{
+  "date": "2026-10-27T02:55:22.422Z",
+  "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.7/drawing-lab.html",
+  "browser": "156.0.4314.42",
+  "checks": [
+    {
+      "name": "TimeGrid physical shortcuts, including Russian key value, toggle play/view/targets/brush/time/columns",
+      "pass": true
+    },
+    {
+      "name": "number input retains arrows and modified keys without triggering canvas actions",
+      "pass": true
+    },
+    {
+      "name": "wheel anchors zoom at cursor, right drag pans, F resets fit",
+      "pass": true
+    },
+    {
+      "name": "grid round exterior BG on all four sides, erase/undo/rebuild/open, include/exclude export",
+      "data": {
+        "crop": {
+          "x": 376.1733190678463,
+          "y": 71.91309619928941,
+          "w": 690.6450994758982,
+          "h": 594.5678071377992
+        },
+        "base": {
+          "x": 405.15466638513516,
+          "y": 100.92578125000006,
+          "w": 629.6906672297297,
+          "h": 533.5546874999999
+        },
+        "ink": 7885,
+        "cacheBytes": 1081600
+      },
+      "pass": true
+    },
+    {
+      "name": "grid spray exterior BG on all four sides, erase/undo/rebuild/open, include/exclude export",
+      "data": {
+        "crop": {
+          "x": 363.2866323101972,
+          "y": 59.22740172661682,
+          "w": 715.1553715462557,
+          "h": 618.9640639224581
+        },
+        "base": {
+          "x": 405.15466638513516,
+          "y": 100.92578125000006,
+          "w": 629.6906672297297,
+          "h": 533.5546874999999
+        },
+        "ink": 25178,
+        "cacheBytes": 1622400
+      },
+      "pass": true
+    },
+    {
+      "name": "single round exterior BG on all four sides, erase/undo/rebuild/open, include/exclude export",
+      "data": {
+        "crop": {
+          "x": 201.0458820251739,
+          "y": -5.368143815142204,
+          "w": 1041.405295623434,
+          "h": 748.8899765998486
+        },
+        "base": {
+          "x": 297.6025390625,
+          "y": 100.92578125,
+          "w": 844.794921875,
+          "h": 533.5546875
+        },
+        "ink": 308902,
+        "cacheBytes": 2704000
+      },
+      "pass": true
+    },
+    {
+      "name": "single spray exterior BG on all four sides, erase/undo/rebuild/open, include/exclude export",
+      "data": {
+        "crop": {
+          "x": 72.72242083358765,
+          "y": -162.6859899495442,
+          "w": 1306.6554430971144,
+          "h": 1052.8892162679035
+        },
+        "base": {
+          "x": 297.6025390625,
+          "y": 100.92578125,
+          "w": 844.794921875,
+          "h": 533.5546875
+        },
+        "ink": 385615,
+        "cacheBytes": 8652800
+      },
+      "pass": true
+    },
+    {
+      "name": "Spray default dots100%, density changes particle count, controls only appear for Spray",
+      "data": [
+        9,
+        90,
+        270
+      ],
+      "pass": true
+    },
+    {
+      "name": "390px layout keeps compact palette below canvas, without horizontal overflow",
+      "data": {
+        "body": 390,
+        "viewport": 390,
+        "stage": {
+          "x": 0,
+          "y": 92,
+          "width": 390,
+          "height": 569,
+          "top": 92,
+          "right": 390,
+          "bottom": 661,
+          "left": 0
+        },
+        "settings": {
+          "x": 8,
+          "y": 667,
+          "width": 374,
+          "height": 152,
+          "top": 667,
+          "right": 382,
+          "bottom": 819,
+          "left": 8
+        }
+      },
+      "pass": true
+    },
+    {
+      "name": "actual .5 BG edge raster stays identical; mixed legacy/new BG clips only old geometry",
+      "data": {
+        "legacyPngSHA256": "36af8dec9feb9be06acc2aa50a6cb403f99671efc1b4e26f4d724c2cd55112d8",
+        "mixed": {
+          "legacyOutside": 0,
+          "newOutside": 255
+        }
+      },
+      "pass": true
+    },
+    {
+      "name": "real Save/download/reload/Open preserves exterior BG and export exclusion choice",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "physicalDevices": false
+}

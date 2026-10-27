@@ -12,7 +12,7 @@
 - production/drawing-panel:11 checks. Direct controls, saved stroke styles, actual download/Clear/Undo/Redo/Open, contextual controls and three viewport touch flows.
 - Screenshots in production/drawing-panel were visually inspected. Browser menu uses existing TimeGrid colors/font; no production app restyle.
 - live/results.json:240rAF samples per brush at1440×1000 on Edge. Render p95:Round3.7ms,softRound1.0ms,Spray1.4ms,softSpray1.6ms. New larger canvas, not a strict A/B.
-- Preview screenshots in preview/ document development inspection; production/ contains final checks. Public verification is recorded after publication.
+- Preview screenshots in preview/ document development inspection; production/ contains final checks. Public verification:22 checks passed (public/drawing-panel and public/drawing-workspace). Source eba3178, Pages18b108a. deployment.json records matching build/public SHA256, license200 responses, missing ordinary index404 and unchanged .6 hash.
 
 ## Limits
 

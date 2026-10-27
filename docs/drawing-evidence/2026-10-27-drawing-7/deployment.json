@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-27T02:54:51.260Z",
+  "source": "eba3178",
+  "pages": "18b108a",
+  "rows": [
+    {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.7/drawing-lab.html",
+      "status": 200,
+      "hash": "8e83aace83b428c4bda247dffe0ff876410dd1800fa08d693b80548958575e2d",
+      "has7": true
+    },
+    {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.7/licenses/perfect-freehand.txt",
+      "status": 200,
+      "hash": "6a5ac82b42ce0af6a1e5fe39b46f0b52f1368e81e437175e8d9ae21569c8688e",
+      "has7": false
+    },
+    {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.7/licenses/inter-OFL.txt",
+      "status": 200,
+      "hash": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
+      "has7": false
+    },
+    {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.7/index.html",
+      "status": 404,
+      "hash": "b620507312c5e97566a3c6cfaf99144fefc18a0da7d941401dfa0f5f58fb0368",
+      "has7": false
+    },
+    {
+      "url": "https://comp1mov.github.io/TimeGrid/drawing/28.35.0-drawing.6/drawing-lab.html",
+      "status": 200,
+      "hash": "1f88f08af866832491eb3e962411be8f386ed2151cd2460438aecc445323ca5e",
+      "has7": false
+    },
+    {
+      "url": "https://comp1mov.github.io/TimeGrid/",
+      "status": 200,
+      "hash": "0f1b5404e72f056dc33615d057121e11537764a0a226aaf40217479bb4ac1596",
+      "has7": true
+    }
+  ],
+  "localHash": "8e83aace83b428c4bda247dffe0ff876410dd1800fa08d693b80548958575e2d",
+  "match": true,
+  "publicBrowserChecks": 22,
+  "publicSuites": [
+    "drawing-panel",
+    "drawing-workspace"
+  ],
+  "commitStatuses": []
+}

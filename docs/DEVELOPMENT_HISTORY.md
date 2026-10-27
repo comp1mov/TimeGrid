@@ -14,6 +14,8 @@ Clear сохраняет прежнюю область удаления: все9
 
 Новый live замер:240rAF samples,96frames,viewport1440×1000,size80,scatter150/dot100/density100. Render p95 Round3.7ms,softRound1.0ms,Spray1.4ms,softSpray1.6ms. Холст стал больше; это не строгое A/B и не улучшение скорости относительно .6. Исходные geometry/cache/time modules не менялись. Мягкие кисти сохраняют fixed stamps; панель не синхронизирует DOM без изменения её состояния.
 
+Публикация проверена: source eba3178, Pages18b108a; public HTML совпадает со сборкой, SHA2568e83aace83b428c4bda247dffe0ff876410dd1800fa08d693b80548958575e2d. На публичной ссылке прошли22browser checks:11panel +11workspace. Лицензии200, ordinary index.html в папке .7 отсутствует404. .6 сохранил прежний SHA2561f88f08af866832491eb3e962411be8f386ed2151cd2460438aecc445323ca5e. Vercel deployment отключён для drawing/gh-pages; список commit statuses записан в deployment.json.
+
 [Evidence .7](drawing-evidence/2026-10-27-drawing-7/README.md). Заливки ещё нет. Следующий шаг: авторская проверка компактной панели на телефоне, затем согласованная заливка в Lab и отдельно интеграция в обычный TimeGrid drawing-ветки. Старые растровые рисунки мигрировать не требуется.
 
 ## 2026-10-27: Уточнение очереди после .6, только документация
